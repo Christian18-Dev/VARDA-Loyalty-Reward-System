@@ -1,4 +1,4 @@
-import { BrowserRouter as Router, Routes, Route, Navigate } from 'react-router-dom';
+import { HashRouter as Router, Routes, Route, Navigate } from 'react-router-dom';
 import { useAuth } from './context/AuthContext';
 
 import Login from './pages/Auth/Login';
@@ -16,7 +16,7 @@ function ProtectedRoute({ children, role }) {
 
 function App() {
   return (
-    <Router basename="/VARDA-Loyalty-Reward-System">
+    <Router>
       <Routes>
         <Route path="/" element={<Navigate to="/login" />} />
         <Route path="/login" element={<Login />} />
