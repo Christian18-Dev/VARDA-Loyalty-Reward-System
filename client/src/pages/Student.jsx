@@ -82,7 +82,7 @@ export default function StudentPage() {
 
   const handleLogout = () => {
     localStorage.removeItem('user');
-    window.location.href = '/VARDA-Loyalty-Reward-System/login';
+    window.location.href = `${window.location.origin}/VARDA-Loyalty-Reward-System/#/login`;
   };
 
   const submitFeedback = async () => {
@@ -210,7 +210,6 @@ export default function StudentPage() {
                 transformStyle: "preserve-3d"
               }}
             >
-
               {/* Card Content */}
               <div className="relative z-10 flex flex-col justify-between h-full">
                 {/* Card issuer and chip */}
@@ -427,7 +426,7 @@ export default function StudentPage() {
         >
           <h3 className="text-2xl font-bold text-green-600">🎉 Congrats!</h3>
           <p className="text-gray-800">
-            You’ve successfully claimed:
+            You've successfully claimed:
             <br />
             <span className="font-bold text-purple-800">{claimedRewardName}</span>
           </p>
@@ -503,30 +502,29 @@ export default function StudentPage() {
       </nav>
 
       {/* Logout Confirmation Modal */}
-{showLogoutModal && (
-  <div className="fixed inset-0 bg-black/40 backdrop-blur-sm flex items-center justify-center z-50">
-    <div className="bg-white rounded-2xl p-6 w-80 shadow-2xl space-y-4">
-      <h2 className="text-lg font-bold text-gray-800">Confirm Logout</h2>
-      <p className="text-sm text-gray-500">Are you sure you want to log out?</p>
+      {showLogoutModal && (
+        <div className="fixed inset-0 bg-black/40 backdrop-blur-sm flex items-center justify-center z-50">
+          <div className="bg-white rounded-2xl p-6 w-80 shadow-2xl space-y-4">
+            <h2 className="text-lg font-bold text-gray-800">Confirm Logout</h2>
+            <p className="text-sm text-gray-500">Are you sure you want to log out?</p>
 
-      <div className="flex justify-end space-x-4 pt-4">
-        <button 
-          onClick={() => setShowLogoutModal(false)}
-          className="px-4 py-2 text-sm rounded-full border border-gray-300 text-gray-700 hover:bg-gray-100 transition-all"
-        >
-          Cancel
-        </button>
-        <button 
-          onClick={handleLogout}
-          className="px-4 py-2 text-sm rounded-full bg-red-500 text-white hover:bg-red-400 transition-all"
-        >
-          Logout
-        </button>
-      </div>
-    </div>
-  </div>
-)}
-
+            <div className="flex justify-end space-x-4 pt-4">
+              <button 
+                onClick={() => setShowLogoutModal(false)}
+                className="px-4 py-2 text-sm rounded-full border border-gray-300 text-gray-700 hover:bg-gray-100 transition-all"
+              >
+                Cancel
+              </button>
+              <button 
+                onClick={handleLogout}
+                className="px-4 py-2 text-sm rounded-full bg-red-500 text-white hover:bg-red-400 transition-all"
+              >
+                Logout
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   );
 }
