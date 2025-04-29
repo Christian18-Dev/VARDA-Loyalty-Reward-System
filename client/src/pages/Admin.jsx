@@ -15,23 +15,25 @@ export default function AdminPage() {
   const [mobileMenuOpen, setMobileMenuOpen] = useState(false);
 
   const token = user.token;
+  const baseUrl = import.meta.env.VITE_API_BASE_URL;
 
   useEffect(() => {
     const fetchData = async () => {
       try {
         setIsLoading(true);
+
         const [statsRes, usersRes, claimedRes] = await Promise.all([
-          axios.get('http://localhost:5000/api/admin/stats', {
+          axios.get(`${baseUrl}/api/admin/stats`, {
             headers: { Authorization: `Bearer ${token}` },
           }),
-          axios.get('http://localhost:5000/api/admin/users', {
+          axios.get(`${baseUrl}/api/admin/users`, {
             headers: { Authorization: `Bearer ${token}` },
           }),
-          axios.get('http://localhost:5000/api/admin/claimed-rewards', {
+          axios.get(`${baseUrl}/api/admin/claimed-rewards`, {
             headers: { Authorization: `Bearer ${token}` },
           })
         ]);
-        
+
         setStats(statsRes.data);
         setUsers(usersRes.data);
         setClaimedRewards(claimedRes.data);
@@ -43,17 +45,17 @@ export default function AdminPage() {
     };
 
     fetchData();
-  }, [token]);
+  }, [token, baseUrl]);
 
   const handleCreateReward = async () => {
     if (!rewards.name.trim() || !rewards.cost) {
       alert('Please fill all fields');
       return;
     }
-    
+
     try {
       await axios.post(
-        'http://localhost:5000/api/admin/reward',
+        `${baseUrl}/api/admin/reward`,
         rewards,
         { headers: { Authorization: `Bearer ${token}` } }
       );

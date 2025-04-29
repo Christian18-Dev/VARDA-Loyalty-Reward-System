@@ -3,6 +3,8 @@ import { useNavigate } from 'react-router-dom';
 import { useAuth } from '../../context/AuthContext';
 import axios from 'axios';
 
+const API_BASE_URL = import.meta.env.VITE_API_BASE_URL;
+
 export default function Register() {
   const [name, setName] = useState('');
   const [password, setPassword] = useState('');
@@ -12,7 +14,7 @@ export default function Register() {
   const handleSubmit = async (e) => {
     e.preventDefault();
     try {
-      const { data } = await axios.post('http://localhost:5000/api/auth/register', {
+      const { data } = await axios.post(`${API_BASE_URL}/api/auth/register`, {
         name,
         password,
       });

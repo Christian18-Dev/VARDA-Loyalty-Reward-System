@@ -8,15 +8,17 @@ export default function CashierPage() {
   const [studentId, setStudentId] = useState('');
   const [claimedRewards, setClaimedRewards] = useState([]);
 
+  const baseUrl = import.meta.env.VITE_API_BASE_URL;
+  const token = user.token;
+
   const handleGenerateCode = async () => {
     try {
-      const token = user.token; // assuming you're getting `user` from context
       const res = await axios.post(
-        'http://localhost:5000/api/cashier/generate-code',
+        `${baseUrl}/api/cashier/generate-code`,
         {}, // empty body
         {
           headers: {
-            Authorization: `Bearer ${token}`, // this is the key!
+            Authorization: `Bearer ${token}`,
           },
         }
       );
@@ -26,14 +28,16 @@ export default function CashierPage() {
       alert('Error generating code');
     }
   };
-  
-  
+
   const fetchClaimed = async () => {
-    const token = user.token;
-    const res = await axios.get('http://localhost:5000/api/cashier/claimed-rewards', {
-      headers: { Authorization: `Bearer ${token}` },
-    });
-    setClaimedRewards(res.data);
+    try {
+      const res = await axios.get(`${baseUrl}/api/cashier/claimed-rewards`, {
+        headers: { Authorization: `Bearer ${token}` },
+      });
+      setClaimedRewards(res.data);
+    } catch (err) {
+      console.error('Error fetching claimed rewards:', err);
+    }
   };
 
   useEffect(() => {

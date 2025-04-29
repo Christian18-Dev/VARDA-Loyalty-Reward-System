@@ -1,7 +1,7 @@
 import { useEffect, useState } from 'react';
 import axios from 'axios';
 import { useAuth } from '../context/AuthContext';
-import { HomeIcon, TicketIcon, GiftIcon, LogoutIcon} from '@heroicons/react/outline';
+import { HomeIcon, TicketIcon, GiftIcon, LogoutIcon } from '@heroicons/react/outline';
 import { motion } from 'framer-motion';
 import confetti from 'canvas-confetti';
 
@@ -21,18 +21,20 @@ export default function StudentPage() {
   const [claimTime, setClaimTime] = useState('');
   const [showLogoutModal, setShowLogoutModal] = useState(false);
 
+  const baseUrl = import.meta.env.VITE_API_BASE_URL;
+
   useEffect(() => {
     const fetchData = async () => {
       setIsLoading(true);
       try {
         const token = user.token;
         const [pointsRes, rewardsRes] = await Promise.all([
-          axios.get('http://localhost:5000/api/student/points', {
+          axios.get(`${baseUrl}/api/student/points`, {
             headers: { Authorization: `Bearer ${token}` },
           }),
-          axios.get('http://localhost:5000/api/rewards', {
+          axios.get(`${baseUrl}/api/rewards`, {
             headers: { Authorization: `Bearer ${token}` },
-          })
+          }),
         ]);
         setPoints(pointsRes.data.points);
         setRewards(rewardsRes.data);
@@ -57,7 +59,7 @@ export default function StudentPage() {
       setIsLoading(true);
       const token = user.token;
       const response = await axios.post(
-        'http://localhost:5000/api/student/claim-code',
+        `${baseUrl}/api/student/claim-code`,
         { code },
         { headers: { Authorization: `Bearer ${token}` } }
       );
@@ -65,11 +67,7 @@ export default function StudentPage() {
       setShowFeedback(true);
       setErrorMessage('');
       setSuccessMessage('Code accepted! Please rate your experience.');
-      confetti({
-        particleCount: 100,
-        spread: 70,
-        origin: { y: 0.6 }
-      });
+      confetti({ particleCount: 100, spread: 70, origin: { y: 0.6 } });
     } catch (error) {
       console.error('Error submitting code:', error);
       if (error.response && error.response.status === 400) {
@@ -83,11 +81,9 @@ export default function StudentPage() {
   };
 
   const handleLogout = () => {
-    localStorage.removeItem('user'); // or your auth token/session
-    // Redirect to login page or homepage
-    window.location.href = '/VARDA-Loyalty-Reward-System/login'; 
+    localStorage.removeItem('user');
+    window.location.href = '/VARDA-Loyalty-Reward-System/login';
   };
-  
 
   const submitFeedback = async () => {
     if (!rating) {
@@ -99,26 +95,22 @@ export default function StudentPage() {
       setIsLoading(true);
       const token = user.token;
       await axios.post(
-        'http://localhost:5000/api/student/submit-feedback',
+        `${baseUrl}/api/student/submit-feedback`,
         { code, rating },
         { headers: { Authorization: `Bearer ${token}` } }
       );
 
-      const updated = await axios.get('http://localhost:5000/api/student/points', {
+      const updated = await axios.get(`${baseUrl}/api/student/points`, {
         headers: { Authorization: `Bearer ${token}` },
       });
-      
+
       setPoints(updated.data.points);
-      setSuccessMessage(`Feedback submitted!`);
+      setSuccessMessage('Feedback submitted!');
       setShowFeedback(false);
       setCode('');
       setRating(0);
-      
-      confetti({
-        particleCount: rating * 20,
-        spread: 70,
-        origin: { y: 0.6 }
-      });
+
+      confetti({ particleCount: rating * 20, spread: 70, origin: { y: 0.6 } });
 
       setTimeout(() => setSuccessMessage(''), 3000);
     } catch (err) {
@@ -132,45 +124,37 @@ export default function StudentPage() {
   const claimReward = async (rewardId) => {
     try {
       setIsLoading(true);
-  
+
       const response = await axios.post(
-        `http://localhost:5000/api/student/claim-reward/${rewardId}`,
+        `${baseUrl}/api/student/claim-reward/${rewardId}`,
         {},
         { headers: { Authorization: `Bearer ${user.token}` } }
       );
-  
+
       setPoints(response.data.newPoints);
-  
-      // Set claimed reward name for modal
+
       const claimed = rewards.find((r) => r._id === rewardId);
       setClaimedRewardName(claimed?.name || 'Reward');
-      setClaimTime(new Date().toLocaleString()); 
-      // Show congrats modal
+      setClaimTime(new Date().toLocaleString());
       setShowClaimModal(true);
-  
-      // Trigger confetti
-      confetti({
-        particleCount: 150,
-        spread: 100,
-        origin: { y: 0.6 }
-      });
-  
+
+      confetti({ particleCount: 150, spread: 100, origin: { y: 0.6 } });
     } catch (err) {
       setErrorMessage(err.response?.data?.message || 'Failed to claim reward');
     } finally {
       setIsLoading(false);
     }
-  };  
+  };
 
   // Animation variants
   const containerVariants = {
     hidden: { opacity: 0 },
-    visible: { opacity: 1, transition: { staggerChildren: 0.1 } }
+    visible: { opacity: 1, transition: { staggerChildren: 0.1 } },
   };
 
   const itemVariants = {
     hidden: { y: 20, opacity: 0 },
-    visible: { y: 0, opacity: 1 }
+    visible: { y: 0, opacity: 1 },
   };
 
   return (

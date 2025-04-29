@@ -2,7 +2,9 @@ import { useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { useAuth } from '../../context/AuthContext';
 import axios from 'axios';
-import { Link } from 'react-router-dom';  // Import Link from react-router-dom
+import { Link } from 'react-router-dom';
+
+const API_BASE_URL = import.meta.env.VITE_API_BASE_URL;
 
 export default function Login() {
   const [name, setName] = useState('');
@@ -13,7 +15,7 @@ export default function Login() {
   const handleSubmit = async (e) => {
     e.preventDefault();
     try {
-      const { data } = await axios.post('http://localhost:5000/api/auth/login', {
+      const { data } = await axios.post(`${API_BASE_URL}/api/auth/login`, {
         name,
         password,
       });
