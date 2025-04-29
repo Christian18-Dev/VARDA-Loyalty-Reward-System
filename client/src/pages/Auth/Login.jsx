@@ -1,8 +1,7 @@
 import { useState } from 'react';
-import { useNavigate } from 'react-router-dom';
+import { useNavigate, Link } from 'react-router-dom';
 import { useAuth } from '../../context/AuthContext';
 import axios from 'axios';
-import { Link } from 'react-router-dom';
 
 const API_BASE_URL = import.meta.env.VITE_API_BASE_URL;
 
@@ -30,34 +29,46 @@ export default function Login() {
   };
 
   return (
-    <form onSubmit={handleSubmit} className="max-w-md mx-auto mt-20 space-y-4">
-      <h1 className="text-2xl font-bold ">Login</h1>
-      <input
-        className="w-full p-2 border rounded"
-        placeholder="Username"
-        value={name}
-        onChange={(e) => setName(e.target.value)}
-        required
-      />
-      <input
-        className="w-full p-2 border rounded"
-        placeholder="Password"
-        type="password"
-        value={password}
-        onChange={(e) => setPassword(e.target.value)}
-        required
-      />
-      <button className="w-full bg-blue-500 text-white p-2 rounded">Login</button>
+    <div className="min-h-screen flex items-center justify-center bg-gradient-to-br from-purple-100 to-blue-100 p-4">
+      <div className="max-w-md w-full bg-white rounded-3xl shadow-xl p-8 space-y-6">
+        <h1 className="text-3xl font-bold text-center text-purple-700">Welcome, 👋</h1>
+        <form onSubmit={handleSubmit} className="space-y-5">
+          <div>
+            <label className="block mb-1 text-sm font-medium text-gray-700">Username</label>
+            <input
+              className="w-full px-4 py-2 border border-gray-300 rounded-xl focus:ring-2 focus:ring-purple-400 focus:outline-none transition"
+              placeholder="Enter your username"
+              value={name}
+              onChange={(e) => setName(e.target.value)}
+              required
+            />
+          </div>
+          <div>
+            <label className="block mb-1 text-sm font-medium text-gray-700">Password</label>
+            <input
+              type="password"
+              className="w-full px-4 py-2 border border-gray-300 rounded-xl focus:ring-2 focus:ring-purple-400 focus:outline-none transition"
+              placeholder="Enter your password"
+              value={password}
+              onChange={(e) => setPassword(e.target.value)}
+              required
+            />
+          </div>
+          <button
+            type="submit"
+            className="w-full bg-purple-600 hover:bg-purple-700 text-white font-semibold py-2 rounded-xl transition shadow-md"
+          >
+            Login
+          </button>
+        </form>
 
-      {/* Add a link to the register page */}
-      <div className="mt-4 text-center">
-        <p>
+        <div className="text-center text-sm text-gray-600 mt-4">
           Don't have an account?{' '}
-          <Link to="/register" className="text-blue-500 hover:underline">
+          <Link to="/register" className="text-purple-600 hover:underline font-semibold">
             Sign up here
           </Link>
-        </p>
+        </div>
       </div>
-    </form>
+    </div>
   );
 }

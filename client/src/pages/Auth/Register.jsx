@@ -1,5 +1,5 @@
 import { useState } from 'react';
-import { useNavigate } from 'react-router-dom';
+import { useNavigate, Link } from 'react-router-dom';
 import { useAuth } from '../../context/AuthContext';
 import axios from 'axios';
 
@@ -27,24 +27,46 @@ export default function Register() {
   };
 
   return (
-    <form onSubmit={handleSubmit} className="max-w-md mx-auto mt-20 space-y-4">
-      <h1 className="text-2xl font-bold">Register</h1>
-      <input
-        className="w-full p-2 border rounded"
-        placeholder="Username"
-        value={name}
-        onChange={(e) => setName(e.target.value)}
-        required
-      />
-      <input
-        className="w-full p-2 border rounded"
-        placeholder="Password"
-        type="password"
-        value={password}
-        onChange={(e) => setPassword(e.target.value)}
-        required
-      />
-      <button className="w-full bg-green-500 text-white p-2 rounded">Register</button>
-    </form>
+    <div className="min-h-screen flex items-center justify-center bg-gradient-to-br from-green-100 to-blue-100 p-4">
+      <div className="max-w-md w-full bg-white rounded-3xl shadow-xl p-8 space-y-6">
+        <h1 className="text-3xl font-bold text-center text-green-700">Create Account 🌟</h1>
+        <form onSubmit={handleSubmit} className="space-y-5">
+          <div>
+            <label className="block mb-1 text-sm font-medium text-gray-700">Username</label>
+            <input
+              className="w-full px-4 py-2 border border-gray-300 rounded-xl focus:ring-2 focus:ring-green-400 focus:outline-none transition"
+              placeholder="Choose a username"
+              value={name}
+              onChange={(e) => setName(e.target.value)}
+              required
+            />
+          </div>
+          <div>
+            <label className="block mb-1 text-sm font-medium text-gray-700">Password</label>
+            <input
+              type="password"
+              className="w-full px-4 py-2 border border-gray-300 rounded-xl focus:ring-2 focus:ring-green-400 focus:outline-none transition"
+              placeholder="Choose a password"
+              value={password}
+              onChange={(e) => setPassword(e.target.value)}
+              required
+            />
+          </div>
+          <button
+            type="submit"
+            className="w-full bg-green-600 hover:bg-green-700 text-white font-semibold py-2 rounded-xl transition shadow-md"
+          >
+            Register
+          </button>
+        </form>
+
+        <div className="text-center text-sm text-gray-600 mt-4">
+          Already have an account?{' '}
+          <Link to="/login" className="text-green-600 hover:underline font-semibold">
+            Login
+          </Link>
+        </div>
+      </div>
+    </div>
   );
 }
