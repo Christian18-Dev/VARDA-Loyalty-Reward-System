@@ -370,7 +370,7 @@ export default function StudentPage() {
         {currentPage === 'rewards' && (
           <motion.div variants={itemVariants} className="space-y-6">
             <div className="text-center">
-              <h2 className="text-2xl font-bold text-purple-800"> Rewards Available</h2>
+              <h2 className="text-2xl font-bold text-purple-800"> Rewards Available!</h2>
               <p className="text-gray-600 mt-1">Redeem your points for awesome rewards!</p>
             </div>
             
