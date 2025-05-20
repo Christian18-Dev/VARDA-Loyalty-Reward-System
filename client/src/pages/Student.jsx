@@ -5,6 +5,10 @@ import { HomeIcon, TicketIcon, GiftIcon, LogoutIcon, ClipboardListIcon } from '@
 import { motion } from 'framer-motion';
 import confetti from 'canvas-confetti';
 import { QRCodeSVG } from 'qrcode.react';
+import completeSetImage from '../assets/completeset.png';
+import spoonImage from '../assets/spoon.png';
+import forkImage from '../assets/fork.png';
+import plateImage from '../assets/plate.png';
 
 export default function StudentPage() {
   const { user } = useAuth();
@@ -26,7 +30,7 @@ export default function StudentPage() {
     {
       id: 1,
       name: 'Complete Set',
-      image: 'https://images.unsplash.com/photo-1556911220-bff31c812dba?w=500&auto=format&fit=crop&q=60&ixlib=rb-4.0.3',
+      image: completeSetImage,
       description: 'Complete dining set (1 Plate, 1 Spoon, 1 Fork)',
       cartQuantity: 0,
       isSet: true
@@ -34,21 +38,21 @@ export default function StudentPage() {
     { 
       id: 2, 
       name: 'Spoon', 
-      image: 'https://images.unsplash.com/photo-1584992236310-6edddc08acff?w=500&auto=format&fit=crop&q=60&ixlib=rb-4.0.3',
+      image: spoonImage,
       description: 'Stainless steel spoon for your dining needs',
       cartQuantity: 0
     },
     { 
       id: 3, 
       name: 'Fork', 
-      image: 'https://images.unsplash.com/photo-1584992236310-6edddc08acff?w=500&auto=format&fit=crop&q=60&ixlib=rb-4.0.3',
+      image: forkImage,
       description: 'Stainless steel fork for your dining needs',
       cartQuantity: 0
     },
     { 
       id: 4, 
       name: 'Plate', 
-      image: 'https://images.unsplash.com/photo-1556911220-bff31c812dba?w=500&auto=format&fit=crop&q=60&ixlib=rb-4.0.3',
+      image: plateImage,
       description: 'Standard ceramic plate for your meals',
       cartQuantity: 0
     },
