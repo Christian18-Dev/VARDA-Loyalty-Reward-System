@@ -34,6 +34,13 @@ export default function CashierPage() {
         {
           fps: 10,
           qrbox: { width: 250, height: 250 },
+          aspectRatio: 1.0,
+          disableFlip: false,
+          formatsToSupport: [ Html5Qrcode.FORMATS.QR_CODE ],
+          videoConstraints: {
+            focusMode: "continuous",
+            zoom: 2.0
+          }
         },
         (decodedText) => {
           handleScan(decodedText);
