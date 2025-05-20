@@ -26,8 +26,12 @@ export default function CashierPage() {
       // Get all cameras
       const devices = await Html5Qrcode.getCameras();
       
-      // Find the back camera (usually the last one in the list)
-      const backCamera = devices[devices.length - 1];
+      // Find the back camera (usually the first one in the list)
+      const backCamera = devices[0];
+
+      if (!backCamera) {
+        throw new Error('No camera found');
+      }
 
       await qrCode.start(
         backCamera.id,
