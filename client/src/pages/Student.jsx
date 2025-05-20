@@ -1,9 +1,10 @@
 import { useEffect, useState } from 'react';
 import axios from 'axios';
 import { useAuth } from '../context/AuthContext';
-import { HomeIcon, TicketIcon, GiftIcon, LogoutIcon } from '@heroicons/react/outline';
+import { HomeIcon, TicketIcon, GiftIcon, LogoutIcon, ClipboardListIcon } from '@heroicons/react/outline';
 import { motion } from 'framer-motion';
 import confetti from 'canvas-confetti';
+import { QRCodeSVG } from 'qrcode.react';
 
 export default function StudentPage() {
   const { user } = useAuth();
@@ -20,6 +21,40 @@ export default function StudentPage() {
   const [claimedRewardName, setClaimedRewardName] = useState('');
   const [claimTime, setClaimTime] = useState('');
   const [showLogoutModal, setShowLogoutModal] = useState(false);
+  const [borrowedItems, setBorrowedItems] = useState([]);
+  const [availableItems, setAvailableItems] = useState([
+    {
+      id: 1,
+      name: 'Complete Set',
+      image: 'https://images.unsplash.com/photo-1556911220-bff31c812dba?w=500&auto=format&fit=crop&q=60&ixlib=rb-4.0.3',
+      description: 'Complete dining set (1 Plate, 1 Spoon, 1 Fork)',
+      cartQuantity: 0,
+      isSet: true
+    },
+    { 
+      id: 2, 
+      name: 'Spoon', 
+      image: 'https://images.unsplash.com/photo-1584992236310-6edddc08acff?w=500&auto=format&fit=crop&q=60&ixlib=rb-4.0.3',
+      description: 'Stainless steel spoon for your dining needs',
+      cartQuantity: 0
+    },
+    { 
+      id: 3, 
+      name: 'Fork', 
+      image: 'https://images.unsplash.com/photo-1584992236310-6edddc08acff?w=500&auto=format&fit=crop&q=60&ixlib=rb-4.0.3',
+      description: 'Stainless steel fork for your dining needs',
+      cartQuantity: 0
+    },
+    { 
+      id: 4, 
+      name: 'Plate', 
+      image: 'https://images.unsplash.com/photo-1556911220-bff31c812dba?w=500&auto=format&fit=crop&q=60&ixlib=rb-4.0.3',
+      description: 'Standard ceramic plate for your meals',
+      cartQuantity: 0
+    },
+  ]);
+  const [showQRModal, setShowQRModal] = useState(false);
+  const [qrData, setQrData] = useState(null);
 
   const baseUrl = import.meta.env.VITE_API_BASE_URL;
 
@@ -144,6 +179,93 @@ export default function StudentPage() {
     } finally {
       setIsLoading(false);
     }
+  };
+
+  const handleAddToCart = (itemId) => {
+    setAvailableItems(prevItems => 
+      prevItems.map(item => {
+        if (item.id === itemId) {
+          return { ...item, cartQuantity: item.cartQuantity + 1 };
+        }
+        return item;
+      })
+    );
+  };
+
+  const handleRemoveFromCart = (itemId) => {
+    setAvailableItems(prevItems => 
+      prevItems.map(item => {
+        if (item.id === itemId && item.cartQuantity > 0) {
+          return { ...item, cartQuantity: item.cartQuantity - 1 };
+        }
+        return item;
+      })
+    );
+  };
+
+  const handleConfirmOrder = () => {
+    const itemsToBorrow = availableItems.filter(item => item.cartQuantity > 0);
+    const orderDetails = {
+      studentName: user.name,
+      items: itemsToBorrow.map(item => ({
+        name: item.name,
+        quantity: item.cartQuantity
+      })),
+      timestamp: new Date().toISOString()
+    };
+
+    // Generate QR code data
+    setQrData(JSON.stringify(orderDetails));
+    setShowQRModal(true);
+
+    // Process the order
+    itemsToBorrow.forEach(item => {
+      if (item.isSet) {
+        // For sets, add one of each item
+        for (let i = 0; i < item.cartQuantity; i++) {
+          handleBorrow(1); // Plate
+          handleBorrow(2); // Spoon
+          handleBorrow(3); // Fork
+        }
+      } else {
+        for (let i = 0; i < item.cartQuantity; i++) {
+          handleBorrow(item.id);
+        }
+      }
+    });
+
+    // Reset cart quantities
+    setAvailableItems(prevItems => 
+      prevItems.map(item => ({ ...item, cartQuantity: 0 }))
+    );
+  };
+
+  const handleBorrow = (itemId) => {
+    setAvailableItems(prevItems => 
+      prevItems.map(item => {
+        if (item.id === itemId && item.quantity > item.borrowed) {
+          return { ...item, borrowed: item.borrowed + 1 };
+        }
+        return item;
+      })
+    );
+    setBorrowedItems(prev => [...prev, { ...availableItems.find(item => item.id === itemId), borrowTime: new Date() }]);
+    setSuccessMessage('Item borrowed successfully!');
+    setTimeout(() => setSuccessMessage(''), 3000);
+  };
+
+  const handleReturn = (itemId) => {
+    setAvailableItems(prevItems =>
+      prevItems.map(item => {
+        if (item.id === itemId) {
+          return { ...item, borrowed: item.borrowed - 1 };
+        }
+        return item;
+      })
+    );
+    setBorrowedItems(prev => prev.filter(item => item.id !== itemId));
+    setSuccessMessage('Item returned successfully!');
+    setTimeout(() => setSuccessMessage(''), 3000);
   };
 
   // Animation variants
@@ -415,6 +537,152 @@ export default function StudentPage() {
             </motion.div>
           </motion.div>
         )}
+
+        {/* Borrowing Page */}
+        {currentPage === 'borrow' && (
+          <motion.div variants={itemVariants} className="space-y-6">
+            <div className="text-center">
+              <p className="text-gray-600 mt-1">Select items to borrow for your needs</p>
+            </div>
+
+            {/* Available Items */}
+            <div className="bg-white p-6 rounded-2xl shadow-lg">
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                {availableItems.map((item) => (
+                  <motion.div 
+                    key={item.id}
+                    whileHover={{ scale: 1.02 }}
+                    className={`bg-white rounded-xl shadow-md overflow-hidden border border-gray-100 ${
+                      item.isSet ? 'md:col-span-2' : ''
+                    }`}
+                  >
+                    <div className="relative h-48 overflow-hidden">
+                      <img 
+                        src={item.image} 
+                        alt={item.name}
+                        className="w-full h-full object-cover"
+                      />
+                      {item.isSet && (
+                        <div className="absolute bottom-0 left-0 right-0 bg-gradient-to-t from-black/60 to-transparent p-4">
+                          <div className="flex items-center space-x-2">
+                            <span className="text-white text-sm">Includes:</span>
+                            <span className="text-white/90 text-sm">1 Plate</span>
+                            <span className="text-white/90 text-sm">•</span>
+                            <span className="text-white/90 text-sm">1 Spoon</span>
+                            <span className="text-white/90 text-sm">•</span>
+                            <span className="text-white/90 text-sm">1 Fork</span>
+                          </div>
+                        </div>
+                      )}
+                    </div>
+                    <div className="p-4">
+                      <h4 className="font-bold text-lg text-gray-800">{item.name}</h4>
+                      <p className="text-sm text-gray-600 mb-3">{item.description}</p>
+                      <div className="flex items-center justify-between">
+                        <div className="flex items-center space-x-2">
+                          <button
+                            onClick={() => handleRemoveFromCart(item.id)}
+                            disabled={item.cartQuantity === 0}
+                            className={`w-8 h-8 rounded-full flex items-center justify-center text-lg font-bold transition-all ${
+                              item.cartQuantity === 0
+                                ? 'bg-gray-200 text-gray-400 cursor-not-allowed'
+                                : 'bg-red-500 text-white hover:bg-red-600'
+                            }`}
+                          >
+                            -
+                          </button>
+                          <span className="w-8 text-center font-medium">{item.cartQuantity}</span>
+                          <button
+                            onClick={() => handleAddToCart(item.id)}
+                            className="w-8 h-8 rounded-full flex items-center justify-center text-lg font-bold transition-all bg-green-500 text-white hover:bg-green-600"
+                          >
+                            +
+                          </button>
+                        </div>
+                        <span className="text-sm text-gray-500">
+                          {item.cartQuantity > 0 ? `${item.cartQuantity} in cart` : ''}
+                        </span>
+                      </div>
+                    </div>
+                  </motion.div>
+                ))}
+              </div>
+            </div>
+
+            {/* Cart Summary */}
+            {availableItems.some(item => item.cartQuantity > 0) && (
+              <motion.div 
+                initial={{ opacity: 0, y: 20 }}
+                animate={{ opacity: 1, y: 0 }}
+                className="bg-white p-6 rounded-2xl shadow-lg"
+              >
+                <h3 className="text-xl font-semibold text-gray-800 mb-4">Cart Summary</h3>
+                <div className="space-y-4">
+                  {availableItems
+                    .filter(item => item.cartQuantity > 0)
+                    .map(item => (
+                      <div key={item.id} className="flex items-center justify-between p-4 bg-gray-50 rounded-xl">
+                        <div className="flex items-center space-x-4">
+                          <img 
+                            src={item.image} 
+                            alt={item.name}
+                            className="w-16 h-16 object-cover rounded-lg"
+                          />
+                          <div>
+                            <h4 className="font-medium text-gray-800">{item.name}</h4>
+                            <p className="text-sm text-gray-600">Quantity: {item.cartQuantity}</p>
+                          </div>
+                        </div>
+                      </div>
+                    ))}
+                  <button
+                    onClick={handleConfirmOrder}
+                    className="w-full py-3 bg-purple-600 text-white rounded-xl font-bold hover:bg-purple-700 transition-all"
+                  >
+                    Confirm
+                  </button>
+                </div>
+              </motion.div>
+            )}
+
+            {/* Borrowed Items */}
+            {borrowedItems.length > 0 && (
+              <div className="bg-white p-6 rounded-2xl shadow-lg">
+                <h3 className="text-xl font-semibold text-gray-800 mb-4">Your Orders</h3>
+                <div className="space-y-4">
+                  {borrowedItems.map((item) => (
+                    <motion.div 
+                      key={item.id}
+                      initial={{ opacity: 0, y: 20 }}
+                      animate={{ opacity: 1, y: 0 }}
+                      className="flex items-center justify-between p-4 bg-gray-50 rounded-xl"
+                    >
+                      <div className="flex items-center space-x-4">
+                        <img 
+                          src={item.image} 
+                          alt={item.name}
+                          className="w-16 h-16 object-cover rounded-lg"
+                        />
+                        <div>
+                          <h4 className="font-medium text-gray-800">{item.name}</h4>
+                          <p className="text-sm text-gray-600">
+                            Ordered: {new Date(item.borrowTime).toLocaleString()}
+                          </p>
+                        </div>
+                      </div>
+                      <button
+                        onClick={() => handleReturn(item.id)}
+                        className="px-4 py-2 bg-green-600 text-white rounded-lg font-medium hover:bg-green-700"
+                      >
+                        Return
+                      </button>
+                    </motion.div>
+                  ))}
+                </div>
+              </div>
+            )}
+          </motion.div>
+        )}
       </motion.div>
 
       {showClaimModal && (
@@ -448,6 +716,50 @@ export default function StudentPage() {
         </motion.div>
       </div>
     )}
+
+      {/* QR Code Modal */}
+      {showQRModal && qrData && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 backdrop-blur-sm">
+          <motion.div 
+            initial={{ scale: 0.9, opacity: 0 }}
+            animate={{ scale: 1, opacity: 1 }}
+            className="bg-white rounded-2xl p-6 max-w-sm w-full shadow-xl border-2 border-purple-300"
+          >
+            <div className="text-center space-y-4">
+              <h3 className="text-xl font-bold text-purple-800">Order Confirmed!</h3>
+              <p className="text-gray-600">Show this QR code to the cashier</p>
+              
+              <div className="bg-white p-4 rounded-xl border-2 border-dashed border-purple-200">
+                <QRCodeSVG 
+                  value={qrData}
+                  size={200}
+                  level="H"
+                  includeMargin={true}
+                  className="mx-auto"
+                />
+              </div>
+
+              <div className="text-left bg-gray-50 p-4 rounded-xl">
+                <h4 className="font-semibold text-gray-800 mb-2">Order Details:</h4>
+                <ul className="space-y-1 text-sm text-gray-600">
+                  {JSON.parse(qrData).items.map((item, index) => (
+                    <li key={index}>
+                      • {item.name} (x{item.quantity})
+                    </li>
+                  ))}
+                </ul>
+              </div>
+
+              <button 
+                onClick={() => setShowQRModal(false)}
+                className="w-full bg-purple-600 text-white px-4 py-2 rounded-xl hover:bg-purple-700 transition"
+              >
+                Close
+              </button>
+            </div>
+          </motion.div>
+        </div>
+      )}
 
       {/* Bottom Navigation */}
       <nav className="fixed bottom-0 left-0 right-0 bg-white border-t-2 border-purple-200 shadow-lg flex justify-around py-3 z-40">
@@ -488,6 +800,13 @@ export default function StudentPage() {
         >
           <GiftIcon className="h-7 w-7" />
           <span className="mt-1 font-medium">Rewards</span>
+        </button>
+        <button
+          onClick={() => setCurrentPage('borrow')}
+          className={`flex flex-col items-center text-sm p-2 rounded-xl transition-all ${currentPage === 'borrow' ? 'text-purple-700 bg-purple-100' : 'text-gray-500'}`}
+        >
+          <ClipboardListIcon className="h-7 w-7" />
+          <span className="mt-1 font-medium">Borrow</span>
         </button>
 
          {/* Logout Button */}
