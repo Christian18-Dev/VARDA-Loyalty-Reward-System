@@ -101,35 +101,51 @@ export default function CashierPage() {
       const res = await axios.get(`${baseUrl}/api/cashier/borrowed-items`, {
         headers: { Authorization: `Bearer ${token}` },
       });
-      setBorrowedItems(res.data.data);
+      // Ensure we're setting an array, even if the response is empty
+      setBorrowedItems(Array.isArray(res.data) ? res.data : []);
     } catch (err) {
       console.error('Error fetching borrowed items:', err);
       setError('Failed to fetch borrowed items');
       setTimeout(() => setError(''), 3000);
+      // Set empty array on error
+      setBorrowedItems([]);
     }
   };
 
   useEffect(() => {
-    fetchBorrowedItems();
     fetchClaimed();
+    fetchBorrowedItems();
   }, []);
 
   const handleScan = async (decodedText) => {
     try {
       const orderData = JSON.parse(decodedText);
       
-      // Add the scanned order to borrowed items
-      setBorrowedItems(prev => [...prev, {
-        ...orderData,
-        id: Date.now(), // Temporary ID for the list
-        status: 'pending'
-      }]);
+      // Save the scanned order to the database
+      const response = await axios.post(
+        `${baseUrl}/api/cashier/borrowed-items`,
+        {
+          ...orderData,
+          status: 'pending',
+          borrowTime: new Date().toISOString()
+        },
+        {
+          headers: { Authorization: `Bearer ${token}` },
+        }
+      );
+
+      // Ensure we're working with an array and add the new item
+      setBorrowedItems(prev => {
+        const currentItems = Array.isArray(prev) ? prev : [];
+        return [...currentItems, response.data];
+      });
 
       setSuccess('QR Code scanned successfully!');
       setScanning(false);
       setTimeout(() => setSuccess(''), 3000);
     } catch (err) {
-      setError('Invalid QR Code');
+      console.error('Error saving borrowed item:', err);
+      setError('Failed to save borrowed item');
       setTimeout(() => setError(''), 3000);
     }
   };
@@ -140,30 +156,12 @@ export default function CashierPage() {
     setTimeout(() => setError(''), 3000);
   };
 
-  const handleConfirmBorrow = async (itemId) => {
-    try {
-      // Here you would typically make an API call to confirm the borrow
-      setBorrowedItems(prev => 
-        prev.map(item => 
-          item._id === itemId 
-            ? { ...item, status: 'confirmed' }
-            : item
-        )
-      );
-      setSuccess('Borrow confirmed successfully!');
-      setTimeout(() => setSuccess(''), 3000);
-    } catch (err) {
-      setError('Failed to confirm borrow');
-      setTimeout(() => setError(''), 3000);
-    }
-  };
-
   return (
     <div className="min-h-screen bg-gradient-to-b from-blue-50 to-purple-50 p-6">
       <div className="max-w-6xl mx-auto space-y-6">
         <div className="text-center">
           <h1 className="text-3xl font-bold text-purple-800">Cashier Dashboard</h1>
-          <p className="text-gray-600 mt-2">Scan QR codes to process borrow requests</p>
+          <p className="text-gray-600 mt-2">Scan QR codes to process requests</p>
         </div>
 
         {/* Scanner Section */}
@@ -220,19 +218,13 @@ export default function CashierPage() {
                     Borrow Time
                   </th>
                   <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
-                    Return Time
-                  </th>
-                  <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
                     Status
-                  </th>
-                  <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
-                    Action
                   </th>
                 </tr>
               </thead>
               <tbody className="bg-white divide-y divide-gray-200">
                 {borrowedItems.map((item) => (
-                  <tr key={item._id}>
+                  <tr key={item.id}>
                     <td className="px-6 py-4 whitespace-nowrap">
                       <div className="text-sm font-medium text-gray-900">{item.studentName}</div>
                     </td>
@@ -247,11 +239,6 @@ export default function CashierPage() {
                       </div>
                     </td>
                     <td className="px-6 py-4 whitespace-nowrap">
-                      <div className="text-sm text-gray-900">
-                        {item.returnTime ? new Date(item.returnTime).toLocaleString() : '-'}
-                      </div>
-                    </td>
-                    <td className="px-6 py-4 whitespace-nowrap">
                       <span className={`px-2 inline-flex text-xs leading-5 font-semibold rounded-full ${
                         item.status === 'returned' 
                           ? 'bg-green-100 text-green-800' 
@@ -259,16 +246,6 @@ export default function CashierPage() {
                       }`}>
                         {item.status}
                       </span>
-                    </td>
-                    <td className="px-6 py-4 whitespace-nowrap text-right text-sm font-medium">
-                      {item.status === 'borrowed' && (
-                        <button
-                          onClick={() => handleConfirmBorrow(item._id)}
-                          className="text-purple-600 hover:text-purple-900"
-                        >
-                          Confirm Return
-                        </button>
-                      )}
                     </td>
                   </tr>
                 ))}
