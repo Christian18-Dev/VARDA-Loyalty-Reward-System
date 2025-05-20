@@ -13,41 +13,24 @@ export default function CashierPage() {
   const [borrowedItems, setBorrowedItems] = useState([]);
   const [error, setError] = useState('');
   const [success, setSuccess] = useState('');
-  const [cameras, setCameras] = useState([]);
-  const [selectedCamera, setSelectedCamera] = useState('');
   const [html5QrCode, setHtml5QrCode] = useState(null);
 
   const baseUrl = import.meta.env.VITE_API_BASE_URL;
   const token = user.token;
-
-  useEffect(() => {
-    // Get available cameras when component mounts
-    Html5Qrcode.getCameras().then(devices => {
-      if (devices && devices.length) {
-        setCameras(devices);
-        setSelectedCamera(devices[0].id);
-      }
-    }).catch(err => {
-      console.error('Error getting cameras:', err);
-      setError('Failed to access camera');
-    });
-
-    return () => {
-      if (html5QrCode) {
-        html5QrCode.stop().catch(err => {
-          console.error('Error stopping scanner:', err);
-        });
-      }
-    };
-  }, []);
 
   const startScanner = async () => {
     try {
       const qrCode = new Html5Qrcode("reader");
       setHtml5QrCode(qrCode);
 
+      // Get all cameras
+      const devices = await Html5Qrcode.getCameras();
+      
+      // Find the back camera (usually the last one in the list)
+      const backCamera = devices[devices.length - 1];
+
       await qrCode.start(
-        selectedCamera,
+        backCamera.id,
         {
           fps: 10,
           qrbox: { width: 250, height: 250 },
@@ -84,7 +67,7 @@ export default function CashierPage() {
     } else {
       stopScanner();
     }
-  }, [scanning, selectedCamera]);
+  }, [scanning]);
 
   const handleGenerateCode = async () => {
     try {
@@ -177,27 +160,12 @@ export default function CashierPage() {
         <div className="bg-white rounded-2xl shadow-lg p-6">
           <div className="flex justify-between items-center mb-4">
             <h2 className="text-xl font-semibold text-gray-800">QR Scanner</h2>
-            <div className="flex items-center space-x-4">
-              {cameras.length > 1 && (
-                <select
-                  value={selectedCamera}
-                  onChange={(e) => setSelectedCamera(e.target.value)}
-                  className="px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-purple-500"
-                >
-                  {cameras.map(camera => (
-                    <option key={camera.id} value={camera.id}>
-                      {camera.label || `Camera ${camera.id}`}
-                    </option>
-                  ))}
-                </select>
-              )}
-              <button
-                onClick={() => setScanning(!scanning)}
-                className="px-4 py-2 bg-purple-600 text-white rounded-xl hover:bg-purple-700 transition-all"
-              >
-                {scanning ? 'Stop Scanning' : 'Start Scanning'}
-              </button>
-            </div>
+            <button
+              onClick={() => setScanning(!scanning)}
+              className="px-4 py-2 bg-purple-600 text-white rounded-xl hover:bg-purple-700 transition-all"
+            >
+              {scanning ? 'Stop Scanning' : 'Start Scanning'}
+            </button>
           </div>
 
           {scanning && (
