@@ -207,7 +207,7 @@ export default function StudentPage() {
     );
   };
 
-  const handleConfirmOrder = () => {
+  const handleConfirmOrder = async () => {
     const itemsToBorrow = availableItems.filter(item => item.cartQuantity > 0);
     const orderDetails = {
       studentName: user.name,
@@ -218,30 +218,44 @@ export default function StudentPage() {
       timestamp: new Date().toISOString()
     };
 
-    // Generate QR code data
-    setQrData(JSON.stringify(orderDetails));
-    setShowQRModal(true);
+    try {
+      // Save order to database
+      await axios.post(
+        `${baseUrl}/api/student/borrow-items`,
+        { items: orderDetails.items },
+        { headers: { Authorization: `Bearer ${user.token}` } }
+      );
 
-    // Process the order
-    itemsToBorrow.forEach(item => {
-      if (item.isSet) {
-        // For sets, add one of each item
-        for (let i = 0; i < item.cartQuantity; i++) {
-          handleBorrow(1); // Plate
-          handleBorrow(2); // Spoon
-          handleBorrow(3); // Fork
-        }
-      } else {
-        for (let i = 0; i < item.cartQuantity; i++) {
-          handleBorrow(item.id);
-        }
-      }
-    });
+      // Generate QR code data
+      setQrData(JSON.stringify(orderDetails));
+      setShowQRModal(true);
 
-    // Reset cart quantities
-    setAvailableItems(prevItems => 
-      prevItems.map(item => ({ ...item, cartQuantity: 0 }))
-    );
+      // Process the order
+      itemsToBorrow.forEach(item => {
+        if (item.isSet) {
+          // For sets, add one of each item
+          for (let i = 0; i < item.cartQuantity; i++) {
+            handleBorrow(1); // Plate
+            handleBorrow(2); // Spoon
+            handleBorrow(3); // Fork
+          }
+        } else {
+          for (let i = 0; i < item.cartQuantity; i++) {
+            handleBorrow(item.id);
+          }
+        }
+      });
+
+      // Reset cart quantities
+      setAvailableItems(prevItems => 
+        prevItems.map(item => ({ ...item, cartQuantity: 0 }))
+      );
+
+      setSuccessMessage('Order placed successfully!');
+    } catch (error) {
+      console.error('Error placing order:', error);
+      setErrorMessage('Failed to place order. Please try again.');
+    }
   };
 
   const handleBorrow = (itemId) => {
