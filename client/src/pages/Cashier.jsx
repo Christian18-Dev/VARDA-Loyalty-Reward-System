@@ -36,10 +36,11 @@ export default function CashierPage() {
           qrbox: { width: 250, height: 250 },
           aspectRatio: 1.0,
           disableFlip: false,
-          formatsToSupport: [ Html5Qrcode.FORMATS.QR_CODE ],
           videoConstraints: {
             focusMode: "continuous",
-            zoom: 2.0
+            zoom: 2.0,
+            width: { min: 360, ideal: 640, max: 1920 },
+            height: { min: 240, ideal: 480, max: 1080 }
           }
         },
         (decodedText) => {
