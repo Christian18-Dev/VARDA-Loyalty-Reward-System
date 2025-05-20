@@ -96,6 +96,24 @@ export default function CashierPage() {
     }
   };
 
+  const fetchBorrowedItems = async () => {
+    try {
+      const res = await axios.get(`${baseUrl}/api/cashier/borrowed-items`, {
+        headers: { Authorization: `Bearer ${token}` },
+      });
+      setBorrowedItems(res.data.data);
+    } catch (err) {
+      console.error('Error fetching borrowed items:', err);
+      setError('Failed to fetch borrowed items');
+      setTimeout(() => setError(''), 3000);
+    }
+  };
+
+  useEffect(() => {
+    fetchBorrowedItems();
+    fetchClaimed();
+  }, []);
+
   const handleScan = async (decodedText) => {
     try {
       const orderData = JSON.parse(decodedText);
@@ -127,7 +145,7 @@ export default function CashierPage() {
       // Here you would typically make an API call to confirm the borrow
       setBorrowedItems(prev => 
         prev.map(item => 
-          item.id === itemId 
+          item._id === itemId 
             ? { ...item, status: 'confirmed' }
             : item
         )
@@ -139,10 +157,6 @@ export default function CashierPage() {
       setTimeout(() => setError(''), 3000);
     }
   };
-
-  useEffect(() => {
-    fetchClaimed();
-  }, []);
 
   return (
     <div className="min-h-screen bg-gradient-to-b from-blue-50 to-purple-50 p-6">
@@ -203,7 +217,10 @@ export default function CashierPage() {
                     Items
                   </th>
                   <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
-                    Time
+                    Borrow Time
+                  </th>
+                  <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                    Return Time
                   </th>
                   <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
                     Status
@@ -215,7 +232,7 @@ export default function CashierPage() {
               </thead>
               <tbody className="bg-white divide-y divide-gray-200">
                 {borrowedItems.map((item) => (
-                  <tr key={item.id}>
+                  <tr key={item._id}>
                     <td className="px-6 py-4 whitespace-nowrap">
                       <div className="text-sm font-medium text-gray-900">{item.studentName}</div>
                     </td>
@@ -226,12 +243,17 @@ export default function CashierPage() {
                     </td>
                     <td className="px-6 py-4 whitespace-nowrap">
                       <div className="text-sm text-gray-900">
-                        {new Date(item.timestamp).toLocaleString()}
+                        {new Date(item.borrowTime).toLocaleString()}
+                      </div>
+                    </td>
+                    <td className="px-6 py-4 whitespace-nowrap">
+                      <div className="text-sm text-gray-900">
+                        {item.returnTime ? new Date(item.returnTime).toLocaleString() : '-'}
                       </div>
                     </td>
                     <td className="px-6 py-4 whitespace-nowrap">
                       <span className={`px-2 inline-flex text-xs leading-5 font-semibold rounded-full ${
-                        item.status === 'confirmed' 
+                        item.status === 'returned' 
                           ? 'bg-green-100 text-green-800' 
                           : 'bg-yellow-100 text-yellow-800'
                       }`}>
@@ -239,12 +261,12 @@ export default function CashierPage() {
                       </span>
                     </td>
                     <td className="px-6 py-4 whitespace-nowrap text-right text-sm font-medium">
-                      {item.status === 'pending' && (
+                      {item.status === 'borrowed' && (
                         <button
-                          onClick={() => handleConfirmBorrow(item.id)}
+                          onClick={() => handleConfirmBorrow(item._id)}
                           className="text-purple-600 hover:text-purple-900"
                         >
-                          Confirm
+                          Confirm Return
                         </button>
                       )}
                     </td>
@@ -252,6 +274,9 @@ export default function CashierPage() {
                 ))}
               </tbody>
             </table>
+            {borrowedItems.length === 0 && (
+              <p className="text-gray-500 text-center py-4">No borrowed items found.</p>
+            )}
           </div>
         </div>
 
