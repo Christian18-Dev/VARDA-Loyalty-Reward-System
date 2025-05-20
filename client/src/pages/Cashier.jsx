@@ -96,56 +96,27 @@ export default function CashierPage() {
     }
   };
 
-  const fetchBorrowedItems = async () => {
-    try {
-      const res = await axios.get(`${baseUrl}/api/cashier/borrowed-items`, {
-        headers: { Authorization: `Bearer ${token}` },
-      });
-      // Ensure we're setting an array, even if the response is empty
-      setBorrowedItems(Array.isArray(res.data) ? res.data : []);
-    } catch (err) {
-      console.error('Error fetching borrowed items:', err);
-      setError('Failed to fetch borrowed items');
-      setTimeout(() => setError(''), 3000);
-      // Set empty array on error
-      setBorrowedItems([]);
-    }
-  };
-
   useEffect(() => {
     fetchClaimed();
-    fetchBorrowedItems();
   }, []);
 
   const handleScan = async (decodedText) => {
     try {
       const orderData = JSON.parse(decodedText);
       
-      // Save the scanned order to the database
-      const response = await axios.post(
-        `${baseUrl}/api/cashier/borrowed-items`,
-        {
-          ...orderData,
-          status: 'pending',
-          borrowTime: new Date().toISOString()
-        },
-        {
-          headers: { Authorization: `Bearer ${token}` },
-        }
-      );
-
-      // Ensure we're working with an array and add the new item
-      setBorrowedItems(prev => {
-        const currentItems = Array.isArray(prev) ? prev : [];
-        return [...currentItems, response.data];
-      });
+      // Add the scanned order to borrowed items
+      setBorrowedItems(prev => [...prev, {
+        ...orderData,
+        id: Date.now(), // Temporary ID for the list
+        status: 'pending',
+        borrowTime: new Date().toISOString()
+      }]);
 
       setSuccess('QR Code scanned successfully!');
       setScanning(false);
       setTimeout(() => setSuccess(''), 3000);
     } catch (err) {
-      console.error('Error saving borrowed item:', err);
-      setError('Failed to save borrowed item');
+      setError('Invalid QR Code');
       setTimeout(() => setError(''), 3000);
     }
   };
