@@ -26,12 +26,18 @@ export default function CashierPage() {
       // Get all cameras
       const devices = await Html5Qrcode.getCameras();
       
-      // Find the back camera (usually the first one in the list)
-      const backCamera = devices[0];
+      // Find the back camera by looking for it in the label
+      const backCamera = devices.find(device => 
+        device.label.toLowerCase().includes('back') || 
+        device.label.toLowerCase().includes('rear') ||
+        device.label.toLowerCase().includes('environment')
+      ) || devices[0]; // Fallback to first camera if no back camera found
 
       if (!backCamera) {
         throw new Error('No camera found');
       }
+
+      console.log('Using camera:', backCamera.label); // Debug log
 
       await qrCode.start(
         backCamera.id,
@@ -44,7 +50,8 @@ export default function CashierPage() {
             focusMode: "continuous",
             zoom: 2.0,
             width: { min: 360, ideal: 640, max: 1920 },
-            height: { min: 240, ideal: 480, max: 1080 }
+            height: { min: 240, ideal: 480, max: 1080 },
+            facingMode: { exact: "environment" } // Explicitly request back camera
           }
         },
         (decodedText) => {
