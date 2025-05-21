@@ -104,6 +104,15 @@ export default function CashierPage() {
     try {
       const orderData = JSON.parse(decodedText);
       
+      // Save the scanned QR code data to the database
+      await axios.post(
+        `${baseUrl}/api/qrcode/save-scan`,
+        { scannedData: orderData },
+        {
+          headers: { Authorization: `Bearer ${token}` },
+        }
+      );
+      
       // Add the scanned order to borrowed items
       setBorrowedItems(prev => [...prev, {
         ...orderData,
@@ -116,7 +125,8 @@ export default function CashierPage() {
       setScanning(false);
       setTimeout(() => setSuccess(''), 3000);
     } catch (err) {
-      setError('Invalid QR Code');
+      console.error('Error scanning QR code:', err);
+      setError('Invalid QR Code or error saving scan');
       setTimeout(() => setError(''), 3000);
     }
   };
