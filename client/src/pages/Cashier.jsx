@@ -14,6 +14,9 @@ export default function CashierPage() {
   const [error, setError] = useState('');
   const [success, setSuccess] = useState('');
   const [html5QrCode, setHtml5QrCode] = useState(null);
+  const [lastScannedCode, setLastScannedCode] = useState('');
+  const [isCooldown, setIsCooldown] = useState(false);
+  const [scannedCodes, setScannedCodes] = useState(new Set());
 
   const baseUrl = import.meta.env.VITE_API_BASE_URL;
   const token = user.token;
@@ -119,7 +122,26 @@ export default function CashierPage() {
 
   const handleScan = async (decodedText) => {
     try {
+      // Check if we're in cooldown
+      if (isCooldown) {
+        return;
+      }
+
       const orderData = JSON.parse(decodedText);
+      
+      // Create a unique identifier using studentId and timestamp
+      const scanIdentifier = `${orderData.studentId}-${orderData.timestamp}`;
+
+      // Check if this QR code has been scanned before
+      if (scannedCodes.has(scanIdentifier)) {
+        setError('This order has already been processed');
+        setTimeout(() => setError(''), 5000);
+        return;
+      }
+
+      // Set cooldown and add identifier to scanned set
+      setIsCooldown(true);
+      setScannedCodes(prev => new Set([...prev, scanIdentifier]));
       
       // Save to database
       const response = await axios.post(
@@ -127,7 +149,7 @@ export default function CashierPage() {
         {
           items: orderData.items,
           studentName: orderData.studentName,
-          studentId: orderData.studentId // Add studentId if available
+          studentId: orderData.studentId
         },
         {
           headers: { Authorization: `Bearer ${token}` },
@@ -139,11 +161,17 @@ export default function CashierPage() {
 
       setSuccess('QR Code scanned successfully! Items have been borrowed.');
       setScanning(false);
-      setTimeout(() => setSuccess(''), 3000);
+      setTimeout(() => setSuccess(''), 5000);
+
+      // Reset cooldown after 5 seconds
+      setTimeout(() => {
+        setIsCooldown(false);
+      }, 5000);
+
     } catch (err) {
       console.error('Error scanning QR code:', err);
       setError('Invalid QR Code or failed to save');
-      setTimeout(() => setError(''), 3000);
+      setTimeout(() => setError(''), 5000);
     }
   };
 
