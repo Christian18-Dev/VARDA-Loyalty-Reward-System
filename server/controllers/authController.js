@@ -22,7 +22,7 @@ export const registerUser  = async (req, res) => {
     _id: user._id,
     name: user.name,
     role: user.role,
-    token: generateToken(user._id),
+    token: generateToken(user),
   });
 };
 
