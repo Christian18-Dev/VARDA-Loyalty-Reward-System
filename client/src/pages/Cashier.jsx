@@ -49,7 +49,8 @@ export default function CashierPage() {
           fps: 10,
           qrbox: { width: 250, height: 250 },
           aspectRatio: 1.0,
-          disableFlip: false
+          disableFlip: false,
+          delayBetweenScanAttempts: 1000
         },
         (decodedText) => {
           handleScan(decodedText);
@@ -122,6 +123,9 @@ export default function CashierPage() {
 
   const handleScan = async (decodedText) => {
     try {
+      // Stop scanning immediately to prevent multiple scans
+      setScanning(false);
+      
       // Check if we're in cooldown
       if (isCooldown) {
         return;
@@ -160,7 +164,6 @@ export default function CashierPage() {
       setBorrowedItems(prev => [...prev, response.data.data]);
 
       setSuccess('QR Code scanned successfully! Items have been borrowed.');
-      setScanning(false);
       setTimeout(() => setSuccess(''), 5000);
 
       // Reset cooldown after 5 seconds
