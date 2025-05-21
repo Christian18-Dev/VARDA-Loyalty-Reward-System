@@ -102,45 +102,7 @@ export default function CashierPage() {
 
   const handleScan = async (decodedText) => {
     try {
-      // First, try to parse the QR code data
-      let orderData;
-      try {
-        orderData = JSON.parse(decodedText);
-      } catch (parseError) {
-        setError('Invalid QR Code format. Please scan a valid QR code.');
-        setTimeout(() => setError(''), 3000);
-        return;
-      }
-
-      // Validate the required fields in the QR code data
-      if (!orderData.studentName || !orderData.items || !Array.isArray(orderData.items)) {
-        setError('QR Code is missing required information (student name or items)');
-        setTimeout(() => setError(''), 3000);
-        return;
-      }
-
-      // Validate each item in the order
-      const invalidItems = orderData.items.filter(item => !item.name || !item.quantity);
-      if (invalidItems.length > 0) {
-        setError('Some items in the QR code are missing required information');
-        setTimeout(() => setError(''), 3000);
-        return;
-      }
-      
-      // Save the scanned QR code data to the database
-      try {
-        await axios.post(
-          `${baseUrl}/api/qrcode/save-scan`,
-          { scannedData: orderData },
-          {
-            headers: { Authorization: `Bearer ${token}` },
-          }
-        );
-      } catch (saveError) {
-        setError('Failed to save scan data. Please try again.');
-        setTimeout(() => setError(''), 3000);
-        return;
-      }
+      const orderData = JSON.parse(decodedText);
       
       // Add the scanned order to borrowed items
       setBorrowedItems(prev => [...prev, {
@@ -154,8 +116,7 @@ export default function CashierPage() {
       setScanning(false);
       setTimeout(() => setSuccess(''), 3000);
     } catch (err) {
-      console.error('Error scanning QR code:', err);
-      setError('Error processing QR code. Please try again.');
+      setError('Invalid QR Code');
       setTimeout(() => setError(''), 3000);
     }
   };
