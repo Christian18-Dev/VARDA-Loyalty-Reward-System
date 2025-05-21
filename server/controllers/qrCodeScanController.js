@@ -2,14 +2,19 @@ import QRCodeScan from '../models/QRCodeScan.js';
 
 export const saveQRCodeScan = async (req, res) => {
   try {
-    console.log('Received QR code scan request:', req.body);
+    console.log('Controller: Received QR code scan request');
     const { scannedData } = req.body;
-    const userId = req.user._id; // From auth middleware
+    
+    if (!scannedData) {
+      console.error('No scanned data provided');
+      return res.status(400).json({
+        success: false,
+        message: 'No scanned data provided'
+      });
+    }
 
-    console.log('Creating QR code scan with data:', {
-      scannedData,
-      userId
-    });
+    const userId = req.user._id;
+    console.log('Creating QR code scan for user:', userId);
 
     const qrCodeScan = await QRCodeScan.create({
       scannedData,
@@ -23,7 +28,7 @@ export const saveQRCodeScan = async (req, res) => {
       data: qrCodeScan
     });
   } catch (error) {
-    console.error('Error saving QR code scan:', error);
+    console.error('Error in saveQRCodeScan controller:', error);
     res.status(500).json({
       success: false,
       message: 'Error saving QR code scan',
@@ -47,7 +52,7 @@ export const getQRCodeScans = async (req, res) => {
       data: scans
     });
   } catch (error) {
-    console.error('Error fetching QR code scans:', error);
+    console.error('Error in getQRCodeScans controller:', error);
     res.status(500).json({
       success: false,
       message: 'Error fetching QR code scans',

@@ -14,7 +14,7 @@ const app = express();
 
 // Debug middleware to log all requests
 app.use((req, res, next) => {
-  console.log(`${req.method} ${req.url}`);
+  console.log(`[${new Date().toISOString()}] ${req.method} ${req.url}`);
   next();
 });
 
@@ -33,6 +33,7 @@ app.get('/api/test', (req, res) => {
 });
 
 // Routes
+console.log('Registering routes...');
 app.use('/api/qrcode', qrCodeScanRoutes);
 app.use('/api/cashier', cashierRoutes);
 app.use('/api/student', studentRoutes);
