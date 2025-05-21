@@ -2,9 +2,7 @@ import BorrowedItem from '../models/BorrowedItem.js';
 
 export const createBorrowedItem = async (req, res) => {
   try {
-    const { items } = req.body;
-    const studentId = req.user._id;
-    const studentName = req.user.name;
+    const { items, studentName, studentId } = req.body;
 
     const borrowedItem = new BorrowedItem({
       studentId,

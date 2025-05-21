@@ -18,6 +18,23 @@ export default function CashierPage() {
   const baseUrl = import.meta.env.VITE_API_BASE_URL;
   const token = user.token;
 
+  // Fetch borrowed items on component mount
+  useEffect(() => {
+    const fetchBorrowedItems = async () => {
+      try {
+        const res = await axios.get(`${baseUrl}/api/cashier/borrowed-items`, {
+          headers: { Authorization: `Bearer ${token}` },
+        });
+        setBorrowedItems(res.data.data);
+      } catch (err) {
+        console.error('Error fetching borrowed items:', err);
+        setError('Failed to fetch borrowed items');
+      }
+    };
+
+    fetchBorrowedItems();
+  }, [token]);
+
   const startScanner = async () => {
     try {
       const qrCode = new Html5Qrcode("reader");
@@ -104,19 +121,28 @@ export default function CashierPage() {
     try {
       const orderData = JSON.parse(decodedText);
       
-      // Add the scanned order to borrowed items
-      setBorrowedItems(prev => [...prev, {
-        ...orderData,
-        id: Date.now(), // Temporary ID for the list
-        status: 'pending',
-        borrowTime: new Date().toISOString()
-      }]);
+      // Save to database
+      const response = await axios.post(
+        `${baseUrl}/api/cashier/scan-item`,
+        {
+          items: orderData.items,
+          studentName: orderData.studentName,
+          studentId: orderData.studentId // Add studentId if available
+        },
+        {
+          headers: { Authorization: `Bearer ${token}` },
+        }
+      );
 
-      setSuccess('QR Code scanned successfully!');
+      // Update local state with the saved item
+      setBorrowedItems(prev => [...prev, response.data.data]);
+
+      setSuccess('QR Code scanned successfully! Items have been borrowed.');
       setScanning(false);
       setTimeout(() => setSuccess(''), 3000);
     } catch (err) {
-      setError('Invalid QR Code');
+      console.error('Error scanning QR code:', err);
+      setError('Invalid QR Code or failed to save');
       setTimeout(() => setError(''), 3000);
     }
   };

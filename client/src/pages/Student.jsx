@@ -211,6 +211,7 @@ export default function StudentPage() {
     const itemsToBorrow = availableItems.filter(item => item.cartQuantity > 0);
     const orderDetails = {
       studentName: user.name,
+      studentId: user._id,
       items: itemsToBorrow.map(item => ({
         name: item.name,
         quantity: item.cartQuantity
@@ -219,42 +220,19 @@ export default function StudentPage() {
     };
 
     try {
-      // Save order to database
-      await axios.post(
-        `${baseUrl}/api/student/borrow-items`,
-        { items: orderDetails.items },
-        { headers: { Authorization: `Bearer ${user.token}` } }
-      );
-
       // Generate QR code data
       setQrData(JSON.stringify(orderDetails));
       setShowQRModal(true);
-
-      // Process the order
-      itemsToBorrow.forEach(item => {
-        if (item.isSet) {
-          // For sets, add one of each item
-          for (let i = 0; i < item.cartQuantity; i++) {
-            handleBorrow(1); // Plate
-            handleBorrow(2); // Spoon
-            handleBorrow(3); // Fork
-          }
-        } else {
-          for (let i = 0; i < item.cartQuantity; i++) {
-            handleBorrow(item.id);
-          }
-        }
-      });
 
       // Reset cart quantities
       setAvailableItems(prevItems => 
         prevItems.map(item => ({ ...item, cartQuantity: 0 }))
       );
 
-      setSuccessMessage('Order placed successfully!');
+      setSuccessMessage('Order created! Show the QR code to the cashier.');
     } catch (error) {
-      console.error('Error placing order:', error);
-      setErrorMessage('Failed to place order. Please try again.');
+      console.error('Error creating order:', error);
+      setErrorMessage('Failed to create order. Please try again.');
     }
   };
 
