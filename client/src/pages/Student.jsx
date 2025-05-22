@@ -59,6 +59,8 @@ export default function StudentPage() {
   ]);
   const [showQRModal, setShowQRModal] = useState(false);
   const [qrData, setQrData] = useState(null);
+  const [showCart, setShowCart] = useState(false);
+  const [showSuccessModal, setShowSuccessModal] = useState(false);
 
   const baseUrl = import.meta.env.VITE_API_BASE_URL;
 
@@ -223,13 +225,12 @@ export default function StudentPage() {
       // Generate QR code data
       setQrData(JSON.stringify(orderDetails));
       setShowQRModal(true);
+      setShowSuccessModal(true);
 
       // Reset cart quantities
       setAvailableItems(prevItems => 
         prevItems.map(item => ({ ...item, cartQuantity: 0 }))
       );
-
-      setSuccessMessage('Order created! Show the QR code to the cashier.');
     } catch (error) {
       console.error('Error creating order:', error);
       setErrorMessage('Failed to create order. Please try again.');
@@ -538,112 +539,159 @@ export default function StudentPage() {
         {currentPage === 'borrow' && (
           <motion.div variants={itemVariants} className="space-y-6">
             <div className="text-center">
+              <h2 className="text-2xl font-bold text-purple-800">Order Items</h2>
               <p className="text-gray-600 mt-1">Select items to borrow for your needs</p>
             </div>
 
-            {/* Available Items */}
-            <div className="bg-white p-6 rounded-2xl shadow-lg">
-              <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                {availableItems.map((item) => (
-                  <motion.div 
-                    key={item.id}
-                    whileHover={{ scale: 1.02 }}
-                    className={`bg-white rounded-xl shadow-md overflow-hidden border border-gray-100 ${
-                      item.isSet ? 'md:col-span-2' : ''
-                    }`}
-                  >
-                    <div className="relative h-48 overflow-hidden">
-                      <img 
-                        src={item.image} 
-                        alt={item.name}
-                        className="w-full h-full object-cover"
-                      />
-                      {item.isSet && (
-                        <div className="absolute bottom-0 left-0 right-0 bg-gradient-to-t from-black/60 to-transparent p-4">
-                          <div className="flex items-center space-x-2">
-                            <span className="text-white text-sm">Includes:</span>
-                            <span className="text-white/90 text-sm">1 Plate</span>
-                            <span className="text-white/90 text-sm">•</span>
-                            <span className="text-white/90 text-sm">1 Spoon</span>
-                            <span className="text-white/90 text-sm">•</span>
-                            <span className="text-white/90 text-sm">1 Fork</span>
-                          </div>
-                        </div>
-                      )}
-                    </div>
-                    <div className="p-4">
-                      <h4 className="font-bold text-lg text-gray-800">{item.name}</h4>
-                      <p className="text-sm text-gray-600 mb-3">{item.description}</p>
-                      <div className="flex items-center justify-between">
+            {/* Available Items Grid */}
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+              {availableItems.map((item) => (
+                <motion.div 
+                  key={item.id}
+                  whileHover={{ scale: 1.02 }}
+                  className={`bg-white rounded-xl shadow-md overflow-hidden border border-gray-100 ${
+                    item.isSet ? 'md:col-span-2' : ''
+                  }`}
+                >
+                  <div className="relative h-48 overflow-hidden">
+                    <img 
+                      src={item.image} 
+                      alt={item.name}
+                      className="w-full h-full object-cover"
+                    />
+                    {item.isSet && (
+                      <div className="absolute bottom-0 left-0 right-0 bg-gradient-to-t from-black/60 to-transparent p-4">
                         <div className="flex items-center space-x-2">
-                          <button
-                            onClick={() => handleRemoveFromCart(item.id)}
-                            disabled={item.cartQuantity === 0}
-                            className={`w-8 h-8 rounded-full flex items-center justify-center text-lg font-bold transition-all ${
-                              item.cartQuantity === 0
-                                ? 'bg-gray-200 text-gray-400 cursor-not-allowed'
-                                : 'bg-red-500 text-white hover:bg-red-600'
-                            }`}
-                          >
-                            -
-                          </button>
-                          <span className="w-8 text-center font-medium">{item.cartQuantity}</span>
-                          <button
-                            onClick={() => handleAddToCart(item.id)}
-                            className="w-8 h-8 rounded-full flex items-center justify-center text-lg font-bold transition-all bg-green-500 text-white hover:bg-green-600"
-                          >
-                            +
-                          </button>
+                          <span className="text-white text-sm">Includes:</span>
+                          <span className="text-white/90 text-sm">1 Plate</span>
+                          <span className="text-white/90 text-sm">•</span>
+                          <span className="text-white/90 text-sm">1 Spoon</span>
+                          <span className="text-white/90 text-sm">•</span>
+                          <span className="text-white/90 text-sm">1 Fork</span>
                         </div>
-                        <span className="text-sm text-gray-500">
-                          {item.cartQuantity > 0 ? `${item.cartQuantity} in cart` : ''}
-                        </span>
+                      </div>
+                    )}
+                  </div>
+                  <div className="p-4">
+                    <h4 className="font-bold text-lg text-gray-800">{item.name}</h4>
+                    <p className="text-sm text-gray-600 mb-3">{item.description}</p>
+                    <div className="flex items-center justify-between">
+                      <div className="flex items-center space-x-2">
+                        <button
+                          onClick={() => handleRemoveFromCart(item.id)}
+                          disabled={item.cartQuantity === 0}
+                          className={`w-8 h-8 rounded-full flex items-center justify-center text-lg font-bold transition-all ${
+                            item.cartQuantity === 0
+                              ? 'bg-gray-200 text-gray-400 cursor-not-allowed'
+                              : 'bg-red-500 text-white hover:bg-red-600'
+                          }`}
+                        >
+                          -
+                        </button>
+                        <span className="w-8 text-center font-medium">{item.cartQuantity}</span>
+                        <button
+                          onClick={() => handleAddToCart(item.id)}
+                          className="w-8 h-8 rounded-full flex items-center justify-center text-lg font-bold transition-all bg-green-500 text-white hover:bg-green-600"
+                        >
+                          +
+                        </button>
                       </div>
                     </div>
-                  </motion.div>
-                ))}
-              </div>
+                  </div>
+                </motion.div>
+              ))}
             </div>
 
-            {/* Cart Summary */}
+            {/* Floating Cart Button */}
             {availableItems.some(item => item.cartQuantity > 0) && (
-              <motion.div 
+              <motion.button
                 initial={{ opacity: 0, y: 20 }}
                 animate={{ opacity: 1, y: 0 }}
-                className="bg-white p-6 rounded-2xl shadow-lg"
+                onClick={() => setShowCart(true)}
+                className="fixed bottom-24 right-6 bg-purple-600 text-white p-4 rounded-full shadow-lg hover:bg-purple-700 transition-all flex items-center space-x-2"
               >
-                <h3 className="text-xl font-semibold text-gray-800 mb-4">Cart Summary</h3>
-                <div className="space-y-4">
-                  {availableItems
-                    .filter(item => item.cartQuantity > 0)
-                    .map(item => (
-                      <div key={item.id} className="flex items-center justify-between p-4 bg-gray-50 rounded-xl">
-                        <div className="flex items-center space-x-4">
-                          <img 
-                            src={item.image} 
-                            alt={item.name}
-                            className="w-16 h-16 object-cover rounded-lg"
-                          />
-                          <div>
-                            <h4 className="font-medium text-gray-800">{item.name}</h4>
-                            <p className="text-sm text-gray-600">Quantity: {item.cartQuantity}</p>
+                <svg xmlns="http://www.w3.org/2000/svg" className="h-6 w-6" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M3 3h2l.4 2M7 13h10l4-8H5.4M7 13L5.4 5M7 13l-2.293 2.293c-.63.63-.184 1.707.707 1.707H17m0 0a2 2 0 100 4 2 2 0 000-4zm-8 2a2 2 0 11-4 0 2 2 0 014 0z" />
+                </svg>
+                <span className="font-bold">
+                  {availableItems.reduce((total, item) => total + item.cartQuantity, 0)} items
+                </span>
+              </motion.button>
+            )}
+
+            {/* Slide-out Cart Panel */}
+            {showCart && (
+              <div className="fixed inset-0 bg-black/50 backdrop-blur-sm z-50">
+                <motion.div 
+                  initial={{ x: '100%' }}
+                  animate={{ x: 0 }}
+                  exit={{ x: '100%' }}
+                  className="absolute right-0 top-0 h-full w-full max-w-md bg-white shadow-xl"
+                >
+                  <div className="p-6 h-full flex flex-col">
+                    <div className="flex justify-between items-center mb-6">
+                      <h3 className="text-xl font-bold text-gray-800">Your Cart</h3>
+                      <button 
+                        onClick={() => setShowCart(false)}
+                        className="text-gray-500 hover:text-gray-700"
+                      >
+                        <svg xmlns="http://www.w3.org/2000/svg" className="h-6 w-6" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
+                        </svg>
+                      </button>
+                    </div>
+
+                    <div className="flex-grow overflow-y-auto">
+                      {availableItems
+                        .filter(item => item.cartQuantity > 0)
+                        .map(item => (
+                          <div key={item.id} className="flex items-center space-x-4 p-4 bg-gray-50 rounded-xl mb-4">
+                            <img 
+                              src={item.image} 
+                              alt={item.name}
+                              className="w-20 h-20 object-cover rounded-lg"
+                            />
+                            <div className="flex-grow">
+                              <h4 className="font-medium text-gray-800">{item.name}</h4>
+                              <div className="flex items-center space-x-2 mt-2">
+                                <button
+                                  onClick={() => handleRemoveFromCart(item.id)}
+                                  className="w-6 h-6 rounded-full flex items-center justify-center text-sm font-bold bg-red-500 text-white hover:bg-red-600"
+                                >
+                                  -
+                                </button>
+                                <span className="w-8 text-center">{item.cartQuantity}</span>
+                                <button
+                                  onClick={() => handleAddToCart(item.id)}
+                                  className="w-6 h-6 rounded-full flex items-center justify-center text-sm font-bold bg-green-500 text-white hover:bg-green-600"
+                                >
+                                  +
+                                </button>
+                              </div>
+                            </div>
                           </div>
-                        </div>
-                      </div>
-                    ))}
-                  <button
-                    onClick={handleConfirmOrder}
-                    className="w-full py-3 bg-purple-600 text-white rounded-xl font-bold hover:bg-purple-700 transition-all"
-                  >
-                    Confirm
-                  </button>
-                </div>
-              </motion.div>
+                        ))}
+                    </div>
+
+                    <div className="mt-6">
+                      <button
+                        onClick={() => {
+                          handleConfirmOrder();
+                          setShowCart(false);
+                        }}
+                        className="w-full py-4 bg-purple-600 text-white rounded-xl font-bold hover:bg-purple-700 transition-all"
+                      >
+                        Confirm Order
+                      </button>
+                    </div>
+                  </div>
+                </motion.div>
+              </div>
             )}
 
             {/* Borrowed Items */}
             {borrowedItems.length > 0 && (
-              <div className="bg-white p-6 rounded-2xl shadow-lg">
+              <div className="bg-white p-6 rounded-2xl shadow-lg mt-6">
                 <h3 className="text-xl font-semibold text-gray-800 mb-4">Your Orders</h3>
                 <div className="space-y-4">
                   {borrowedItems.map((item) => (
@@ -722,8 +770,7 @@ export default function StudentPage() {
             className="bg-white rounded-2xl p-6 max-w-sm w-full shadow-xl border-2 border-purple-300"
           >
             <div className="text-center space-y-4">
-              <h3 className="text-xl font-bold text-purple-800">Order Confirmed!</h3>
-              <p className="text-gray-600">Show this QR code to the cashier</p>
+              <h3 className="text-xl font-bold text-purple-800">Scan Me!</h3>
               
               <div className="bg-white p-4 rounded-xl border-2 border-dashed border-purple-200">
                 <QRCodeSVG 
@@ -751,6 +798,36 @@ export default function StudentPage() {
                 className="w-full bg-purple-600 text-white px-4 py-2 rounded-xl hover:bg-purple-700 transition"
               >
                 Close
+              </button>
+            </div>
+          </motion.div>
+        </div>
+      )}
+
+      {/* Success Modal */}
+      {showSuccessModal && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 backdrop-blur-sm">
+          <motion.div 
+            initial={{ scale: 0.9, opacity: 0 }}
+            animate={{ scale: 1, opacity: 1 }}
+            className="bg-white rounded-2xl p-6 max-w-sm w-full shadow-xl border-2 border-green-300"
+          >
+            <div className="text-center space-y-4">
+              <div className="w-16 h-16 bg-green-100 rounded-full flex items-center justify-center mx-auto">
+                <svg xmlns="http://www.w3.org/2000/svg" className="h-8 w-8 text-green-600" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M5 13l4 4L19 7" />
+                </svg>
+              </div>
+              <h3 className="text-xl font-bold text-gray-800">Order Created!</h3>
+              <p className="text-gray-600">Show the QR code to the cashier</p>
+              <button 
+                onClick={() => {
+                  setShowSuccessModal(false);
+                  setShowCart(false);
+                }}
+                className="w-full py-3 bg-green-600 text-white rounded-xl font-bold hover:bg-green-700 transition-all"
+              >
+                OK
               </button>
             </div>
           </motion.div>
