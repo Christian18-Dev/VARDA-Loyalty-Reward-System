@@ -16,7 +16,11 @@ export default function CashierPage() {
   const [html5QrCode, setHtml5QrCode] = useState(null);
   const [lastScannedCode, setLastScannedCode] = useState('');
   const [isCooldown, setIsCooldown] = useState(false);
-  const [scannedCodes, setScannedCodes] = useState(new Set());
+  const [scannedCodes, setScannedCodes] = useState(() => {
+    // Initialize from localStorage if available
+    const savedCodes = localStorage.getItem('scannedCodes');
+    return savedCodes ? new Set(JSON.parse(savedCodes)) : new Set();
+  });
   const [returnedItems, setReturnedItems] = useState([]);
   const [borrowedSearchTerm, setBorrowedSearchTerm] = useState('');
   const [returnedSearchTerm, setReturnedSearchTerm] = useState('');
@@ -192,6 +196,11 @@ export default function CashierPage() {
     fetchClaimed();
   }, []);
 
+  // Save scanned codes to localStorage whenever it changes
+  useEffect(() => {
+    localStorage.setItem('scannedCodes', JSON.stringify([...scannedCodes]));
+  }, [scannedCodes]);
+
   const handleScan = async (decodedText) => {
     try {
       // Stop scanning immediately to prevent multiple scans
@@ -207,9 +216,9 @@ export default function CashierPage() {
       // Create a unique identifier using studentId and timestamp
       const scanIdentifier = `${orderData.studentId}-${orderData.timestamp}`;
 
-      // Check if this QR code has been scanned before
+      // Check if this specific QR code has been scanned before
       if (scannedCodes.has(scanIdentifier)) {
-        setError('This order has already been processed');
+        setError('This QR code has already been scanned.');
         setTimeout(() => setError(''), 5000);
         return;
       }
@@ -231,8 +240,8 @@ export default function CashierPage() {
         }
       );
 
-      // Update local state with the saved item
-      setBorrowedItems(prev => [...prev, response.data.data]);
+      // Update local state with the saved item at the beginning of the list
+      setBorrowedItems(prev => [response.data.data, ...prev]);
 
       setSuccess('QR Code scanned successfully! Items have been borrowed.');
       setTimeout(() => setSuccess(''), 5000);
@@ -274,6 +283,12 @@ export default function CashierPage() {
       setError(err.response?.data?.message || 'Failed to return item');
       setTimeout(() => setError(''), 5000);
     }
+  };
+
+  // Add a function to clear scanned codes (optional, can be used if needed)
+  const clearScannedCodes = () => {
+    setScannedCodes(new Set());
+    localStorage.removeItem('scannedCodes');
   };
 
   return (
