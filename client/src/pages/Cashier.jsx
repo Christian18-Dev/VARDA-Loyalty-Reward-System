@@ -17,25 +17,96 @@ export default function CashierPage() {
   const [lastScannedCode, setLastScannedCode] = useState('');
   const [isCooldown, setIsCooldown] = useState(false);
   const [scannedCodes, setScannedCodes] = useState(new Set());
+  const [returnedItems, setReturnedItems] = useState([]);
+  const [borrowedSearchTerm, setBorrowedSearchTerm] = useState('');
+  const [returnedSearchTerm, setReturnedSearchTerm] = useState('');
+  const [currentBorrowedPage, setCurrentBorrowedPage] = useState(1);
+  const [currentReturnedPage, setCurrentReturnedPage] = useState(1);
+  const itemsPerPage = 5;
 
   const baseUrl = import.meta.env.VITE_API_BASE_URL;
   const token = user.token;
 
-  // Fetch borrowed items on component mount
-  useEffect(() => {
-    const fetchBorrowedItems = async () => {
-      try {
-        const res = await axios.get(`${baseUrl}/api/cashier/borrowed-items`, {
-          headers: { Authorization: `Bearer ${token}` },
-        });
-        setBorrowedItems(res.data.data);
-      } catch (err) {
-        console.error('Error fetching borrowed items:', err);
-        setError('Failed to fetch borrowed items');
-      }
-    };
+  const fetchBorrowedItems = async () => {
+    try {
+      const res = await axios.get(`${baseUrl}/api/cashier/borrowed-items`, {
+        headers: { Authorization: `Bearer ${token}` },
+      });
+      const items = res.data.data;
+      // Sort borrowed items by borrow time (newest first)
+      const sortedBorrowed = items
+        .filter(item => item.status === 'borrowed')
+        .sort((a, b) => new Date(b.borrowTime) - new Date(a.borrowTime));
+      // Sort returned items by return time (newest first)
+      const sortedReturned = items
+        .filter(item => item.status === 'returned')
+        .sort((a, b) => new Date(b.returnTime) - new Date(a.returnTime));
+      
+      setBorrowedItems(sortedBorrowed);
+      setReturnedItems(sortedReturned);
+    } catch (err) {
+      console.error('Error fetching borrowed items:', err);
+      setError('Failed to fetch borrowed items');
+    }
+  };
 
+  // Filter items based on search terms
+  const filteredBorrowedItems = borrowedItems.filter(item =>
+    item.studentName.toLowerCase().includes(borrowedSearchTerm.toLowerCase())
+  );
+
+  const filteredReturnedItems = returnedItems.filter(item =>
+    item.studentName.toLowerCase().includes(returnedSearchTerm.toLowerCase())
+  );
+
+  // Pagination calculations
+  const totalBorrowedPages = Math.ceil(filteredBorrowedItems.length / itemsPerPage);
+  const totalReturnedPages = Math.ceil(filteredReturnedItems.length / itemsPerPage);
+
+  const paginatedBorrowedItems = filteredBorrowedItems.slice(
+    (currentBorrowedPage - 1) * itemsPerPage,
+    currentBorrowedPage * itemsPerPage
+  );
+
+  const paginatedReturnedItems = filteredReturnedItems.slice(
+    (currentReturnedPage - 1) * itemsPerPage,
+    currentReturnedPage * itemsPerPage
+  );
+
+  // Handle page changes
+  const handleBorrowedPageChange = (page) => {
+    setCurrentBorrowedPage(page);
+  };
+
+  const handleReturnedPageChange = (page) => {
+    setCurrentReturnedPage(page);
+  };
+
+  // Handle search
+  const handleBorrowedSearch = (e) => {
+    setBorrowedSearchTerm(e.target.value);
+    setCurrentBorrowedPage(1);
+  };
+
+  const handleReturnedSearch = (e) => {
+    setReturnedSearchTerm(e.target.value);
+    setCurrentReturnedPage(1);
+  };
+
+  // Initial fetch on component mount
+  useEffect(() => {
     fetchBorrowedItems();
+  }, [token]);
+
+  // Set up polling for auto-updates
+  useEffect(() => {
+    // Poll every 5 seconds
+    const pollInterval = setInterval(fetchBorrowedItems, 5000);
+
+    // Cleanup interval on component unmount
+    return () => {
+      clearInterval(pollInterval);
+    };
   }, [token]);
 
   const startScanner = async () => {
@@ -184,6 +255,27 @@ export default function CashierPage() {
     setTimeout(() => setError(''), 3000);
   };
 
+  const handleReturnItem = async (itemId) => {
+    try {
+      const response = await axios.put(
+        `${baseUrl}/api/cashier/return-item/${itemId}`,
+        {},
+        { headers: { Authorization: `Bearer ${token}` } }
+      );
+
+      // Update the local state
+      setBorrowedItems(prev => prev.filter(item => item._id !== itemId));
+      setReturnedItems(prev => [...prev, response.data.data]);
+      
+      setSuccess('Item returned successfully!');
+      setTimeout(() => setSuccess(''), 5000);
+    } catch (err) {
+      console.error('Error returning item:', err);
+      setError(err.response?.data?.message || 'Failed to return item');
+      setTimeout(() => setError(''), 5000);
+    }
+  };
+
   return (
     <div className="min-h-screen bg-gradient-to-b from-blue-50 to-purple-50 p-6">
       <div className="max-w-6xl mx-auto space-y-6">
@@ -231,7 +323,18 @@ export default function CashierPage() {
 
         {/* Borrowed Items Table */}
         <div className="bg-white rounded-2xl shadow-lg p-6">
-          <h2 className="text-xl font-semibold text-gray-800 mb-4">Borrowed Items</h2>
+          <div className="flex justify-between items-center mb-4">
+            <h2 className="text-xl font-semibold text-gray-800">Borrowed Items</h2>
+            <div className="w-64">
+              <input
+                type="text"
+                placeholder="Search by student name..."
+                value={borrowedSearchTerm}
+                onChange={handleBorrowedSearch}
+                className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-purple-500 focus:border-transparent"
+              />
+            </div>
+          </div>
           <div className="overflow-x-auto">
             <table className="min-w-full divide-y divide-gray-200">
               <thead className="bg-gray-50">
@@ -248,11 +351,14 @@ export default function CashierPage() {
                   <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
                     Status
                   </th>
+                  <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                    Action
+                  </th>
                 </tr>
               </thead>
               <tbody className="bg-white divide-y divide-gray-200">
-                {borrowedItems.map((item) => (
-                  <tr key={item.id}>
+                {paginatedBorrowedItems.map((item) => (
+                  <tr key={item._id}>
                     <td className="px-6 py-4 whitespace-nowrap">
                       <div className="text-sm font-medium text-gray-900">{item.studentName}</div>
                     </td>
@@ -267,11 +373,105 @@ export default function CashierPage() {
                       </div>
                     </td>
                     <td className="px-6 py-4 whitespace-nowrap">
-                      <span className={`px-2 inline-flex text-xs leading-5 font-semibold rounded-full ${
-                        item.status === 'returned' 
-                          ? 'bg-green-100 text-green-800' 
-                          : 'bg-yellow-100 text-yellow-800'
-                      }`}>
+                      <span className="px-2 inline-flex text-xs leading-5 font-semibold rounded-full bg-yellow-100 text-yellow-800">
+                        {item.status}
+                      </span>
+                    </td>
+                    <td className="px-6 py-4 whitespace-nowrap">
+                      <button
+                        onClick={() => handleReturnItem(item._id)}
+                        className="px-3 py-1 text-sm font-medium text-white bg-green-600 rounded-md hover:bg-green-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-green-500"
+                      >
+                        Return
+                      </button>
+                    </td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+            {paginatedBorrowedItems.length === 0 && (
+              <p className="text-gray-500 text-center py-4">No borrowed items found.</p>
+            )}
+            
+            {/* Pagination for Borrowed Items */}
+            {totalBorrowedPages > 1 && (
+              <div className="flex justify-center mt-4 space-x-2">
+                {Array.from({ length: totalBorrowedPages }, (_, i) => i + 1).map((page) => (
+                  <button
+                    key={page}
+                    onClick={() => handleBorrowedPageChange(page)}
+                    className={`px-3 py-1 rounded-md ${
+                      currentBorrowedPage === page
+                        ? 'bg-purple-600 text-white'
+                        : 'bg-gray-100 text-gray-700 hover:bg-gray-200'
+                    }`}
+                  >
+                    {page}
+                  </button>
+                ))}
+              </div>
+            )}
+          </div>
+        </div>
+
+        {/* Returned Items Table */}
+        <div className="bg-white rounded-2xl shadow-lg p-6 mt-6">
+          <div className="flex justify-between items-center mb-4">
+            <h2 className="text-xl font-semibold text-gray-800">Returned Items History</h2>
+            <div className="w-64">
+              <input
+                type="text"
+                placeholder="Search by student name..."
+                value={returnedSearchTerm}
+                onChange={handleReturnedSearch}
+                className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-purple-500 focus:border-transparent"
+              />
+            </div>
+          </div>
+          <div className="overflow-x-auto">
+            <table className="min-w-full divide-y divide-gray-200">
+              <thead className="bg-gray-50">
+                <tr>
+                  <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                    Student
+                  </th>
+                  <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                    Items
+                  </th>
+                  <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                    Borrow Time
+                  </th>
+                  <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                    Return Time
+                  </th>
+                  <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                    Status
+                  </th>
+                </tr>
+              </thead>
+              <tbody className="bg-white divide-y divide-gray-200">
+                {paginatedReturnedItems.map((item) => (
+                  <tr key={item._id}>
+                    <td className="px-6 py-4 whitespace-nowrap">
+                      <div className="text-sm font-medium text-gray-900">{item.studentName}</div>
+                    </td>
+                    <td className="px-6 py-4">
+                      <div className="text-sm text-gray-900">
+                        {item.items.map(i => `${i.name} (${i.quantity})`).join(', ')}
+                      </div>
+                    </td>
+                    <td className="px-6 py-4 whitespace-nowrap">
+                      <div className="text-sm text-gray-900">
+                        {new Date(item.borrowTime).toLocaleString()}
+                      </div>
+                    </td>
+                    <td className="px-6 py-4 whitespace-nowrap">
+                      <div className="text-sm text-gray-900">
+                        {new Date(item.returnTime).toLocaleString()}
+                      </div>
+                    </td>
+                    <td className="px-6 py-4 whitespace-nowrap">
+                      <span className="px-2 inline-flex text-xs leading-5 font-semibold rounded-full bg-green-100 text-green-800">
                         {item.status}
                       </span>
                     </td>
@@ -279,8 +479,27 @@ export default function CashierPage() {
                 ))}
               </tbody>
             </table>
-            {borrowedItems.length === 0 && (
-              <p className="text-gray-500 text-center py-4">No borrowed items found.</p>
+            {paginatedReturnedItems.length === 0 && (
+              <p className="text-gray-500 text-center py-4">No returned items found.</p>
+            )}
+            
+            {/* Pagination for Returned Items */}
+            {totalReturnedPages > 1 && (
+              <div className="flex justify-center mt-4 space-x-2">
+                {Array.from({ length: totalReturnedPages }, (_, i) => i + 1).map((page) => (
+                  <button
+                    key={page}
+                    onClick={() => handleReturnedPageChange(page)}
+                    className={`px-3 py-1 rounded-md ${
+                      currentReturnedPage === page
+                        ? 'bg-purple-600 text-white'
+                        : 'bg-gray-100 text-gray-700 hover:bg-gray-200'
+                    }`}
+                  >
+                    {page}
+                  </button>
+                ))}
+              </div>
             )}
           </div>
         </div>
