@@ -276,7 +276,8 @@ export default function CashierPage() {
       setBorrowedItems(prev => prev.filter(item => item._id !== itemId));
       setReturnedItems(prev => [...prev, response.data.data]);
       
-      setSuccess('Item returned successfully!');
+      // Always show points added message since we're adding points on every return
+      setSuccess('Item returned successfully! Student earned 1 loyalty point.');
       setTimeout(() => setSuccess(''), 5000);
     } catch (err) {
       console.error('Error returning item:', err);
