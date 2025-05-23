@@ -391,7 +391,7 @@ export default function CashierPage() {
   return (
     <div className="min-h-screen bg-gradient-to-br from-indigo-50 via-purple-50 to-pink-50">
       {/* Header with Welcome Message and Logout */}
-      <div className="bg-white shadow-lg sticky top-0 z-50">
+      <div className="bg-white shadow-lg fixed top-0 left-0 right-0 z-[100]">
         <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
           <div className="flex justify-between items-center py-4">
             <div className="flex items-center space-x-3">
@@ -402,7 +402,7 @@ export default function CashierPage() {
                 <h1 className="text-xl font-bold text-gray-800">Cashier Dashboard</h1>
                 <p className="text-sm text-gray-600">Welcome, {user?.name || 'User'}</p>
               </div>
-        </div>
+            </div>
             <button
               onClick={handleLogoutClick}
               className="flex items-center space-x-2 px-4 py-2 bg-red-500 text-white rounded-lg hover:bg-red-600 transition-colors shadow-sm"
@@ -479,7 +479,7 @@ export default function CashierPage() {
       </AnimatePresence>
 
       {/* Tab Navigation */}
-      <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-4">
+      <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-4 bg-white fixed top-[72px] left-0 right-0 z-[90] shadow-sm">
         <div className="flex space-x-2 overflow-x-auto pb-2 scrollbar-hide">
           {[
             { id: 'scanner', icon: CameraIcon, label: 'Scanner' },
@@ -505,7 +505,7 @@ export default function CashierPage() {
       </div>
 
       {/* Main Content */}
-      <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-6">
+      <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-6 mt-[144px]">
         {/* Scanner Tab */}
         {activeTab === 'scanner' && (
           <motion.div
