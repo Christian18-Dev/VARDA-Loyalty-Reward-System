@@ -321,13 +321,15 @@ export default function StudentPage() {
         {currentPage === 'home' && (
           <motion.div variants={itemVariants} className="space-y-6">
             <motion.div 
-              className="relative mx-auto p-4 sm:p-6 md:p-7 w-full max-w-md bg-gradient-to-br from-indigo-600 via-purple-700 to-purple-800 rounded-2xl shadow-2xl text-white overflow-hidden aspect-[85.6/54]"
+              className="relative mx-auto p-3 sm:p-4 md:p-6 w-full max-w-md bg-gradient-to-br from-indigo-600 via-purple-700 to-purple-800 rounded-2xl shadow-2xl text-white overflow-hidden"
               whileHover={{ scale: 1.02 }}
               whileTap={{ scale: 0.98 }}
               style={{
                 perspective: "1000px",
                 transformStyle: "preserve-3d",
-                minHeight: "200px"
+                height: "clamp(220px, 50vw, 280px)",
+                width: "clamp(280px, 85vw, 400px)",
+                margin: "0 auto"
               }}
             >
               {/* Card Content */}
@@ -335,9 +337,9 @@ export default function StudentPage() {
                 {/* Card issuer and chip */}
                 <div className="flex justify-between items-start">
                   <div className="text-xs font-medium opacity-80">LOYALTY CARD</div>
-                  <div className="w-10 h-8 bg-gradient-to-br from-yellow-300 to-yellow-500 rounded-md flex items-center justify-center">
-                    <div className="w-8 h-6 bg-gradient-to-br from-yellow-400 to-yellow-600 rounded-sm border border-yellow-200/50 flex items-center justify-center">
-                      <div className="w-5 h-4 bg-gradient-to-br from-yellow-500 to-yellow-700 rounded-xs border border-yellow-300/50"></div>
+                  <div className="w-8 sm:w-10 h-6 sm:h-8 bg-gradient-to-br from-yellow-300 to-yellow-500 rounded-md flex items-center justify-center">
+                    <div className="w-6 sm:w-8 h-4 sm:h-6 bg-gradient-to-br from-yellow-400 to-yellow-600 rounded-sm border border-yellow-200/50 flex items-center justify-center">
+                      <div className="w-4 sm:w-5 h-3 sm:h-4 bg-gradient-to-br from-yellow-500 to-yellow-700 rounded-xs border border-yellow-300/50"></div>
                     </div>
                   </div>
                 </div>
@@ -347,25 +349,25 @@ export default function StudentPage() {
                   key={points}
                   initial={{ scale: 1.1, opacity: 0.8 }}
                   animate={{ scale: 1, opacity: 1 }}
-                  className="text-center my-2 sm:my-4"
+                  className="text-center flex-grow flex flex-col justify-center py-2 sm:py-4"
                 >
                   <p className="text-xs opacity-80 mb-1">POINTS BALANCE:</p>
-                  <p className="text-3xl sm:text-4xl md:text-5xl font-bold tracking-tight flex items-center justify-center">
-                    {points} <span className="text-xl sm:text-2xl ml-2">⭐</span>
+                  <p className="text-2xl sm:text-3xl md:text-4xl font-bold tracking-tight flex items-center justify-center">
+                    {points} <span className="text-lg sm:text-xl ml-2">⭐</span>
                   </p>
                 </motion.div>
 
                 {/* Card footer */}
-                <div className="flex justify-between items-end mt-2 sm:mt-4">
-                  <div>
-                    <p className="text-sm sm:text-base font-medium tracking-wider">{user.name.toUpperCase()}</p>
+                <div className="flex justify-between items-end mt-auto pt-2 sm:pt-3">
+                  <div className="max-w-[60%]">
+                    <p className="text-xs sm:text-sm font-medium tracking-wider truncate">{user.name.toUpperCase()}</p>
                   </div>
                   
                   <div className="text-right">
                     <p className="text-xs opacity-80">STATUS</p>
                     <div className="flex items-center justify-end space-x-1">
                       <div className="w-2 h-2 bg-green-400 rounded-full animate-pulse"></div>
-                      <p className="text-sm sm:text-base font-medium">ACTIVE</p>
+                      <p className="text-xs sm:text-sm font-medium">ACTIVE</p>
                     </div>
                   </div>
                 </div>
