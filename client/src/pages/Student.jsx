@@ -1,7 +1,7 @@
 import { useEffect, useState } from 'react';
 import axios from 'axios';
 import { useAuth } from '../context/AuthContext';
-import { HomeIcon, TicketIcon, GiftIcon, LogoutIcon, ClipboardListIcon } from '@heroicons/react/outline';
+import { HomeIcon, TicketIcon, GiftIcon, LogoutIcon, ShoppingBagIcon } from '@heroicons/react/outline';
 import { motion } from 'framer-motion';
 import confetti from 'canvas-confetti';
 import { QRCodeSVG } from 'qrcode.react';
@@ -375,6 +375,49 @@ export default function StudentPage() {
                 <div className="absolute top-0 left-0 w-full h-full bg-gradient-to-r from-transparent via-white/30 to-transparent opacity-0 hover:opacity-30 transition-opacity duration-300"></div>
               </div>
             </motion.div>
+
+            {/* Navigation Buttons */}
+            <div className="grid grid-cols-3 gap-4 mt-6">
+              <motion.button
+                whileHover={{ scale: 1.05 }}
+                whileTap={{ scale: 0.95 }}
+                onClick={() => {
+                  setCurrentPage('claim');
+                  setCode('');
+                  setShowFeedback(false);
+                  setErrorMessage('');
+                  setSuccessMessage('');
+                }}
+                className="flex flex-col items-center p-4 bg-white rounded-xl shadow-md hover:shadow-lg transition-all"
+              >
+                <TicketIcon className="h-8 w-8 text-blue-600" />
+                <span className="mt-2 font-medium text-gray-700">Redeem</span>
+              </motion.button>
+
+              <motion.button
+                whileHover={{ scale: 1.05 }}
+                whileTap={{ scale: 0.95 }}
+                onClick={() => {
+                  setCurrentPage('rewards');
+                  setErrorMessage('');
+                  setSuccessMessage('');
+                }}
+                className="flex flex-col items-center p-4 bg-white rounded-xl shadow-md hover:shadow-lg transition-all"
+              >
+                <GiftIcon className="h-8 w-8 text-pink-600" />
+                <span className="mt-2 font-medium text-gray-700">Rewards</span>
+              </motion.button>
+
+              <motion.button
+                whileHover={{ scale: 1.05 }}
+                whileTap={{ scale: 0.95 }}
+                onClick={() => setCurrentPage('borrow')}
+                className="flex flex-col items-center p-4 bg-white rounded-xl shadow-md hover:shadow-lg transition-all"
+              >
+                <ShoppingBagIcon className="h-8 w-8 text-purple-600" />
+                <span className="mt-2 font-medium text-gray-700">Borrow</span>
+              </motion.button>
+            </div>
           </motion.div>
         )}
 
@@ -727,6 +770,11 @@ export default function StudentPage() {
             )}
           </motion.div>
         )}
+
+        {/* Settings Page */}
+        {currentPage === 'settings' && (
+          <SettingsPage user={user} onBack={() => setCurrentPage('home')} />
+        )}
       </motion.div>
 
       {showClaimModal && (
@@ -835,61 +883,38 @@ export default function StudentPage() {
       )}
 
       {/* Bottom Navigation */}
-      <nav className="fixed bottom-0 left-0 right-0 bg-white border-t-2 border-purple-200 shadow-lg flex justify-around py-3 z-40">
+      <nav className="fixed bottom-0 left-0 right-0 bg-white border-t border-purple-200 shadow-md flex justify-around py-2 z-40">
         <button 
-          onClick={() => {
-            setCurrentPage('home');
-            setErrorMessage('');
-            setSuccessMessage('');
-          }} 
-          className={`flex flex-col items-center text-sm p-2 rounded-xl transition-all ${currentPage === 'home' ? 'text-purple-700 bg-purple-100' : 'text-gray-500'}`}
-          aria-label="Home"
+          onClick={() => setCurrentPage('settings')}
+          className="flex items-center justify-center p-2 rounded-full bg-gray-50 hover:bg-purple-50 text-gray-500 hover:text-purple-700 transition-all"
+          aria-label="Settings"
         >
-          <HomeIcon className="h-7 w-7" />
-          <span className="mt-1 font-medium">Home</span>
-        </button>
-        <button 
-          onClick={() => {
-            setCurrentPage('claim');
-            setCode('');
-            setShowFeedback(false);
-            setErrorMessage('');
-            setSuccessMessage('');
-          }} 
-          className={`flex flex-col items-center text-sm p-2 rounded-xl transition-all ${currentPage === 'claim' ? 'text-blue-700 bg-blue-100' : 'text-gray-500'}`}
-          aria-label="Claim Code"
-        >
-          <TicketIcon className="h-7 w-7" />
-          <span className="mt-1 font-medium">Redeem</span>
-        </button>
-        <button 
-          onClick={() => {
-            setCurrentPage('rewards');
-            setErrorMessage('');
-            setSuccessMessage('');
-          }} 
-          className={`flex flex-col items-center text-sm p-2 rounded-xl transition-all ${currentPage === 'rewards' ? 'text-pink-700 bg-pink-100' : 'text-gray-500'}`}
-          aria-label="Rewards"
-        >
-          <GiftIcon className="h-7 w-7" />
-          <span className="mt-1 font-medium">Rewards</span>
-        </button>
-        <button
-          onClick={() => setCurrentPage('borrow')}
-          className={`flex flex-col items-center text-sm p-2 rounded-xl transition-all ${currentPage === 'borrow' ? 'text-purple-700 bg-purple-100' : 'text-gray-500'}`}
-        >
-          <ClipboardListIcon className="h-7 w-7" />
-          <span className="mt-1 font-medium">Borrow</span>
+          <svg xmlns="http://www.w3.org/2000/svg" className="h-8 w-8" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M10.325 4.317c.426-1.756 2.924-1.756 3.35 0a1.724 1.724 0 002.573 1.066c1.543-.94 3.31.826 2.37 2.37a1.724 1.724 0 001.065 2.572c1.756.426 1.756 2.924 0 3.35a1.724 1.724 0 00-1.066 2.573c.94 1.543-.826 3.31-2.37 2.37a1.724 1.724 0 00-2.572 1.065c-.426 1.756-2.924 1.756-3.35 0a1.724 1.724 0 00-2.573-1.066c-1.543.94-3.31-.826-2.37-2.37a1.724 1.724 0 00-1.065-2.572c-1.756-.426-1.756-2.924 0-3.35a1.724 1.724 0 001.066-2.573c-.94-1.543.826-3.31 2.37-2.37.996.608 2.296.07 2.572-1.065z" />
+            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 12a3 3 0 11-6 0 3 3 0 016 0z" />
+          </svg>
         </button>
 
-         {/* Logout Button */}
+        <div className="relative">
+          <button 
+            onClick={() => {
+              setCurrentPage('home');
+              setErrorMessage('');
+              setSuccessMessage('');
+            }} 
+            className={`absolute -top-8 left-1/2 transform -translate-x-1/2 flex flex-col items-center justify-center w-16 h-16 rounded-full bg-gradient-to-br from-purple-600 to-purple-800 text-white shadow-lg hover:shadow-xl transition-all ${currentPage === 'home' ? 'ring-4 ring-purple-200' : ''}`}
+            aria-label="Home"
+          >
+            <HomeIcon className="h-8 w-8" />
+          </button>
+        </div>
+
         <button 
           onClick={() => setShowLogoutModal(true)}
-          className="flex flex-col items-center text-sm p-2 rounded-xl text-red-500 transition-all"
+          className="flex items-center justify-center p-2 rounded-full bg-gray-50 hover:bg-red-50 text-red-500 hover:text-red-600 transition-all"
           aria-label="Logout"
         >
-          <LogoutIcon className="h-7 w-7" />
-          <span className="mt-1 font-medium">Logout</span>
+          <LogoutIcon className="h-8 w-8" />
         </button>
       </nav>
 
@@ -915,6 +940,262 @@ export default function StudentPage() {
               </button>
             </div>
           </div>
+        </div>
+      )}
+    </div>
+  );
+}
+
+function SettingsPage({ user, onBack }) {
+  const [section, setSection] = useState('profile');
+  const [username, setUsername] = useState(user.name);
+  const [currentPassword, setCurrentPassword] = useState('');
+  const [password, setPassword] = useState('');
+  const [confirmPassword, setConfirmPassword] = useState('');
+  const [successMsg, setSuccessMsg] = useState('');
+  const [errorMsg, setErrorMsg] = useState('');
+  const [isLoading, setIsLoading] = useState(false);
+  const [profileTab, setProfileTab] = useState('username');
+  const baseUrl = import.meta.env.VITE_API_BASE_URL;
+
+  const handleProfileUpdate = async (e) => {
+    e.preventDefault();
+    setErrorMsg('');
+    setSuccessMsg('');
+
+    // If trying to change password, require current password
+    if (profileTab === 'password') {
+      if (!currentPassword) {
+        setErrorMsg('Please enter your current password to change it');
+        return;
+      }
+
+      if (password !== confirmPassword) {
+        setErrorMsg('New passwords do not match');
+        return;
+      }
+    }
+
+    // If trying to change username, require current password
+    if (profileTab === 'username') {
+      if (!currentPassword) {
+        setErrorMsg('Please enter your current password to change username');
+        return;
+      }
+    }
+
+    try {
+      setIsLoading(true);
+      const token = user.token;
+      await axios.put(
+        `${baseUrl}/api/student/profile`,
+        { 
+          name: profileTab === 'username' ? username : undefined,
+          currentPassword: currentPassword,
+          ...(profileTab === 'password' ? { newPassword: password } : {})
+        },
+        { headers: { Authorization: `Bearer ${token}` } }
+      );
+      setSuccessMsg(profileTab === 'username' ? 'Username updated successfully!' : 'Password updated successfully!');
+      setCurrentPassword('');
+      setPassword('');
+      setConfirmPassword('');
+    } catch (err) {
+      if (err.response?.data?.message === 'Current password is incorrect') {
+        setErrorMsg('Current password is incorrect. Please try again.');
+      } else {
+        setErrorMsg(err.response?.data?.message || 'Failed to update profile');
+      }
+    } finally {
+      setIsLoading(false);
+    }
+  };
+
+  return (
+    <div className="max-w-md mx-auto p-6 bg-white rounded-2xl shadow-lg mt-8 mb-24">
+      <div className="flex items-center mb-6">
+        <button onClick={onBack} className="mr-4 text-purple-600 hover:text-purple-800">
+          <svg xmlns="http://www.w3.org/2000/svg" className="h-6 w-6" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 19l-7-7 7-7" />
+          </svg>
+        </button>
+        <h2 className="text-2xl font-bold text-purple-800">Settings</h2>
+      </div>
+      <div className="flex space-x-2 mb-6">
+        <button onClick={() => setSection('profile')} className={`flex-1 py-2 rounded-lg font-semibold ${section === 'profile' ? 'bg-purple-100 text-purple-700' : 'bg-gray-100 text-gray-600'}`}>Profile</button>
+        <button onClick={() => setSection('about')} className={`flex-1 py-2 rounded-lg font-semibold ${section === 'about' ? 'bg-purple-100 text-purple-700' : 'bg-gray-100 text-gray-600'}`}>About</button>
+        <button onClick={() => setSection('help')} className={`flex-1 py-2 rounded-lg font-semibold ${section === 'help' ? 'bg-purple-100 text-purple-700' : 'bg-gray-100 text-gray-600'}`}>Help</button>
+      </div>
+      {section === 'profile' && (
+        <div className="space-y-6">
+          <div className="flex space-x-4 mb-6">
+            <button 
+              onClick={() => setProfileTab('username')}
+              className={`flex-1 py-3 px-4 rounded-xl font-semibold transition-all ${
+                profileTab === 'username' 
+                  ? 'bg-purple-600 text-white shadow-md' 
+                  : 'bg-gray-100 text-gray-600 hover:bg-gray-200'
+              }`}
+            >
+              Change Username
+            </button>
+            <button 
+              onClick={() => setProfileTab('password')}
+              className={`flex-1 py-3 px-4 rounded-xl font-semibold transition-all ${
+                profileTab === 'password' 
+                  ? 'bg-purple-600 text-white shadow-md' 
+                  : 'bg-gray-100 text-gray-600 hover:bg-gray-200'
+              }`}
+            >
+              Change Password
+            </button>
+          </div>
+
+          {profileTab === 'username' && (
+            <form onSubmit={handleProfileUpdate} className="space-y-4">
+              <div>
+                <label className="block text-sm font-medium text-gray-700 mb-1">Current Username</label>
+                <input 
+                  type="text" 
+                  className="w-full border-2 border-purple-200 rounded-lg p-2 bg-gray-50" 
+                  value={user.name}
+                  disabled
+                />
+              </div>
+              <div>
+                <label className="block text-sm font-medium text-gray-700 mb-1">New Username</label>
+                <input 
+                  type="text" 
+                  className="w-full border-2 border-purple-200 rounded-lg p-2" 
+                  value={username} 
+                  onChange={e => setUsername(e.target.value)} 
+                  required 
+                />
+              </div>
+              <div>
+                <label className="block text-sm font-medium text-gray-700 mb-1">Current Password</label>
+                <input 
+                  type="password" 
+                  className="w-full border-2 border-purple-200 rounded-lg p-2" 
+                  value={currentPassword} 
+                  onChange={e => setCurrentPassword(e.target.value)} 
+                  placeholder="Enter password"
+                  required
+                />
+              </div>
+              {errorMsg && (
+                <div className="p-3 bg-red-50 border-l-4 border-red-500 rounded-lg flex items-start space-x-2">
+                  <svg xmlns="http://www.w3.org/2000/svg" className="h-5 w-5 text-red-500 mt-0.5" viewBox="0 0 20 20" fill="currentColor">
+                    <path fillRule="evenodd" d="M18 10a8 8 0 11-16 0 8 8 0 0116 0zm-7 4a1 1 0 11-2 0 1 1 0 012 0zm-1-9a1 1 0 00-1 1v4a1 1 0 102 0V6a1 1 0 00-1-1z" clipRule="evenodd" />
+                  </svg>
+                  <span className="text-red-700 font-medium">{errorMsg}</span>
+                </div>
+              )}
+              {successMsg && (
+                <div className="p-3 bg-green-50 border-l-4 border-green-500 rounded-lg flex items-start space-x-2">
+                  <svg xmlns="http://www.w3.org/2000/svg" className="h-5 w-5 text-green-500 mt-0.5" viewBox="0 0 20 20" fill="currentColor">
+                    <path fillRule="evenodd" d="M10 18a8 8 0 100-16 8 8 0 000 16zm3.707-9.293a1 1 0 00-1.414-1.414L9 10.586 7.707 9.293a1 1 0 00-1.414 1.414l2 2a1 1 0 001.414 0l4-4z" clipRule="evenodd" />
+                  </svg>
+                  <span className="text-green-700 font-medium">{successMsg}</span>
+                </div>
+              )}
+              <button 
+                type="submit" 
+                disabled={isLoading} 
+                className="w-full py-2 bg-purple-600 text-white rounded-lg font-bold hover:bg-purple-700 transition-all"
+              >
+                {isLoading ? 'Saving...' : 'Update'}
+              </button>
+            </form>
+          )}
+
+          {profileTab === 'password' && (
+            <form onSubmit={handleProfileUpdate} className="space-y-4">
+              <div>
+                <label className="block text-sm font-medium text-gray-700 mb-1">Current Password</label>
+                <input 
+                  type="password" 
+                  className="w-full border-2 border-purple-200 rounded-lg p-2" 
+                  value={currentPassword} 
+                  onChange={e => setCurrentPassword(e.target.value)} 
+                  placeholder="Enter current password"
+                  required
+                />
+              </div>
+              <div>
+                <label className="block text-sm font-medium text-gray-700 mb-1">New Password</label>
+                <input 
+                  type="password" 
+                  className="w-full border-2 border-purple-200 rounded-lg p-2" 
+                  value={password} 
+                  onChange={e => setPassword(e.target.value)} 
+                  placeholder="Enter new password"
+                  required
+                />
+              </div>
+              <div>
+                <label className="block text-sm font-medium text-gray-700 mb-1">Confirm New Password</label>
+                <input 
+                  type="password" 
+                  className="w-full border-2 border-purple-200 rounded-lg p-2" 
+                  value={confirmPassword} 
+                  onChange={e => setConfirmPassword(e.target.value)} 
+                  placeholder="Confirm new password"
+                  required
+                />
+              </div>
+              {errorMsg && (
+                <div className="p-3 bg-red-50 border-l-4 border-red-500 rounded-lg flex items-start space-x-2">
+                  <svg xmlns="http://www.w3.org/2000/svg" className="h-5 w-5 text-red-500 mt-0.5" viewBox="0 0 20 20" fill="currentColor">
+                    <path fillRule="evenodd" d="M18 10a8 8 0 11-16 0 8 8 0 0116 0zm-7 4a1 1 0 11-2 0 1 1 0 012 0zm-1-9a1 1 0 00-1 1v4a1 1 0 102 0V6a1 1 0 00-1-1z" clipRule="evenodd" />
+                  </svg>
+                  <span className="text-red-700 font-medium">{errorMsg}</span>
+                </div>
+              )}
+              {successMsg && (
+                <div className="p-3 bg-green-50 border-l-4 border-green-500 rounded-lg flex items-start space-x-2">
+                  <svg xmlns="http://www.w3.org/2000/svg" className="h-5 w-5 text-green-500 mt-0.5" viewBox="0 0 20 20" fill="currentColor">
+                    <path fillRule="evenodd" d="M10 18a8 8 0 100-16 8 8 0 000 16zm3.707-9.293a1 1 0 00-1.414-1.414L9 10.586 7.707 9.293a1 1 0 00-1.414 1.414l2 2a1 1 0 001.414 0l4-4z" clipRule="evenodd" />
+                  </svg>
+                  <span className="text-green-700 font-medium">{successMsg}</span>
+                </div>
+              )}
+              <button 
+                type="submit" 
+                disabled={isLoading} 
+                className="w-full py-2 bg-purple-600 text-white rounded-lg font-bold hover:bg-purple-700 transition-all"
+              >
+                {isLoading ? 'Saving...' : 'Update'}
+              </button>
+            </form>
+          )}
+        </div>
+      )}
+      {section === 'about' && (
+        <div className="space-y-3 text-gray-700">
+          <h3 className="text-lg font-bold text-purple-700">About </h3>
+          <p>
+            This Website designed to encourage sustainable dining habits by rewarding students for borrowing and returning reusable dining sets. Earn points by participating, redeem them for rewards, and help reduce single-use waste on campus!
+          </p>
+          <ul className="list-disc ml-6">
+            <li>Borrow dining sets (plate, spoon, fork) using the app</li>
+            <li>Earn points for responsible use and returns</li>
+            <li>Redeem points for exciting rewards</li>
+            <li>Track your points and activity</li>
+          </ul>
+          <p>
+            This app is part of our commitment to a greener, cleaner campus. Thank you for participating!
+          </p>
+        </div>
+      )}
+      {section === 'help' && (
+        <div className="space-y-3 text-gray-700">
+          <h3 className="text-lg font-bold text-purple-700">Need Help?</h3>
+          <p>If you need assistance with your account or have questions, please contact a staff member:</p>
+          <ul className="list-disc ml-6">
+            <li>Go to any of the Cashier during for assistance.</li>
+          </ul>
+          <p>We're here to help you make the most of the VARDA Loyalty Reward System!</p>
         </div>
       )}
     </div>

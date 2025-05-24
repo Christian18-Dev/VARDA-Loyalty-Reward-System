@@ -1,7 +1,9 @@
 import Code from '../models/Code.js';
 import Reward from '../models/Reward.js';
 import Feedback from '../models/Feedback.js';
-import ClaimedReward from '../models/ClaimedReward.js'; 
+import ClaimedReward from '../models/ClaimedReward.js';
+import User from '../models/User.js';
+import bcrypt from 'bcryptjs';
 
 export const claimCode = async (req, res) => {
   try {
@@ -69,7 +71,6 @@ export const claimReward = async (req, res) => {
   }
 };
 
-
 export const getPoints = async (req, res) => {
   res.json({ points: req.user.points });
 };
@@ -113,6 +114,53 @@ export const submitFeedback = async (req, res) => {
     res.json({ message: 'Feedback submitted and points added' });
   } catch (error) {
     console.error('Error in submitFeedback:', error);
+    res.status(500).json({ message: 'Server error' });
+  }
+};
+
+export const updateProfile = async (req, res) => {
+  try {
+    const { name, currentPassword, newPassword } = req.body;
+    const user = await User.findById(req.user._id);
+
+    if (!user) {
+      return res.status(404).json({ message: 'User not found' });
+    }
+
+    // If trying to change password
+    if (newPassword) {
+      // Verify current password
+      const isMatch = await bcrypt.compare(currentPassword, user.password);
+      if (!isMatch) {
+        return res.status(400).json({ message: 'Current password is incorrect' });
+      }
+
+      // Hash new password
+      const salt = await bcrypt.genSalt(10);
+      user.password = await bcrypt.hash(newPassword, salt);
+    }
+
+    // If changing username, check if it's already taken
+    if (name && name !== user.name) {
+      const existingUser = await User.findOne({ name });
+      if (existingUser) {
+        return res.status(400).json({ message: 'Username is already taken' });
+      }
+      user.name = name;
+    }
+
+    await user.save();
+
+    res.json({ 
+      message: 'Profile updated successfully',
+      user: {
+        _id: user._id,
+        name: user.name,
+        role: user.role
+      }
+    });
+  } catch (error) {
+    console.error('Error updating profile:', error);
     res.status(500).json({ message: 'Server error' });
   }
 };
