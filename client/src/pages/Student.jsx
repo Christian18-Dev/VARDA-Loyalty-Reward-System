@@ -321,12 +321,13 @@ export default function StudentPage() {
         {currentPage === 'home' && (
           <motion.div variants={itemVariants} className="space-y-6">
             <motion.div 
-              className="relative mx-auto p-6 md:p-7 w-full max-w-md bg-gradient-to-br from-indigo-600 via-purple-700 to-purple-800 rounded-2xl shadow-2xl text-white overflow-hidden aspect-[85.6/54]"
+              className="relative mx-auto p-4 sm:p-6 md:p-7 w-full max-w-md bg-gradient-to-br from-indigo-600 via-purple-700 to-purple-800 rounded-2xl shadow-2xl text-white overflow-hidden aspect-[85.6/54]"
               whileHover={{ scale: 1.02 }}
               whileTap={{ scale: 0.98 }}
               style={{
                 perspective: "1000px",
-                transformStyle: "preserve-3d"
+                transformStyle: "preserve-3d",
+                minHeight: "200px"
               }}
             >
               {/* Card Content */}
@@ -346,25 +347,25 @@ export default function StudentPage() {
                   key={points}
                   initial={{ scale: 1.1, opacity: 0.8 }}
                   animate={{ scale: 1, opacity: 1 }}
-                  className="text-center my-4"
+                  className="text-center my-2 sm:my-4"
                 >
                   <p className="text-xs opacity-80 mb-1">POINTS BALANCE:</p>
-                  <p className="text-4xl md:text-5xl font-bold tracking-tight flex items-center justify-center">
-                    {points} <span className="text-2xl ml-2">⭐</span>
+                  <p className="text-3xl sm:text-4xl md:text-5xl font-bold tracking-tight flex items-center justify-center">
+                    {points} <span className="text-xl sm:text-2xl ml-2">⭐</span>
                   </p>
                 </motion.div>
 
                 {/* Card footer */}
-                <div className="flex justify-between items-end">
+                <div className="flex justify-between items-end mt-2 sm:mt-4">
                   <div>
-                    <p className="font-medium tracking-wider">{user.name.toUpperCase()}</p>
+                    <p className="text-sm sm:text-base font-medium tracking-wider">{user.name.toUpperCase()}</p>
                   </div>
                   
                   <div className="text-right">
                     <p className="text-xs opacity-80">STATUS</p>
                     <div className="flex items-center justify-end space-x-1">
                       <div className="w-2 h-2 bg-green-400 rounded-full animate-pulse"></div>
-                      <p className="font-medium">ACTIVE</p>
+                      <p className="text-sm sm:text-base font-medium">ACTIVE</p>
                     </div>
                   </div>
                 </div>
