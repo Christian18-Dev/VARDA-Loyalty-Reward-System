@@ -40,7 +40,7 @@ export default function Login() {
   return (
     <div className="min-h-screen flex items-center justify-center bg-gradient-to-br from-green-100 to-blue-100 p-4">
       <div className="max-w-md w-full bg-white rounded-3xl shadow-xl p-8 space-y-6">
-        <h1 className="text-3xl font-bold text-center text-green-700">Welcome Back! 🌟</h1>
+        <h1 className="text-3xl font-bold text-center text-green-700">Welcome! 🌟</h1>
         <form onSubmit={handleSubmit} className="space-y-5">
           <div>
             <label className="block mb-1 text-sm font-medium text-gray-700">Username</label>
