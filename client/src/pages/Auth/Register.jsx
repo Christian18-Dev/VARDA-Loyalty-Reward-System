@@ -7,7 +7,6 @@ import logo from '../../assets/2gonzlogo.png';
 const API_BASE_URL = import.meta.env.VITE_API_BASE_URL;
 
 export default function Register() {
-  const [name, setName] = useState('');
   const [firstName, setFirstName] = useState('');
   const [lastName, setLastName] = useState('');
   const [password, setPassword] = useState('');
@@ -32,10 +31,6 @@ export default function Register() {
   };
 
   const validateForm = () => {
-    if (!name.trim()) {
-      setErrorMessage('Please enter a username');
-      return false;
-    }
     if (!firstName.trim()) {
       setErrorMessage('Please enter your First Name');
       return false;
@@ -77,7 +72,6 @@ export default function Register() {
 
     try {
       const userData = {
-        name,
         firstName,
         lastName,
         password,
@@ -154,19 +148,6 @@ export default function Register() {
           <h1 className="text-3xl font-bold text-center text-white">Create Account </h1>
         </div>
         <form onSubmit={handleSubmit} className="space-y-5">
-          <div>
-            <label className="block mb-1 text-sm font-medium text-gray-200">Username</label>
-            <input
-              className="w-full px-4 py-2 bg-gray-800/50 border border-gray-700 rounded-xl focus:ring-2 focus:ring-blue-500 focus:outline-none transition text-white placeholder-gray-400"
-              placeholder="Enter username"
-              value={name}
-              onChange={(e) => {
-                setName(e.target.value);
-                setErrorMessage('');
-              }}
-              required
-            />
-          </div>
           <div>
             <label className="block mb-1 text-sm font-medium text-gray-200">First Name</label>
             <input

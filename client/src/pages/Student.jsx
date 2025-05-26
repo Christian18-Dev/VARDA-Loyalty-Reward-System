@@ -391,7 +391,9 @@ export default function StudentPage() {
                 {/* Card footer */}
                 <div className="flex justify-between items-end mt-auto pt-2 sm:pt-3">
                   <div className="max-w-[60%]">
-                    <p className="text-xs sm:text-sm font-medium tracking-wider text-white/90 truncate">{user.name.toUpperCase()}</p>
+                    <p className="text-xs sm:text-sm font-medium tracking-wider text-white/90 truncate">
+                      {`${user.firstName} ${user.lastName}`.toUpperCase()}
+                    </p>
                   </div>
                   
                   <div className="text-right">
@@ -518,7 +520,7 @@ export default function StudentPage() {
                   <button
                     key={star}
                     aria-label={`Rate ${star} star`}
-                    className={`p-4 rounded-full border-4 text-2xl ${rating >= star ? 'bg-yellow-900/50 border-yellow-600 scale-110' : 'bg-gray-800/50 border-gray-700'} transition-all`}
+                    className={`p-4 rounded-full border-4 text-2xl text-white ${rating >= star ? 'bg-yellow-900/50 border-yellow-600 scale-110' : 'bg-gray-800/50 border-gray-700'} transition-all`}
                     onClick={() => setRating(star)}
                     disabled={isLoading}
                   >
@@ -1031,15 +1033,13 @@ export default function StudentPage() {
 }
 
 function SettingsPage({ user, onBack }) {
-  const [section, setSection] = useState('profile');
-  const [username, setUsername] = useState(user.name);
   const [currentPassword, setCurrentPassword] = useState('');
   const [password, setPassword] = useState('');
   const [confirmPassword, setConfirmPassword] = useState('');
   const [successMsg, setSuccessMsg] = useState('');
   const [errorMsg, setErrorMsg] = useState('');
   const [isLoading, setIsLoading] = useState(false);
-  const [profileTab, setProfileTab] = useState('username');
+  const [section, setSection] = useState('profile');
   const baseUrl = import.meta.env.VITE_API_BASE_URL;
 
   const handleProfileUpdate = async (e) => {
@@ -1047,25 +1047,14 @@ function SettingsPage({ user, onBack }) {
     setErrorMsg('');
     setSuccessMsg('');
 
-    // If trying to change password, require current password
-    if (profileTab === 'password') {
-      if (!currentPassword) {
-        setErrorMsg('Please enter your current password to change it');
-        return;
-      }
-
-      if (password !== confirmPassword) {
-        setErrorMsg('New passwords do not match');
-        return;
-      }
+    if (!currentPassword) {
+      setErrorMsg('Please enter your current password');
+      return;
     }
 
-    // If trying to change username, require current password
-    if (profileTab === 'username') {
-      if (!currentPassword) {
-        setErrorMsg('Please enter your current password to change username');
-        return;
-      }
+    if (password !== confirmPassword) {
+      setErrorMsg('New passwords do not match');
+      return;
     }
 
     try {
@@ -1074,13 +1063,12 @@ function SettingsPage({ user, onBack }) {
       await axios.put(
         `${baseUrl}/api/student/profile`,
         { 
-          name: profileTab === 'username' ? username : undefined,
-          currentPassword: currentPassword,
-          ...(profileTab === 'password' ? { newPassword: password } : {})
+          currentPassword,
+          newPassword: password
         },
         { headers: { Authorization: `Bearer ${token}` } }
       );
-      setSuccessMsg(profileTab === 'username' ? 'Username updated successfully!' : 'Password updated successfully!');
+      setSuccessMsg('Password updated successfully!');
       setCurrentPassword('');
       setPassword('');
       setConfirmPassword('');
@@ -1112,174 +1100,82 @@ function SettingsPage({ user, onBack }) {
       </div>
       {section === 'profile' && (
         <div className="space-y-6">
-          <div className="flex space-x-4 mb-6">
+          <form onSubmit={handleProfileUpdate} className="space-y-4">
+            <div>
+              <label className="block text-sm font-medium text-gray-700 mb-1">Current Password</label>
+              <input 
+                type="password" 
+                className="w-full border-2 border-purple-200 rounded-lg p-2" 
+                value={currentPassword} 
+                onChange={e => setCurrentPassword(e.target.value)} 
+                placeholder="Enter current password"
+                required
+              />
+            </div>
+            <div>
+              <label className="block text-sm font-medium text-gray-700 mb-1">New Password</label>
+              <input 
+                type="password" 
+                className="w-full border-2 border-purple-200 rounded-lg p-2" 
+                value={password} 
+                onChange={e => setPassword(e.target.value)} 
+                placeholder="Enter new password"
+                required
+              />
+            </div>
+            <div>
+              <label className="block text-sm font-medium text-gray-700 mb-1">Confirm New Password</label>
+              <input 
+                type="password" 
+                className="w-full border-2 border-purple-200 rounded-lg p-2" 
+                value={confirmPassword} 
+                onChange={e => setConfirmPassword(e.target.value)} 
+                placeholder="Confirm new password"
+                required
+              />
+            </div>
+            {errorMsg && (
+              <div className="p-3 bg-red-50 border-l-4 border-red-500 rounded-lg flex items-start space-x-2">
+                <svg xmlns="http://www.w3.org/2000/svg" className="h-5 w-5 text-red-500 mt-0.5" viewBox="0 0 20 20" fill="currentColor">
+                  <path fillRule="evenodd" d="M18 10a8 8 0 11-16 0 8 8 0 0116 0zm-7 4a1 1 0 11-2 0 1 1 0 012 0zm-1-9a1 1 0 00-1 1v4a1 1 0 102 0V6a1 1 0 00-1-1z" clipRule="evenodd" />
+                </svg>
+                <span className="text-red-700 font-medium">{errorMsg}</span>
+              </div>
+            )}
+            {successMsg && (
+              <div className="p-3 bg-green-50 border-l-4 border-green-500 rounded-lg flex items-start space-x-2">
+                <svg xmlns="http://www.w3.org/2000/svg" className="h-5 w-5 text-green-500 mt-0.5" viewBox="0 0 20 20" fill="currentColor">
+                  <path fillRule="evenodd" d="M10 18a8 8 0 100-16 8 8 0 000 16zm3.707-9.293a1 1 0 00-1.414-1.414L9 10.586 7.707 9.293a1 1 0 00-1.414 1.414l2 2a1 1 0 001.414 0l4-4z" clipRule="evenodd" />
+                </svg>
+                <span className="text-green-700 font-medium">{successMsg}</span>
+              </div>
+            )}
             <button 
-              onClick={() => setProfileTab('username')}
-              className={`flex-1 py-3 px-4 rounded-xl font-semibold transition-all ${
-                profileTab === 'username' 
-                  ? 'bg-purple-600 text-white shadow-md' 
-                  : 'bg-gray-100 text-gray-600 hover:bg-gray-200'
-              }`}
+              type="submit" 
+              disabled={isLoading} 
+              className="w-full py-2 bg-purple-600 text-white rounded-lg font-bold hover:bg-purple-700 transition-all"
             >
-              Change Username
+              {isLoading ? 'Saving...' : 'Update Password'}
             </button>
-            <button 
-              onClick={() => setProfileTab('password')}
-              className={`flex-1 py-3 px-4 rounded-xl font-semibold transition-all ${
-                profileTab === 'password' 
-                  ? 'bg-purple-600 text-white shadow-md' 
-                  : 'bg-gray-100 text-gray-600 hover:bg-gray-200'
-              }`}
-            >
-              Change Password
-            </button>
-          </div>
-
-          {profileTab === 'username' && (
-            <form onSubmit={handleProfileUpdate} className="space-y-4">
-              <div>
-                <label className="block text-sm font-medium text-gray-700 mb-1">Current Username</label>
-                <input 
-                  type="text" 
-                  className="w-full border-2 border-purple-200 rounded-lg p-2 bg-gray-50" 
-                  value={user.name}
-                  disabled
-                />
-              </div>
-              <div>
-                <label className="block text-sm font-medium text-gray-700 mb-1">New Username</label>
-                <input 
-                  type="text" 
-                  className="w-full border-2 border-purple-200 rounded-lg p-2" 
-                  value={username} 
-                  onChange={e => setUsername(e.target.value)} 
-                  required 
-                />
-              </div>
-              <div>
-                <label className="block text-sm font-medium text-gray-700 mb-1">Current Password</label>
-                <input 
-                  type="password" 
-                  className="w-full border-2 border-purple-200 rounded-lg p-2" 
-                  value={currentPassword} 
-                  onChange={e => setCurrentPassword(e.target.value)} 
-                  placeholder="Enter password"
-                  required
-                />
-              </div>
-              {errorMsg && (
-                <div className="p-3 bg-red-50 border-l-4 border-red-500 rounded-lg flex items-start space-x-2">
-                  <svg xmlns="http://www.w3.org/2000/svg" className="h-5 w-5 text-red-500 mt-0.5" viewBox="0 0 20 20" fill="currentColor">
-                    <path fillRule="evenodd" d="M18 10a8 8 0 11-16 0 8 8 0 0116 0zm-7 4a1 1 0 11-2 0 1 1 0 012 0zm-1-9a1 1 0 00-1 1v4a1 1 0 102 0V6a1 1 0 00-1-1z" clipRule="evenodd" />
-                  </svg>
-                  <span className="text-red-700 font-medium">{errorMsg}</span>
-                </div>
-              )}
-              {successMsg && (
-                <div className="p-3 bg-green-50 border-l-4 border-green-500 rounded-lg flex items-start space-x-2">
-                  <svg xmlns="http://www.w3.org/2000/svg" className="h-5 w-5 text-green-500 mt-0.5" viewBox="0 0 20 20" fill="currentColor">
-                    <path fillRule="evenodd" d="M10 18a8 8 0 100-16 8 8 0 000 16zm3.707-9.293a1 1 0 00-1.414-1.414L9 10.586 7.707 9.293a1 1 0 00-1.414 1.414l2 2a1 1 0 001.414 0l4-4z" clipRule="evenodd" />
-                  </svg>
-                  <span className="text-green-700 font-medium">{successMsg}</span>
-                </div>
-              )}
-              <button 
-                type="submit" 
-                disabled={isLoading} 
-                className="w-full py-2 bg-purple-600 text-white rounded-lg font-bold hover:bg-purple-700 transition-all"
-              >
-                {isLoading ? 'Saving...' : 'Update'}
-              </button>
-            </form>
-          )}
-
-          {profileTab === 'password' && (
-            <form onSubmit={handleProfileUpdate} className="space-y-4">
-              <div>
-                <label className="block text-sm font-medium text-gray-700 mb-1">Current Password</label>
-                <input 
-                  type="password" 
-                  className="w-full border-2 border-purple-200 rounded-lg p-2" 
-                  value={currentPassword} 
-                  onChange={e => setCurrentPassword(e.target.value)} 
-                  placeholder="Enter current password"
-                  required
-                />
-              </div>
-              <div>
-                <label className="block text-sm font-medium text-gray-700 mb-1">New Password</label>
-                <input 
-                  type="password" 
-                  className="w-full border-2 border-purple-200 rounded-lg p-2" 
-                  value={password} 
-                  onChange={e => setPassword(e.target.value)} 
-                  placeholder="Enter new password"
-                  required
-                />
-              </div>
-              <div>
-                <label className="block text-sm font-medium text-gray-700 mb-1">Confirm New Password</label>
-                <input 
-                  type="password" 
-                  className="w-full border-2 border-purple-200 rounded-lg p-2" 
-                  value={confirmPassword} 
-                  onChange={e => setConfirmPassword(e.target.value)} 
-                  placeholder="Confirm new password"
-                  required
-                />
-              </div>
-              {errorMsg && (
-                <div className="p-3 bg-red-50 border-l-4 border-red-500 rounded-lg flex items-start space-x-2">
-                  <svg xmlns="http://www.w3.org/2000/svg" className="h-5 w-5 text-red-500 mt-0.5" viewBox="0 0 20 20" fill="currentColor">
-                    <path fillRule="evenodd" d="M18 10a8 8 0 11-16 0 8 8 0 0116 0zm-7 4a1 1 0 11-2 0 1 1 0 012 0zm-1-9a1 1 0 00-1 1v4a1 1 0 102 0V6a1 1 0 00-1-1z" clipRule="evenodd" />
-                  </svg>
-                  <span className="text-red-700 font-medium">{errorMsg}</span>
-                </div>
-              )}
-              {successMsg && (
-                <div className="p-3 bg-green-50 border-l-4 border-green-500 rounded-lg flex items-start space-x-2">
-                  <svg xmlns="http://www.w3.org/2000/svg" className="h-5 w-5 text-green-500 mt-0.5" viewBox="0 0 20 20" fill="currentColor">
-                    <path fillRule="evenodd" d="M10 18a8 8 0 100-16 8 8 0 000 16zm3.707-9.293a1 1 0 00-1.414-1.414L9 10.586 7.707 9.293a1 1 0 00-1.414 1.414l2 2a1 1 0 001.414 0l4-4z" clipRule="evenodd" />
-                  </svg>
-                  <span className="text-green-700 font-medium">{successMsg}</span>
-                </div>
-              )}
-              <button 
-                type="submit" 
-                disabled={isLoading} 
-                className="w-full py-2 bg-purple-600 text-white rounded-lg font-bold hover:bg-purple-700 transition-all"
-              >
-                {isLoading ? 'Saving...' : 'Update'}
-              </button>
-            </form>
-          )}
+          </form>
         </div>
       )}
       {section === 'about' && (
-        <div className="space-y-3 text-gray-700">
-          <h3 className="text-lg font-bold text-purple-700">About </h3>
-          <p>
-            This Website designed to encourage sustainable dining habits by rewarding students for borrowing and returning reusable dining sets. Earn points by participating, redeem them for rewards, and help reduce single-use waste on campus!
-          </p>
-          <ul className="list-disc ml-6">
-            <li>Borrow dining sets (plate, spoon, fork) using the app</li>
-            <li>Earn points for responsible use and returns</li>
-            <li>Redeem points for exciting rewards</li>
-            <li>Track your points and activity</li>
-          </ul>
-          <p>
-            This app is part of our commitment to a greener, cleaner campus. Thank you for participating!
+        <div className="space-y-4">
+          <h3 className="text-lg font-semibold text-gray-900">About VARDA</h3>
+          <p className="text-gray-600">
+            VARDA is a loyalty reward system designed to encourage sustainable practices
+            by rewarding students for borrowing and returning items properly.
           </p>
         </div>
       )}
       {section === 'help' && (
-        <div className="space-y-3 text-gray-700">
-          <h3 className="text-lg font-bold text-purple-700">Need Help?</h3>
-          <p>If you need assistance with your account or have questions, please contact a staff member:</p>
-          <ul className="list-disc ml-6">
-            <li>Go to any of the staff for assistance.</li>
-          </ul>
-          <p>We're here to help you make the most of the VARDA Loyalty Reward System!</p>
+        <div className="space-y-4">
+          <h3 className="text-lg font-semibold text-gray-900">Need Help?</h3>
+          <p className="text-gray-600">
+            If you need assistance, please contact the system administrator or visit
+            the help desk at the library.
+          </p>
         </div>
       )}
     </div>

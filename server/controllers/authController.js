@@ -11,9 +11,9 @@ const generateToken = (user) => {
 };
 
 export const registerUser = async (req, res) => {
-  const { name, firstName, lastName, password, termsAccepted, idNumber } = req.body;
+  const { firstName, lastName, password, termsAccepted, idNumber } = req.body;
   
-  console.log('Received registration data:', { name, firstName, lastName, idNumber });
+  console.log('Received registration data:', { firstName, lastName, idNumber });
   
   if (!termsAccepted) {
     return res.status(400).json({ message: 'Terms and conditions must be accepted' });
@@ -27,19 +27,13 @@ export const registerUser = async (req, res) => {
     return res.status(400).json({ message: 'First Name and Last Name are required' });
   }
 
-  const existing = await User.findOne({ $or: [{ name }, { idNumber }] });
+  const existing = await User.findOne({ idNumber });
   if (existing) {
-    if (existing.name === name) {
-      return res.status(400).json({ message: 'Username taken' });
-    }
-    if (existing.idNumber === idNumber) {
-      return res.status(400).json({ message: 'ID Number already registered' });
-    }
+    return res.status(400).json({ message: 'ID Number already registered' });
   }
 
   const hashed = await bcrypt.hash(password, 10);
   const userData = { 
-    name, 
     firstName,
     lastName,
     password: hashed,
@@ -54,7 +48,6 @@ export const registerUser = async (req, res) => {
     const user = await User.create(userData);
     console.log('Created user:', { 
       _id: user._id,
-      name: user.name,
       firstName: user.firstName,
       lastName: user.lastName,
       idNumber: user.idNumber,
@@ -64,7 +57,6 @@ export const registerUser = async (req, res) => {
     // Create response object with all user data
     const responseData = {
       _id: user._id,
-      name: user.name,
       firstName: user.firstName,
       lastName: user.lastName,
       idNumber: user.idNumber,
@@ -81,19 +73,19 @@ export const registerUser = async (req, res) => {
 };
 
 export const loginUser = async (req, res) => {
-  const { name, password } = req.body;
+  const { idNumber, password } = req.body;
   try {
-    const user = await User.findOne({ name });
-    if (!user) return res.status(400).json({ message: 'Invalid username or password' });
+    const user = await User.findOne({ idNumber });
+    if (!user) return res.status(400).json({ message: 'Invalid ID number or password' });
 
     const isMatch = await bcrypt.compare(password, user.password);
-    if (!isMatch) return res.status(400).json({ message: 'Invalid username or password' });
+    if (!isMatch) return res.status(400).json({ message: 'Invalid ID number or password' });
 
     res.status(200).json({
       _id: user._id,
-      name: user.name,
       firstName: user.firstName,
       lastName: user.lastName,
+      idNumber: user.idNumber,
       role: user.role,
       token: generateToken(user),
     });

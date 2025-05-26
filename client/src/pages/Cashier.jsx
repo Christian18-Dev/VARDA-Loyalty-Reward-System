@@ -72,11 +72,11 @@ export default function CashierPage() {
 
   // Filter items based on search terms
   const filteredBorrowedItems = borrowedItems.filter(item =>
-    item.studentName.toLowerCase().includes(borrowedSearchTerm.toLowerCase())
+    item?.studentIdNumber?.toLowerCase().includes(borrowedSearchTerm.toLowerCase())
   );
 
   const filteredReturnedItems = returnedItems.filter(item =>
-    item.studentName.toLowerCase().includes(returnedSearchTerm.toLowerCase())
+    item?.studentIdNumber?.toLowerCase().includes(returnedSearchTerm.toLowerCase())
   );
 
   // Pagination calculations
@@ -114,9 +114,9 @@ export default function CashierPage() {
   };
 
   // Filter rewards based on search term
-  const filteredRewards = claimedRewards.filter(reward =>
-    reward.name.toLowerCase().includes(rewardsSearchTerm.toLowerCase()) ||
-    reward.reward.toLowerCase().includes(rewardsSearchTerm.toLowerCase())
+  const filteredRewards = claimedRewards.filter(reward => 
+    reward?.name?.toLowerCase().includes(rewardsSearchTerm.toLowerCase()) ||
+    reward?.reward?.toLowerCase().includes(rewardsSearchTerm.toLowerCase())
   );
 
   // Pagination calculations for rewards
@@ -666,7 +666,7 @@ export default function CashierPage() {
                 <div className="relative">
               <input
                 type="text"
-                placeholder="Search by student name..."
+                placeholder="Search by student ID..."
                 value={borrowedSearchTerm}
                 onChange={handleBorrowedSearch}
                     className="w-full px-4 py-2 pl-10 border border-gray-300 rounded-xl focus:ring-2 focus:ring-purple-500 focus:border-transparent"
@@ -682,7 +682,7 @@ export default function CashierPage() {
               <thead className="bg-gray-50">
                 <tr>
                     <th className="px-4 sm:px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
-                    Student
+                    ID Number
                   </th>
                     <th className="px-4 sm:px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
                     Items
@@ -700,34 +700,38 @@ export default function CashierPage() {
               </thead>
               <tbody className="bg-white divide-y divide-gray-200">
                 {paginatedBorrowedItems.map((item) => (
-                    <tr key={item._id} className="hover:bg-gray-50 transition-colors">
-                      <td className="px-4 sm:px-6 py-4 whitespace-nowrap">
-                      <div className="text-sm font-medium text-gray-900">{item.studentName}</div>
-                    </td>
-                      <td className="px-4 sm:px-6 py-4">
-                      <div className="text-sm text-gray-900">
-                        {item.items.map(i => `${i.name} (${i.quantity})`).join(', ')}
-                      </div>
-                    </td>
-                      <td className="px-4 sm:px-6 py-4 whitespace-nowrap">
-                      <div className="text-sm text-gray-900">
+                    <tr key={item._id} className="hover:bg-gray-50">
+                      <td className="px-4 sm:px-6 py-4 whitespace-nowrap text-sm font-medium text-gray-900">
+                        {item.studentIdNumber}
+                      </td>
+                      <td className="px-4 sm:px-6 py-4 whitespace-nowrap text-sm text-gray-500">
+                        {item.items.map((i, index) => (
+                          <div key={index}>
+                            {i.name} (x{i.quantity})
+                          </div>
+                        ))}
+                      </td>
+                      <td className="px-4 sm:px-6 py-4 whitespace-nowrap text-sm text-gray-500">
                         {new Date(item.borrowTime).toLocaleString()}
-                      </div>
-                    </td>
-                      <td className="px-4 sm:px-6 py-4 whitespace-nowrap">
-                        <span className="px-3 py-1 inline-flex text-xs leading-5 font-semibold rounded-full bg-yellow-100 text-yellow-800">
-                        {item.status}
-                      </span>
-                    </td>
-                      <td className="px-4 sm:px-6 py-4 whitespace-nowrap">
-                      <button
-                        onClick={() => handleReturnItem(item._id)}
-                          className="px-4 py-2 text-sm font-medium text-white bg-green-500 rounded-lg hover:bg-green-600 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-green-500 transition-colors"
-                      >
-                        Returned
-                      </button>
-                    </td>
-                  </tr>
+                      </td>
+                      <td className="px-4 sm:px-6 py-4 whitespace-nowrap text-sm text-gray-500">
+                        <span className={`px-2 inline-flex text-xs leading-5 font-semibold rounded-full ${
+                          item.status === 'borrowed' ? 'bg-yellow-100 text-yellow-800' : 'bg-green-100 text-green-800'
+                        }`}>
+                          {item.status}
+                        </span>
+                      </td>
+                      <td className="px-4 sm:px-6 py-4 whitespace-nowrap text-sm text-gray-500">
+                        {item.status === 'borrowed' && (
+                          <button
+                            onClick={() => handleReturnItem(item._id)}
+                            className="text-blue-600 hover:text-blue-900"
+                          >
+                            Return
+                          </button>
+                        )}
+                      </td>
+                    </tr>
                 ))}
               </tbody>
             </table>
@@ -787,7 +791,7 @@ export default function CashierPage() {
                 <div className="relative">
               <input
                 type="text"
-                placeholder="Search by student name..."
+                placeholder="Search by student ID..."
                 value={returnedSearchTerm}
                 onChange={handleReturnedSearch}
                     className="w-full px-4 py-2 pl-10 border border-gray-300 rounded-xl focus:ring-2 focus:ring-purple-500 focus:border-transparent"
@@ -803,7 +807,7 @@ export default function CashierPage() {
               <thead className="bg-gray-50">
                 <tr>
                     <th className="px-4 sm:px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
-                    Student
+                    ID Number
                   </th>
                     <th className="px-4 sm:px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
                     Items
@@ -821,31 +825,29 @@ export default function CashierPage() {
               </thead>
               <tbody className="bg-white divide-y divide-gray-200">
                 {paginatedReturnedItems.map((item) => (
-                    <tr key={item._id} className="hover:bg-gray-50 transition-colors">
-                      <td className="px-4 sm:px-6 py-4 whitespace-nowrap">
-                      <div className="text-sm font-medium text-gray-900">{item.studentName}</div>
-                    </td>
-                      <td className="px-4 sm:px-6 py-4">
-                      <div className="text-sm text-gray-900">
-                        {item.items.map(i => `${i.name} (${i.quantity})`).join(', ')}
-                      </div>
-                    </td>
-                      <td className="px-4 sm:px-6 py-4 whitespace-nowrap">
-                      <div className="text-sm text-gray-900">
+                    <tr key={item._id} className="hover:bg-gray-50">
+                      <td className="px-4 sm:px-6 py-4 whitespace-nowrap text-sm font-medium text-gray-900">
+                        {item.studentIdNumber}
+                      </td>
+                      <td className="px-4 sm:px-6 py-4 whitespace-nowrap text-sm text-gray-500">
+                        {item.items.map((i, index) => (
+                          <div key={index}>
+                            {i.name} (x{i.quantity})
+                          </div>
+                        ))}
+                      </td>
+                      <td className="px-4 sm:px-6 py-4 whitespace-nowrap text-sm text-gray-500">
                         {new Date(item.borrowTime).toLocaleString()}
-                      </div>
-                    </td>
-                      <td className="px-4 sm:px-6 py-4 whitespace-nowrap">
-                      <div className="text-sm text-gray-900">
+                      </td>
+                      <td className="px-4 sm:px-6 py-4 whitespace-nowrap text-sm text-gray-500">
                         {new Date(item.returnTime).toLocaleString()}
-                      </div>
-                    </td>
-                      <td className="px-4 sm:px-6 py-4 whitespace-nowrap">
-                        <span className="px-3 py-1 inline-flex text-xs leading-5 font-semibold rounded-full bg-green-100 text-green-800">
-                        {item.status}
-                      </span>
-                    </td>
-                  </tr>
+                      </td>
+                      <td className="px-4 sm:px-6 py-4 whitespace-nowrap text-sm text-gray-500">
+                        <span className="px-2 inline-flex text-xs leading-5 font-semibold rounded-full bg-green-100 text-green-800">
+                          {item.status}
+                        </span>
+                      </td>
+                    </tr>
                 ))}
               </tbody>
             </table>
@@ -925,7 +927,7 @@ export default function CashierPage() {
               <table className="min-w-full table-auto">
               <thead>
                   <tr className="bg-gray-50">
-                    <th className="px-4 sm:px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Student</th>
+                    <th className="px-4 sm:px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">ID Number</th>
                     <th className="px-4 sm:px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Reward</th>
                     <th className="px-4 sm:px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Points Used</th>
                     <th className="px-4 sm:px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Date Claimed</th>
@@ -935,7 +937,7 @@ export default function CashierPage() {
                   {paginatedRewards.map((claim) => (
                     <tr key={claim._id} className="hover:bg-gray-50 transition-colors">
                       <td className="px-4 sm:px-6 py-4 whitespace-nowrap">
-                        <div className="text-sm font-medium text-gray-900">{claim.name}</div>
+                        <div className="text-sm font-medium text-gray-900">{claim.idNumber}</div>
                       </td>
                       <td className="px-4 sm:px-6 py-4">
                         <div className="text-sm text-gray-900">{claim.reward}</div>
@@ -947,13 +949,13 @@ export default function CashierPage() {
                       </td>
                       <td className="px-4 sm:px-6 py-4 whitespace-nowrap">
                         <div className="text-sm text-gray-900">
-                      {new Date(claim.dateClaimed).toLocaleString()}
+                          {new Date(claim.dateClaimed).toLocaleString()}
                         </div>
-                    </td>
-                  </tr>
-                ))}
-              </tbody>
-            </table>
+                      </td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
               {paginatedRewards.length === 0 && (
                 <div className="text-center py-12">
                   <p className="text-gray-500">No claimed rewards found.</p>

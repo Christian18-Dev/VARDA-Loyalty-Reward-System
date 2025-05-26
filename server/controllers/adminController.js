@@ -40,7 +40,7 @@ export const createReward = async (req, res) => {
 };
 
 export const getUsers = async (req, res) => {
-  const users = await User.find({}, 'name points role');
+  const users = await User.find({}, 'idNumber points role');
   res.json(users);
 };
 

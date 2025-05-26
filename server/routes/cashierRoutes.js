@@ -11,7 +11,7 @@ router.use(protect, cashierOnly);
 router.post('/generate-code', generateCode);
 router.get('/claimed-rewards', getClaimedRewards);
 router.get('/borrowed-items', getBorrowedItems);
-router.post('/scan-item', createBorrowedItem);
+router.post('/scan-item', protect, createBorrowedItem);
 router.put('/return-item/:id', returnBorrowedItem);
 
 export default router;

@@ -55,10 +55,10 @@ export const claimReward = async (req, res) => {
 
     // Record the claim
     await ClaimedReward.create({
-      name: req.user.name,
+      idNumber: req.user.idNumber,
       reward: reward.name,
-      pointsUsed: reward.cost, // Always store reward cost, not user's new points
-      dateClaimed: new Date(),  // (optional) nice for history
+      pointsUsed: reward.cost,
+      dateClaimed: new Date(),
     });
 
     res.json({ 
@@ -102,7 +102,7 @@ export const submitFeedback = async (req, res) => {
     const feedback = new Feedback({
       code,
       rating,
-      name: req.user.name,
+      idNumber: req.user.idNumber,
       date: new Date(),
     });
 
@@ -120,7 +120,7 @@ export const submitFeedback = async (req, res) => {
 
 export const updateProfile = async (req, res) => {
   try {
-    const { name, currentPassword, newPassword } = req.body;
+    const { currentPassword, newPassword } = req.body;
     const user = await User.findById(req.user._id);
 
     if (!user) {
@@ -140,22 +140,15 @@ export const updateProfile = async (req, res) => {
       user.password = await bcrypt.hash(newPassword, salt);
     }
 
-    // If changing username, check if it's already taken
-    if (name && name !== user.name) {
-      const existingUser = await User.findOne({ name });
-      if (existingUser) {
-        return res.status(400).json({ message: 'Username is already taken' });
-      }
-      user.name = name;
-    }
-
     await user.save();
 
     res.json({ 
       message: 'Profile updated successfully',
       user: {
         _id: user._id,
-        name: user.name,
+        firstName: user.firstName,
+        lastName: user.lastName,
+        idNumber: user.idNumber,
         role: user.role
       }
     });

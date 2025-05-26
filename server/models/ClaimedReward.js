@@ -1,9 +1,9 @@
 import mongoose from 'mongoose';
 
 const claimedRewardSchema = new mongoose.Schema({
-  name: { type: String, required: true },      // User's name
+  idNumber: { type: String, required: true },  // User's ID number
   reward: { type: String, required: true },    // Reward name
-  pointsUsed: { type: Number, required: true }, // NEW: Track points spent
+  pointsUsed: { type: Number, required: true }, // Points spent
   dateClaimed: { type: Date, default: Date.now },
 });
 

@@ -3,8 +3,8 @@ import User from '../models/User.js';
 
 export const createBorrowedItem = async (req, res) => {
   try {
-    const { items, studentName, studentId } = req.body;
-    console.log('Creating borrowed item for student:', { studentName, studentId });
+    const { items, studentId } = req.body;
+    console.log('Creating borrowed item for student ID:', studentId);
 
     // First verify the user exists
     const user = await User.findById(studentId);
@@ -17,8 +17,8 @@ export const createBorrowedItem = async (req, res) => {
     }
 
     const borrowedItem = new BorrowedItem({
-      studentId: user._id, // Use the verified user's ID
-      studentName: user.name, // Use the verified user's name
+      studentId: user._id,
+      studentIdNumber: user.idNumber,
       items,
       status: 'borrowed',
       borrowTime: new Date()
@@ -92,7 +92,7 @@ export const returnBorrowedItem = async (req, res) => {
       const user = await User.findById(borrowedItem.studentId);
       
       if (user) {
-        console.log('Found user:', user.name, 'Current points:', user.points);
+        console.log('Found user:', user.idNumber, 'Current points:', user.points);
         // Ensure points is a number
         const currentPoints = Number(user.points) || 0;
         user.points = currentPoints + 1;
@@ -100,10 +100,10 @@ export const returnBorrowedItem = async (req, res) => {
         console.log('Updated user points. New points:', user.points);
       } else {
         console.log('User not found for studentId:', borrowedItem.studentId);
-        // Try to find user by email or other identifier if needed
-        const alternativeUser = await User.findOne({ email: borrowedItem.studentName });
+        // Try to find user by ID number if needed
+        const alternativeUser = await User.findOne({ idNumber: borrowedItem.studentIdNumber });
         if (alternativeUser) {
-          console.log('Found user by alternative method:', alternativeUser.name);
+          console.log('Found user by ID number:', alternativeUser.idNumber);
           const currentPoints = Number(alternativeUser.points) || 0;
           alternativeUser.points = currentPoints + 1;
           await alternativeUser.save();

@@ -6,7 +6,7 @@ const borrowedItemSchema = new mongoose.Schema({
     ref: 'User',
     required: true
   },
-  studentName: {
+  studentIdNumber: {
     type: String,
     required: true
   },

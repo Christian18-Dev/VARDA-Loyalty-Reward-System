@@ -7,7 +7,7 @@ import logo from '../../assets/2gonzlogo.png';
 const API_BASE_URL = import.meta.env.VITE_API_BASE_URL;
 
 export default function Login() {
-  const [name, setName] = useState('');
+  const [idNumber, setIdNumber] = useState('');
   const [password, setPassword] = useState('');
   const [showPassword, setShowPassword] = useState(false);
   const [errorMessage, setErrorMessage] = useState('');
@@ -18,14 +18,14 @@ export default function Login() {
     e.preventDefault();
     setErrorMessage('');
 
-    if (!name.trim() || !password.trim()) {
+    if (!idNumber.trim() || !password.trim()) {
       setErrorMessage('Please fill in all fields');
       return;
     }
 
     try {
       const { data } = await axios.post(`${API_BASE_URL}/api/auth/login`, {
-        name,
+        idNumber,
         password,
       });
 
@@ -38,7 +38,7 @@ export default function Login() {
         navigate('/student');
       }
     } catch (err) {
-      setErrorMessage(err.response?.data?.message || 'Invalid username or password');
+      setErrorMessage(err.response?.data?.message || 'Invalid ID number or password');
     }
   };
 
@@ -51,14 +51,20 @@ export default function Login() {
         </div>
         <form onSubmit={handleSubmit} className="space-y-5">
           <div>
-            <label className="block mb-1 text-sm font-medium text-gray-200">Username</label>
+            <label className="block mb-1 text-sm font-medium text-gray-200">ID Number</label>
             <input
+              type="text"
+              inputMode="numeric"
+              pattern="[0-9]*"
               className="w-full px-4 py-2 bg-gray-800/50 border border-gray-700 rounded-xl focus:ring-2 focus:ring-blue-500 focus:outline-none transition text-white placeholder-gray-400"
-              placeholder="Enter your username"
-              value={name}
+              placeholder="Enter your ID number"
+              value={idNumber}
               onChange={(e) => {
-                setName(e.target.value);
-                setErrorMessage('');
+                const value = e.target.value;
+                if (value === '' || /^\d+$/.test(value)) {
+                  setIdNumber(value);
+                  setErrorMessage('');
+                }
               }}
               required
             />
