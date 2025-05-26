@@ -624,8 +624,8 @@ export default function CashierPage() {
                       <div className="font-mono text-3xl text-green-700 bg-white p-6 rounded-xl border border-green-300 text-center tracking-wider shadow-inner">
                         {generatedCode}
                       </div>
-                      <div className="absolute -bottom-6 left-1/2 transform -translate-x-1/2 bg-white px-3 py-1 rounded-full shadow-sm border border-green-200">
-                        <div className="flex items-center space-x-2 text-sm text-green-600">
+                      <div className="mt-4 text-center">
+                        <div className="inline-flex items-center space-x-2 text-sm text-green-600 bg-white px-3 py-1 rounded-full shadow-sm border border-green-200">
                           <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                             <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M12 8v4l3 3m6-3a9 9 0 11-18 0 9 9 0 0118 0z" />
                           </svg>
