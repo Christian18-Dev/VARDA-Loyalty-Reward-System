@@ -25,6 +25,7 @@ console.log(`🔧 Using MongoDB URI: ${mongoURI ? "✅ Loaded" : "❌ Not Found"
 const allowedOrigins = [
   "https://christian18-dev.github.io",
   "https://www.2gonz.com",
+  "http://www.2gonz.com",
   "https://2gonz.com",
   "http://localhost:5000",
   "http://localhost:5173" // Add Vite's default development server
