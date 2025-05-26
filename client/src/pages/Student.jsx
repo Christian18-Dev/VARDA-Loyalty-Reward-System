@@ -9,6 +9,9 @@ import completeSetImage from '../assets/completeset.png';
 import spoonImage from '../assets/spoon.png';
 import forkImage from '../assets/fork.png';
 import plateImage from '../assets/plate.png';
+import bowlImage from '../assets/bowl.png';
+import glassImage from '../assets/glassofwater.png'; 
+import saucerImage from '../assets/saucer.png';
 
 export default function StudentPage() {
   const { user } = useAuth();
@@ -31,7 +34,7 @@ export default function StudentPage() {
       id: 1,
       name: 'Complete Set',
       image: completeSetImage,
-      description: 'Complete dining set (1 Plate, 1 Spoon, 1 Fork)',
+      description: 'Complete dining set (1 Plate, 1 Spoon, 1 Fork, Tray)',
       cartQuantity: 0,
       isSet: true
     },
@@ -53,7 +56,28 @@ export default function StudentPage() {
       id: 4, 
       name: 'Plate', 
       image: plateImage,
-      description: 'Standard ceramic plate for your meals',
+      description: 'Ceramic plate',
+      cartQuantity: 0
+    },
+    { 
+      id: 5, 
+      name: 'Bowl', 
+      image: bowlImage,
+      description: 'Ceramic bowl',
+      cartQuantity: 0
+    },
+    { 
+      id: 6, 
+      name: 'Saucer', 
+      image: saucerImage,
+      description: 'Smaller plate',
+      cartQuantity: 0
+    },
+    { 
+      id: 7, 
+      name: 'Glass', 
+      image: glassImage,
+      description: 'Glass for water and beverages',
       cartQuantity: 0
     },
   ]);
@@ -284,7 +308,7 @@ export default function StudentPage() {
   };
 
   return (
-    <div className="flex flex-col min-h-screen bg-gradient-to-b from-blue-50 to-purple-50">
+    <div className="flex flex-col min-h-screen bg-gradient-to-br from-[#0f172a] to-[#1e293b]">
       {/* Main Content */}
       <motion.div 
         className="flex-grow p-6 pb-24 space-y-6 max-w-2xl mx-auto w-full"
@@ -295,7 +319,7 @@ export default function StudentPage() {
         {/* Success/Error Messages */}
         {successMessage && (
           <motion.div 
-            className="p-4 bg-green-100 border-2 border-green-300 text-green-800 rounded-lg shadow-md"
+            className="p-4 bg-green-900/50 border-2 border-green-700 text-green-200 rounded-lg shadow-md"
             initial={{ opacity: 0, y: -20 }}
             animate={{ opacity: 1, y: 0 }}
             exit={{ opacity: 0 }}
@@ -305,7 +329,7 @@ export default function StudentPage() {
         )}
         {errorMessage && (
           <motion.div 
-            className="p-4 bg-red-100 border-2 border-red-300 text-red-800 rounded-lg shadow-md"
+            className="p-4 bg-red-900/50 border-2 border-red-700 text-red-200 rounded-lg shadow-md"
             initial={{ opacity: 0, y: -20 }}
             animate={{ opacity: 1, y: 0 }}
             exit={{ opacity: 0 }}
@@ -343,7 +367,7 @@ export default function StudentPage() {
               <div className="relative z-10 flex flex-col justify-between h-full">
                 {/* Card issuer and chip */}
                 <div className="flex justify-between items-start">
-                  <div className="text-xs font-medium opacity-80">LOYALTY CARD</div>
+                  <div className="text-xs font-medium text-white/80">LOYALTY CARD</div>
                   <div className="w-8 sm:w-10 h-6 sm:h-8 bg-gradient-to-br from-yellow-300 to-yellow-500 rounded-md flex items-center justify-center">
                     <div className="w-6 sm:w-8 h-4 sm:h-6 bg-gradient-to-br from-yellow-400 to-yellow-600 rounded-sm border border-yellow-200/50 flex items-center justify-center">
                       <div className="w-4 sm:w-5 h-3 sm:h-4 bg-gradient-to-br from-yellow-500 to-yellow-700 rounded-xs border border-yellow-300/50"></div>
@@ -358,8 +382,8 @@ export default function StudentPage() {
                   animate={{ scale: 1, opacity: 1 }}
                   className="text-center flex-grow flex flex-col justify-center py-2 sm:py-4"
                 >
-                  <p className="text-xs opacity-80 mb-1">POINTS BALANCE:</p>
-                  <p className="text-2xl sm:text-3xl md:text-4xl font-bold tracking-tight flex items-center justify-center">
+                  <p className="text-xs text-white/80 mb-1">POINTS BALANCE:</p>
+                  <p className="text-2xl sm:text-3xl md:text-4xl font-bold tracking-tight text-white flex items-center justify-center">
                     {points} <span className="text-lg sm:text-xl ml-2">⭐</span>
                   </p>
                 </motion.div>
@@ -367,14 +391,14 @@ export default function StudentPage() {
                 {/* Card footer */}
                 <div className="flex justify-between items-end mt-auto pt-2 sm:pt-3">
                   <div className="max-w-[60%]">
-                    <p className="text-xs sm:text-sm font-medium tracking-wider truncate">{user.name.toUpperCase()}</p>
+                    <p className="text-xs sm:text-sm font-medium tracking-wider text-white/90 truncate">{user.name.toUpperCase()}</p>
                   </div>
                   
                   <div className="text-right">
-                    <p className="text-xs opacity-80">STATUS</p>
+                    <p className="text-xs text-white/80">STATUS</p>
                     <div className="flex items-center justify-end space-x-1">
                       <div className="w-2 h-2 bg-green-400 rounded-full animate-pulse"></div>
-                      <p className="text-xs sm:text-sm font-medium">ACTIVE</p>
+                      <p className="text-xs sm:text-sm font-medium text-white/90">ACTIVE</p>
                     </div>
                   </div>
                 </div>
@@ -398,10 +422,10 @@ export default function StudentPage() {
                   setErrorMessage('');
                   setSuccessMessage('');
                 }}
-                className="flex flex-col items-center p-4 bg-white rounded-xl shadow-md hover:shadow-lg transition-all"
+                className="flex flex-col items-center p-4 bg-[#1e293b] rounded-xl shadow-md hover:shadow-lg transition-all border border-gray-700/50"
               >
-                <TicketIcon className="h-8 w-8 text-blue-600" />
-                <span className="mt-2 font-medium text-gray-700">Redeem</span>
+                <TicketIcon className="h-8 w-8 text-blue-400" />
+                <span className="mt-2 font-medium text-gray-200">Redeem</span>
               </motion.button>
 
               <motion.button
@@ -412,20 +436,20 @@ export default function StudentPage() {
                   setErrorMessage('');
                   setSuccessMessage('');
                 }}
-                className="flex flex-col items-center p-4 bg-white rounded-xl shadow-md hover:shadow-lg transition-all"
+                className="flex flex-col items-center p-4 bg-[#1e293b] rounded-xl shadow-md hover:shadow-lg transition-all border border-gray-700/50"
               >
-                <GiftIcon className="h-8 w-8 text-pink-600" />
-                <span className="mt-2 font-medium text-gray-700">Rewards</span>
+                <GiftIcon className="h-8 w-8 text-pink-400" />
+                <span className="mt-2 font-medium text-gray-200">Rewards</span>
               </motion.button>
 
               <motion.button
                 whileHover={{ scale: 1.05 }}
                 whileTap={{ scale: 0.95 }}
                 onClick={() => setCurrentPage('borrow')}
-                className="flex flex-col items-center p-4 bg-white rounded-xl shadow-md hover:shadow-lg transition-all"
+                className="flex flex-col items-center p-4 bg-[#1e293b] rounded-xl shadow-md hover:shadow-lg transition-all border border-gray-700/50"
               >
-                <ShoppingBagIcon className="h-8 w-8 text-purple-600" />
-                <span className="mt-2 font-medium text-gray-700">Borrow</span>
+                <ShoppingBagIcon className="h-8 w-8 text-purple-400" />
+                <span className="mt-2 font-medium text-gray-200">Borrow</span>
               </motion.button>
             </div>
           </motion.div>
@@ -435,25 +459,25 @@ export default function StudentPage() {
         {currentPage === 'claim' && (
           <motion.div variants={itemVariants} className="space-y-6">
             <div className="text-center">
-              <h2 className="text-2xl font-bold text-purple-800">Redeem Your Code</h2>
+              <h2 className="text-2xl font-bold text-blue-400">Redeem Your Code</h2>
             </div>
             
             <motion.div 
-              className="bg-white p-6 rounded-2xl shadow-lg border-2 border-dashed border-yellow-400"
+              className="bg-[#1e293b] p-6 rounded-2xl shadow-lg border-2 border-dashed border-gray-700/50"
               initial={{ scale: 0.9 }}
               animate={{ scale: 1 }}
             >
               <div className="space-y-4">
                 <div className="text-center mb-4">
-                  <div className="inline-block bg-yellow-100 px-4 py-2 rounded-full">
-                    <span className="font-bold text-yellow-800">✨  Enter Code ✨</span>
+                  <div className="inline-block bg-blue-900/50 px-4 py-2 rounded-full">
+                    <span className="font-bold text-blue-300">✨  Enter Code ✨</span>
                   </div>
                 </div>
                 
                 <div className="space-y-2">
                   <input
                     id="code-input"
-                    className="w-full border-2 border-purple-300 p-4 rounded-xl text-center font-mono text-xl focus:ring-2 focus:ring-purple-500 focus:border-purple-500"
+                    className="w-full border-2 border-gray-700 bg-gray-800/50 p-4 rounded-xl text-center font-mono text-xl focus:ring-2 focus:ring-blue-500 focus:border-blue-500 text-white placeholder-gray-500"
                     placeholder="ex. 123456"
                     value={code}
                     onChange={(e) => setCode(e.target.value.toUpperCase())}
@@ -465,7 +489,7 @@ export default function StudentPage() {
                 <button
                   onClick={handleCodeSubmit}
                   disabled={isLoading}
-                  className="w-full bg-gradient-to-r from-green-500 to-green-600 hover:from-green-600 hover:to-green-700 text-white px-4 py-4 rounded-xl font-bold text-lg shadow-lg transition-all disabled:opacity-70"
+                  className="w-full bg-gradient-to-r from-blue-600 to-blue-700 hover:from-blue-700 hover:to-blue-800 text-white px-4 py-4 rounded-xl font-bold text-lg shadow-lg transition-all disabled:opacity-70"
                 >
                   {isLoading ? (
                     <span className="flex items-center justify-center">
@@ -480,13 +504,13 @@ export default function StudentPage() {
 
             {showFeedback && (
             <motion.div 
-              className="mt-6 w-full max-w-md mx-auto p-4 sm:p-6 bg-white rounded-2xl shadow-lg border-2 border-blue-300 space-y-6"
+              className="mt-6 w-full max-w-md mx-auto p-4 sm:p-6 bg-[#1e293b] rounded-2xl shadow-lg border-2 border-gray-700/50 space-y-6"
               initial={{ opacity: 0, y: 20 }}
               animate={{ opacity: 1, y: 0 }}
             >
               <div className="text-center">
-                <h3 className="text-xl font-bold text-blue-800">How was it? 🤔</h3>
-                <p className="text-gray-600 mt-1">Rate your experience to earn bonus points!</p>
+                <h3 className="text-xl font-bold text-blue-400">How was it? 🤔</h3>
+                <p className="text-gray-400 mt-1">Rate your experience to earn bonus points!</p>
               </div>
               
               <div className="flex justify-center gap-2 flex-wrap">
@@ -494,7 +518,7 @@ export default function StudentPage() {
                   <button
                     key={star}
                     aria-label={`Rate ${star} star`}
-                    className={`p-4 rounded-full border-4 text-2xl ${rating >= star ? 'bg-yellow-200 border-yellow-400 scale-110' : 'bg-gray-100 border-gray-300'} transition-all`}
+                    className={`p-4 rounded-full border-4 text-2xl ${rating >= star ? 'bg-yellow-900/50 border-yellow-600 scale-110' : 'bg-gray-800/50 border-gray-700'} transition-all`}
                     onClick={() => setRating(star)}
                     disabled={isLoading}
                   >
@@ -507,7 +531,7 @@ export default function StudentPage() {
                 <button
                   onClick={submitFeedback}
                   disabled={!rating || isLoading}
-                  className={`px-6 py-3 w-full rounded-xl font-bold text-lg shadow-md transition-all ${!rating || isLoading ? 'bg-gray-300 text-gray-500' : 'bg-gradient-to-r from-blue-500 to-purple-600 hover:from-blue-600 hover:to-purple-700 text-white'}`}
+                  className={`px-6 py-3 w-full rounded-xl font-bold text-lg shadow-md transition-all ${!rating || isLoading ? 'bg-gray-800 text-gray-600' : 'bg-gradient-to-r from-blue-600 to-blue-700 hover:from-blue-700 hover:to-blue-800 text-white'}`}
                 >
                   {isLoading ? 'Sending...' : (
                     <span className="flex items-center justify-center gap-2">
@@ -525,55 +549,54 @@ export default function StudentPage() {
         {currentPage === 'rewards' && (
           <motion.div variants={itemVariants} className="space-y-6">
             <div className="text-center">
-              <h2 className="text-2xl font-bold text-purple-800"> Rewards Available!</h2>
-              <p className="text-gray-600 mt-1">Redeem your points for awesome rewards!</p>
+              <h2 className="text-2xl font-bold text-blue-400">Rewards Available!</h2>
+              <p className="text-gray-400 mt-1">Redeem your points for awesome rewards!</p>
             </div>
             
             <motion.div 
-              className="bg-white p-4 rounded-2xl shadow-inner border-2 border-purple-200"
+              className="bg-[#1e293b] p-4 rounded-2xl shadow-inner border-2 border-gray-700/50"
               initial={{ opacity: 0 }}
               animate={{ opacity: 1 }}
             >
               <div className="text-center mb-4">
-                <div className="inline-block bg-purple-100 px-4 py-2 rounded-full">
-                  <span className="font-bold text-purple-800">🌟 You have: {points} points 🌟</span>
+                <div className="inline-block bg-blue-900/50 px-4 py-2 rounded-full">
+                  <span className="font-bold text-blue-300">🌟 You have: {points} points 🌟</span>
                 </div>
               </div>
               
               {rewards.length === 0 ? (
                 <div className="text-center py-8">
-                  <p className="text-gray-500 text-lg">No rewards available right now</p>
-                  <p className="text-gray-400 mt-2">Check back later!</p>
+                  <p className="text-gray-400 text-lg">No rewards available right now</p>
+                  <p className="text-gray-500 mt-2">Check back later!</p>
                 </div>
               ) : (
                 <div className="grid gap-4">
               {rewards
-                .sort((a, b) => a.cost - b.cost) // sort by cost ascending
+                .sort((a, b) => a.cost - b.cost)
                 .map((reward) => (
                   <motion.div 
                     key={reward._id}
                     variants={itemVariants}
                     whileHover={{ scale: 1.03 }}
-                    className={`p-1 rounded-xl ${points >= reward.cost ? 'bg-gradient-to-r from-yellow-100 to-pink-100' : 'bg-gray-100'}`}
+                    className={`p-1 rounded-xl ${points >= reward.cost ? 'bg-gradient-to-r from-indigo-600 via-purple-700 to-purple-800' : 'bg-gray-800/50'}`}
                   >
-                    <div className="bg-white p-4 rounded-lg border-2 border-dashed border-purple-300 relative overflow-hidden">
-                      {/* Coupon design elements */}
-                      <div className="absolute top-0 left-0 w-2 h-full bg-purple-500"></div>
-                      <div className="absolute top-2 right-2 text-xs font-bold bg-yellow-400 px-2 py-1 rounded">
+                    <div className="bg-gradient-to-br from-indigo-400 via-purple-600 to-purple-700 p-4 rounded-lg border-2 border-dashed border-white/20 relative overflow-hidden">
+                      <div className="absolute top-0 left-0 w-2 h-full bg-white"></div>
+                      <div className="absolute top-2 right-2 text-xs font-bold bg-white/10 px-2 py-1 rounded text-white">
                         {reward.cost} pts
                       </div>
                       
                       <div className="flex justify-between items-center pl-4">
                         <div>
-                          <h3 className="text-lg font-bold text-purple-800">{reward.name}</h3>
-                          <p className="text-sm text-gray-600">{reward.description || 'Awesome reward!'}</p>
+                          <h3 className="text-lg font-bold text-white">{reward.name}</h3>
+                          <p className="text-sm text-white/80">{reward.description || 'Awesome reward!'}</p>
                         </div>
                         <button
                           onClick={() => claimReward(reward._id)}
                           disabled={points < reward.cost || isLoading}
                           className={`px-4 py-2 rounded-lg font-bold shadow-md transition-all ${points >= reward.cost ? 
-                            'bg-gradient-to-r from-green-500 to-green-600 hover:from-green-600 hover:to-green-700 text-white' : 
-                            'bg-gray-300 text-gray-500'}`}
+                            'bg-blue-400 hover:bg-blue-500 text-white' : 
+                            'bg-gray-800 text-gray-600'}`}
                         >
                           Claim!
                         </button>
@@ -581,7 +604,6 @@ export default function StudentPage() {
                     </div>
                   </motion.div>
               ))}
-
                 </div>
               )}
             </motion.div>
@@ -592,8 +614,8 @@ export default function StudentPage() {
         {currentPage === 'borrow' && (
           <motion.div variants={itemVariants} className="space-y-6">
             <div className="text-center">
-              <h2 className="text-2xl font-bold text-purple-800">Borrow Items</h2>
-              <p className="text-gray-600 mt-1">Select items to borrow for your needs</p>
+              <h2 className="text-2xl font-bold text-blue-400">Borrow Items</h2>
+              <p className="text-gray-400 mt-1">Select items to borrow for your needs</p>
             </div>
 
             {/* Available Items Grid */}
@@ -602,7 +624,7 @@ export default function StudentPage() {
                 <motion.div 
                   key={item.id}
                   whileHover={{ scale: 1.02 }}
-                  className={`bg-white rounded-xl shadow-md overflow-hidden border border-gray-100 ${
+                  className={`bg-[#1e293b] rounded-xl shadow-md overflow-hidden border border-gray-700/50 ${
                     item.isSet ? 'md:col-span-2' : ''
                   }`}
                 >
@@ -626,8 +648,8 @@ export default function StudentPage() {
                     )}
                   </div>
                   <div className="p-4">
-                    <h4 className="font-bold text-lg text-gray-800">{item.name}</h4>
-                    <p className="text-sm text-gray-600 mb-3">{item.description}</p>
+                    <h4 className="font-bold text-lg text-gray-200">{item.name}</h4>
+                    <p className="text-sm text-gray-400 mb-3">{item.description}</p>
                     <div className="flex items-center justify-between">
                       <div className="flex items-center space-x-2">
                         <button
@@ -635,16 +657,16 @@ export default function StudentPage() {
                           disabled={item.cartQuantity === 0}
                           className={`w-8 h-8 rounded-full flex items-center justify-center text-lg font-bold transition-all ${
                             item.cartQuantity === 0
-                              ? 'bg-gray-200 text-gray-400 cursor-not-allowed'
-                              : 'bg-red-500 text-white hover:bg-red-600'
+                              ? 'bg-gray-800 text-gray-600 cursor-not-allowed'
+                              : 'bg-red-600 text-white hover:bg-red-700'
                           }`}
                         >
                           -
                         </button>
-                        <span className="w-8 text-center font-medium">{item.cartQuantity}</span>
+                        <span className="w-8 text-center font-medium text-gray-200">{item.cartQuantity}</span>
                         <button
                           onClick={() => handleAddToCart(item.id)}
-                          className="w-8 h-8 rounded-full flex items-center justify-center text-lg font-bold transition-all bg-green-500 text-white hover:bg-green-600"
+                          className="w-8 h-8 rounded-full flex items-center justify-center text-lg font-bold transition-all bg-blue-600 text-white hover:bg-blue-700"
                         >
                           +
                         </button>
@@ -661,7 +683,7 @@ export default function StudentPage() {
                 initial={{ opacity: 0, y: 20 }}
                 animate={{ opacity: 1, y: 0 }}
                 onClick={() => setShowCart(true)}
-                className="fixed bottom-24 right-6 bg-purple-600 text-white p-4 rounded-full shadow-lg hover:bg-purple-700 transition-all flex items-center space-x-2"
+                className="fixed bottom-24 right-6 bg-blue-600 text-white p-4 rounded-full shadow-lg hover:bg-blue-700 transition-all flex items-center space-x-2"
               >
                 <svg xmlns="http://www.w3.org/2000/svg" className="h-6 w-6" fill="none" viewBox="0 0 24 24" stroke="currentColor">
                   <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M3 3h2l.4 2M7 13h10l4-8H5.4M7 13L5.4 5M7 13l-2.293 2.293c-.63.63-.184 1.707.707 1.707H17m0 0a2 2 0 100 4 2 2 0 000-4zm-8 2a2 2 0 11-4 0 2 2 0 014 0z" />
@@ -679,14 +701,14 @@ export default function StudentPage() {
                   initial={{ x: '100%' }}
                   animate={{ x: 0 }}
                   exit={{ x: '100%' }}
-                  className="absolute right-0 top-0 h-full w-full max-w-md bg-white shadow-xl"
+                  className="absolute right-0 top-0 h-full w-full max-w-md bg-[#1e293b] shadow-xl border-l border-gray-700/50"
                 >
                   <div className="p-6 h-full flex flex-col">
                     <div className="flex justify-between items-center mb-6">
-                      <h3 className="text-xl font-bold text-gray-800">Your Cart</h3>
+                      <h3 className="text-xl font-bold text-gray-200">Your Cart</h3>
                       <button 
                         onClick={() => setShowCart(false)}
-                        className="text-gray-500 hover:text-gray-700"
+                        className="text-gray-400 hover:text-gray-200"
                       >
                         <svg xmlns="http://www.w3.org/2000/svg" className="h-6 w-6" fill="none" viewBox="0 0 24 24" stroke="currentColor">
                           <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
@@ -697,10 +719,10 @@ export default function StudentPage() {
                     <div className="flex-grow overflow-y-auto">
                       {availableItems.some(item => item.cartQuantity > 0) ? (
                         <>
-                          <div className="bg-purple-50 p-4 rounded-xl mb-4">
+                          <div className="bg-blue-900/50 p-4 rounded-xl mb-4">
                             <div className="flex justify-between items-center">
-                              <span className="text-purple-800 font-medium">Total Items:</span>
-                              <span className="text-purple-900 font-bold">
+                              <span className="text-blue-300 font-medium">Total Items:</span>
+                              <span className="text-blue-200 font-bold">
                                 {availableItems.reduce((total, item) => total + item.cartQuantity, 0)}
                               </span>
                             </div>
@@ -709,32 +731,32 @@ export default function StudentPage() {
                           {availableItems
                             .filter(item => item.cartQuantity > 0)
                             .map(item => (
-                              <div key={item.id} className="flex items-center space-x-4 p-4 bg-gray-50 rounded-xl mb-4">
+                              <div key={item.id} className="flex items-center space-x-4 p-4 bg-gray-800/50 rounded-xl mb-4">
                                 <img 
                                   src={item.image} 
                                   alt={item.name}
                                   className="w-20 h-20 object-cover rounded-lg"
                                 />
                                 <div className="flex-grow">
-                                  <h4 className="font-medium text-gray-800">{item.name}</h4>
-                                  <p className="text-sm text-gray-600 mt-1">{item.description}</p>
+                                  <h4 className="font-medium text-gray-200">{item.name}</h4>
+                                  <p className="text-sm text-gray-400 mt-1">{item.description}</p>
                                   <div className="flex items-center justify-between mt-2">
                                     <div className="flex items-center space-x-2">
                                       <button
                                         onClick={() => handleRemoveFromCart(item.id)}
-                                        className="w-6 h-6 rounded-full flex items-center justify-center text-sm font-bold bg-red-500 text-white hover:bg-red-600"
+                                        className="w-6 h-6 rounded-full flex items-center justify-center text-sm font-bold bg-red-600 text-white hover:bg-red-700"
                                       >
                                         -
                                       </button>
-                                      <span className="w-8 text-center font-medium">{item.cartQuantity}</span>
+                                      <span className="w-8 text-center font-medium text-gray-200">{item.cartQuantity}</span>
                                       <button
                                         onClick={() => handleAddToCart(item.id)}
-                                        className="w-6 h-6 rounded-full flex items-center justify-center text-sm font-bold bg-green-500 text-white hover:bg-green-600"
+                                        className="w-6 h-6 rounded-full flex items-center justify-center text-sm font-bold bg-blue-600 text-white hover:bg-blue-700"
                                       >
                                         +
                                       </button>
                                     </div>
-                                    <span className="text-sm font-medium text-gray-600">
+                                    <span className="text-sm font-medium text-gray-400">
                                       {item.isSet ? 'Complete Set' : 'Individual Item'}
                                     </span>
                                   </div>
@@ -744,10 +766,10 @@ export default function StudentPage() {
                         </>
                       ) : (
                         <div className="flex flex-col items-center justify-center h-64 text-center">
-                          <svg xmlns="http://www.w3.org/2000/svg" className="h-16 w-16 text-gray-400 mb-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                          <svg xmlns="http://www.w3.org/2000/svg" className="h-16 w-16 text-gray-600 mb-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
                             <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M3 3h2l.4 2M7 13h10l4-8H5.4M7 13L5.4 5M7 13l-2.293 2.293c-.63.63-.184 1.707.707 1.707H17m0 0a2 2 0 100 4 2 2 0 000-4zm-8 2a2 2 0 11-4 0 2 2 0 014 0z" />
                           </svg>
-                          <h4 className="text-lg font-medium text-gray-600 mb-2">Your cart is empty</h4>
+                          <h4 className="text-lg font-medium text-gray-400 mb-2">Your cart is empty</h4>
                           <p className="text-gray-500">Add items to your cart to proceed with your borrow</p>
                         </div>
                       )}
@@ -755,15 +777,15 @@ export default function StudentPage() {
 
                     <div className="mt-6 space-y-4">
                       {availableItems.some(item => item.cartQuantity > 0) && (
-                        <div className="bg-gray-50 p-4 rounded-xl">
-                          <h4 className="font-medium text-gray-800 mb-2">Borrow Summary</h4>
+                        <div className="bg-gray-800/50 p-4 rounded-xl">
+                          <h4 className="font-medium text-gray-200 mb-2">Borrow Summary</h4>
                           <div className="space-y-2">
                             {availableItems
                               .filter(item => item.cartQuantity > 0)
                               .map(item => (
                                 <div key={item.id} className="flex justify-between text-sm">
-                                  <span className="text-gray-600">{item.name} x {item.cartQuantity}</span>
-                                  <span className="font-medium text-gray-800">
+                                  <span className="text-gray-400">{item.name} x {item.cartQuantity}</span>
+                                  <span className="font-medium text-gray-300">
                                     {item.isSet ? 'Complete Set' : 'Individual Item'}
                                   </span>
                                 </div>
@@ -780,8 +802,8 @@ export default function StudentPage() {
                         disabled={!availableItems.some(item => item.cartQuantity > 0)}
                         className={`w-full py-4 rounded-xl font-bold transition-all ${
                           availableItems.some(item => item.cartQuantity > 0)
-                            ? 'bg-purple-600 text-white hover:bg-purple-700'
-                            : 'bg-gray-300 text-gray-500 cursor-not-allowed'
+                            ? 'bg-blue-600 text-white hover:bg-blue-700'
+                            : 'bg-gray-800 text-gray-600 cursor-not-allowed'
                         }`}
                       >
                         {availableItems.some(item => item.cartQuantity > 0)
@@ -796,15 +818,15 @@ export default function StudentPage() {
 
             {/* Borrowed Items */}
             {borrowedItems.length > 0 && (
-              <div className="bg-white p-6 rounded-2xl shadow-lg mt-6">
-                <h3 className="text-xl font-semibold text-gray-800 mb-4">Your Orders</h3>
+              <div className="bg-[#1e293b] p-6 rounded-2xl shadow-lg mt-6 border border-gray-700/50">
+                <h3 className="text-xl font-semibold text-gray-200 mb-4">Your Orders</h3>
                 <div className="space-y-4">
                   {borrowedItems.map((item) => (
                     <motion.div 
                       key={item.id}
                       initial={{ opacity: 0, y: 20 }}
                       animate={{ opacity: 1, y: 0 }}
-                      className="flex items-center justify-between p-4 bg-gray-50 rounded-xl"
+                      className="flex items-center justify-between p-4 bg-gray-800/50 rounded-xl"
                     >
                       <div className="flex items-center space-x-4">
                         <img 
@@ -813,15 +835,15 @@ export default function StudentPage() {
                           className="w-16 h-16 object-cover rounded-lg"
                         />
                         <div>
-                          <h4 className="font-medium text-gray-800">{item.name}</h4>
-                          <p className="text-sm text-gray-600">
+                          <h4 className="font-medium text-gray-200">{item.name}</h4>
+                          <p className="text-sm text-gray-400">
                             Ordered: {new Date(item.borrowTime).toLocaleString()}
                           </p>
                         </div>
                       </div>
                       <button
                         onClick={() => handleReturn(item.id)}
-                        className="px-4 py-2 bg-green-600 text-white rounded-lg font-medium hover:bg-green-700"
+                        className="px-4 py-2 bg-blue-600 text-white rounded-lg font-medium hover:bg-blue-700"
                       >
                         Return
                       </button>
@@ -840,21 +862,21 @@ export default function StudentPage() {
       </motion.div>
 
       {showClaimModal && (
-      <div className="fixed inset-0 z-50 flex items-center justify-center bg-opacity-50">
+      <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 backdrop-blur-sm">
         <motion.div 
           initial={{ scale: 0.8, opacity: 0 }}
           animate={{ scale: 1, opacity: 1 }}
-          className="bg-white rounded-2xl p-6 max-w-sm w-full shadow-lg border-2 border-purple-300 text-center space-y-4"
+          className="bg-[#1e293b] rounded-2xl p-6 max-w-sm w-full shadow-lg border-2 border-gray-700/50 text-center space-y-4"
         >
-          <h3 className="text-2xl font-bold text-green-600">🎉 Congrats!</h3>
-          <p className="text-gray-800">
+          <h3 className="text-2xl font-bold text-green-400">🎉 Congrats!</h3>
+          <p className="text-gray-200">
             You've successfully claimed:
             <br />
-            <span className="font-bold text-purple-800">{claimedRewardName}</span>
+            <span className="font-bold text-blue-400">{claimedRewardName}</span>
           </p>
 
-          <div className="text-sm text-gray-600 mt-2">
-            Claimed on: <span className="font-medium">{claimTime}</span>
+          <div className="text-sm text-gray-400 mt-2">
+            Claimed on: <span className="font-medium text-gray-300">{claimTime}</span>
           </div>
 
           <p className="text-xs text-gray-500 mt-1">
@@ -863,7 +885,7 @@ export default function StudentPage() {
 
           <button 
             onClick={() => setShowClaimModal(false)}
-            className="mt-4 bg-purple-600 text-white px-4 py-2 rounded-full hover:bg-purple-700 transition"
+            className="mt-4 bg-blue-600 text-white px-4 py-2 rounded-full hover:bg-blue-700 transition"
           >
             Got it!
           </button>
@@ -877,12 +899,12 @@ export default function StudentPage() {
           <motion.div 
             initial={{ scale: 0.9, opacity: 0 }}
             animate={{ scale: 1, opacity: 1 }}
-            className="bg-white rounded-2xl p-6 max-w-sm w-full shadow-xl border-2 border-purple-300"
+            className="bg-[#1e293b] rounded-2xl p-6 max-w-sm w-full shadow-xl border-2 border-gray-700/50"
           >
             <div className="text-center space-y-4">
-              <h3 className="text-xl font-bold text-purple-800">Scan Me!</h3>
+              <h3 className="text-xl font-bold text-blue-400">Scan Me!</h3>
               
-              <div className="bg-white p-4 rounded-xl border-2 border-dashed border-purple-200">
+              <div className="bg-gray-800/50 p-4 rounded-xl border-2 border-dashed border-gray-700/50">
                 <QRCodeSVG 
                   value={qrData}
                   size={200}
@@ -892,9 +914,9 @@ export default function StudentPage() {
                 />
               </div>
 
-              <div className="text-left bg-gray-50 p-4 rounded-xl">
-                <h4 className="font-semibold text-gray-800 mb-2">Order Details:</h4>
-                <ul className="space-y-1 text-sm text-gray-600">
+              <div className="text-left bg-gray-800/50 p-4 rounded-xl">
+                <h4 className="font-semibold text-gray-200 mb-2">Order Details:</h4>
+                <ul className="space-y-1 text-sm text-gray-400">
                   {JSON.parse(qrData).items.map((item, index) => (
                     <li key={index}>
                       • {item.name} (x{item.quantity})
@@ -905,7 +927,7 @@ export default function StudentPage() {
 
               <button 
                 onClick={() => setShowQRModal(false)}
-                className="w-full bg-purple-600 text-white px-4 py-2 rounded-xl hover:bg-purple-700 transition"
+                className="w-full bg-blue-600 text-white px-4 py-2 rounded-xl hover:bg-blue-700 transition"
               >
                 Close
               </button>
@@ -920,22 +942,22 @@ export default function StudentPage() {
           <motion.div 
             initial={{ scale: 0.9, opacity: 0 }}
             animate={{ scale: 1, opacity: 1 }}
-            className="bg-white rounded-2xl p-6 max-w-sm w-full shadow-xl border-2 border-green-300"
+            className="bg-[#1e293b] rounded-2xl p-6 max-w-sm w-full shadow-xl border-2 border-gray-700/50"
           >
             <div className="text-center space-y-4">
-              <div className="w-16 h-16 bg-green-100 rounded-full flex items-center justify-center mx-auto">
-                <svg xmlns="http://www.w3.org/2000/svg" className="h-8 w-8 text-green-600" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+              <div className="w-16 h-16 bg-green-900/50 rounded-full flex items-center justify-center mx-auto">
+                <svg xmlns="http://www.w3.org/2000/svg" className="h-8 w-8 text-green-400" fill="none" viewBox="0 0 24 24" stroke="currentColor">
                   <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M5 13l4 4L19 7" />
                 </svg>
               </div>
-              <h3 className="text-xl font-bold text-gray-800">Borrow Created!</h3>
-              <p className="text-gray-600">Show the QR code to the cashier</p>
+              <h3 className="text-xl font-bold text-gray-200">Borrow Created!</h3>
+              <p className="text-gray-400">Show the QR code to the Concierge</p>
               <button 
                 onClick={() => {
                   setShowSuccessModal(false);
                   setShowCart(false);
                 }}
-                className="w-full py-3 bg-green-600 text-white rounded-xl font-bold hover:bg-green-700 transition-all"
+                className="w-full py-3 bg-blue-600 text-white rounded-xl font-bold hover:bg-blue-700 transition-all"
               >
                 OK
               </button>
@@ -945,10 +967,10 @@ export default function StudentPage() {
       )}
 
       {/* Bottom Navigation */}
-      <nav className="fixed bottom-0 left-0 right-0 bg-white border-t border-purple-200 shadow-md flex justify-around py-2 z-40">
+      <nav className="fixed bottom-0 left-0 right-0 bg-[#1e293b] border-t border-gray-700/50 shadow-md flex justify-around py-2 z-40">
         <button 
           onClick={() => setCurrentPage('settings')}
-          className="flex items-center justify-center p-2 rounded-full bg-gray-50 hover:bg-purple-50 text-gray-500 hover:text-purple-700 transition-all"
+          className="flex items-center justify-center p-2 rounded-full bg-gray-800/50 hover:bg-gray-700/50 text-gray-400 hover:text-gray-200 transition-all"
           aria-label="Settings"
         >
           <svg xmlns="http://www.w3.org/2000/svg" className="h-8 w-8" fill="none" viewBox="0 0 24 24" stroke="currentColor">
@@ -964,7 +986,7 @@ export default function StudentPage() {
               setErrorMessage('');
               setSuccessMessage('');
             }} 
-            className={`absolute -top-8 left-1/2 transform -translate-x-1/2 flex flex-col items-center justify-center w-16 h-16 rounded-full bg-gradient-to-br from-purple-600 to-purple-800 text-white shadow-lg hover:shadow-xl transition-all ${currentPage === 'home' ? 'ring-4 ring-purple-200' : ''}`}
+            className={`absolute -top-8 left-1/2 transform -translate-x-1/2 flex flex-col items-center justify-center w-16 h-16 rounded-full bg-gradient-to-br from-blue-600 to-blue-800 text-white shadow-lg hover:shadow-xl transition-all ${currentPage === 'home' ? 'ring-4 ring-blue-500/50' : ''}`}
             aria-label="Home"
           >
             <HomeIcon className="h-8 w-8" />
@@ -973,7 +995,7 @@ export default function StudentPage() {
 
         <button 
           onClick={() => setShowLogoutModal(true)}
-          className="flex items-center justify-center p-2 rounded-full bg-gray-50 hover:bg-red-50 text-red-500 hover:text-red-600 transition-all"
+          className="flex items-center justify-center p-2 rounded-full bg-gray-800/50 hover:bg-red-900/50 text-red-400 hover:text-red-300 transition-all"
           aria-label="Logout"
         >
           <LogoutIcon className="h-8 w-8" />
@@ -982,21 +1004,21 @@ export default function StudentPage() {
 
       {/* Logout Confirmation Modal */}
       {showLogoutModal && (
-        <div className="fixed inset-0 bg-black/40 backdrop-blur-sm flex items-center justify-center z-50">
-          <div className="bg-white rounded-2xl p-6 w-80 shadow-2xl space-y-4">
-            <h2 className="text-lg font-bold text-gray-800">Confirm Logout</h2>
-            <p className="text-sm text-gray-500">Are you sure you want to log out?</p>
+        <div className="fixed inset-0 bg-black/50 backdrop-blur-sm flex items-center justify-center z-50">
+          <div className="bg-[#1e293b] rounded-2xl p-6 w-80 shadow-2xl space-y-4 border border-gray-700/50">
+            <h2 className="text-lg font-bold text-gray-200">Confirm Logout</h2>
+            <p className="text-sm text-gray-400">Are you sure you want to log out?</p>
 
             <div className="flex justify-end space-x-4 pt-4">
               <button 
                 onClick={() => setShowLogoutModal(false)}
-                className="px-4 py-2 text-sm rounded-full border border-gray-300 text-gray-700 hover:bg-gray-100 transition-all"
+                className="px-4 py-2 text-sm rounded-full border border-gray-300 bg-gray-100 text-gray-700 hover:bg-gray-200 transition-all"
               >
                 Cancel
               </button>
               <button 
                 onClick={handleLogout}
-                className="px-4 py-2 text-sm rounded-full bg-red-500 text-white hover:bg-red-400 transition-all"
+                className="px-4 py-2 text-sm rounded-full bg-red-600 text-white hover:bg-red-700 transition-all"
               >
                 Logout
               </button>
@@ -1255,7 +1277,7 @@ function SettingsPage({ user, onBack }) {
           <h3 className="text-lg font-bold text-purple-700">Need Help?</h3>
           <p>If you need assistance with your account or have questions, please contact a staff member:</p>
           <ul className="list-disc ml-6">
-            <li>Go to any of the Cashier during for assistance.</li>
+            <li>Go to any of the staff for assistance.</li>
           </ul>
           <p>We're here to help you make the most of the VARDA Loyalty Reward System!</p>
         </div>
