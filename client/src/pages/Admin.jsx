@@ -13,6 +13,8 @@ export default function AdminPage() {
   const [activeTab, setActiveTab] = useState('overview');
   const [isLoading, setIsLoading] = useState(true);
   const [mobileMenuOpen, setMobileMenuOpen] = useState(false);
+  const [error, setError] = useState('');
+  const [success, setSuccess] = useState('');
 
   const token = user.token;
   const baseUrl = import.meta.env.VITE_API_BASE_URL;
@@ -81,6 +83,62 @@ export default function AdminPage() {
     closeMobileMenu();
   };
 
+  const handleRoleChange = (userId, newRole) => {
+    // Prevent role change for admin users
+    const user = users.find(u => u._id === userId);
+    if (user && user.role === 'admin') {
+      return;
+    }
+    
+    // Update the users state with the new role
+    setUsers(users.map(u => 
+      u._id === userId ? { ...u, role: newRole } : u
+    ));
+  };
+
+  const handleSaveRole = async (userId) => {
+    // Prevent role change for admin users
+    const user = users.find(u => u._id === userId);
+    if (user && user.role === 'admin') {
+      return;
+    }
+
+    try {
+      setError('');
+      setSuccess('');
+      
+      // Get the updated role from the users state
+      const updatedUser = users.find(u => u._id === userId);
+      if (!updatedUser) return;
+
+      // Make API call to update the role
+      const response = await axios.put(
+        `${baseUrl}/api/admin/users/${userId}/role`,
+        { role: updatedUser.role },
+        { headers: { Authorization: `Bearer ${token}` } }
+      );
+
+      // Show success message
+      setSuccess('Role updated successfully');
+      
+      // Refresh the users list after 1 second
+      setTimeout(() => {
+        window.location.reload();
+      }, 1000);
+    } catch (error) {
+      console.error('Error updating role:', error);
+      setError(error.response?.data?.message || 'Error updating role');
+      
+      // Revert the role change in the UI
+      const originalUser = users.find(u => u._id === userId);
+      if (originalUser) {
+        setUsers(users.map(u => 
+          u._id === userId ? { ...u, role: originalUser.role } : u
+        ));
+      }
+    }
+  };
+
   if (isLoading) {
     return (
       <div className="flex justify-center items-center h-screen">
@@ -116,6 +174,40 @@ export default function AdminPage() {
           </button>
         </div>
       </header>
+
+      {error && (
+        <div className="max-w-7xl mx-auto px-4 py-2">
+          <div className="bg-red-50 border-l-4 border-red-400 p-4">
+            <div className="flex">
+              <div className="flex-shrink-0">
+                <svg className="h-5 w-5 text-red-400" viewBox="0 0 20 20" fill="currentColor">
+                  <path fillRule="evenodd" d="M10 18a8 8 0 100-16 8 8 0 000 16zM8.707 7.293a1 1 0 00-1.414 1.414L8.586 10l-1.293 1.293a1 1 0 101.414 1.414L10 11.414l1.293 1.293a1 1 0 001.414-1.414L11.414 10l1.293-1.293a1 1 0 00-1.414-1.414L10 8.586 8.707 7.293z" clipRule="evenodd" />
+                </svg>
+              </div>
+              <div className="ml-3">
+                <p className="text-sm text-red-700">{error}</p>
+              </div>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {success && (
+        <div className="max-w-7xl mx-auto px-4 py-2">
+          <div className="bg-green-50 border-l-4 border-green-400 p-4">
+            <div className="flex">
+              <div className="flex-shrink-0">
+                <svg className="h-5 w-5 text-green-400" viewBox="0 0 20 20" fill="currentColor">
+                  <path fillRule="evenodd" d="M10 18a8 8 0 100-16 8 8 0 000 16zm3.707-9.293a1 1 0 00-1.414-1.414L9 10.586 7.707 9.293a1 1 0 00-1.414 1.414l2 2a1 1 0 001.414 0l4-4z" clipRule="evenodd" />
+                </svg>
+              </div>
+              <div className="ml-3">
+                <p className="text-sm text-green-700">{success}</p>
+              </div>
+            </div>
+          </div>
+        </div>
+      )}
 
       {/* Mobile Menu - Overlay with close button */}
       {mobileMenuOpen && (
@@ -314,13 +406,16 @@ export default function AdminPage() {
                       Name
                     </th>
                     <th scope="col" className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
-                      Email
+                      ID Number
                     </th>
                     <th scope="col" className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
                       Points
                     </th>
                     <th scope="col" className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
                       Role
+                    </th>
+                    <th scope="col" className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                      Actions
                     </th>
                   </tr>
                 </thead>
@@ -331,7 +426,7 @@ export default function AdminPage() {
                         {u.name}
                       </td>
                       <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500">
-                        {u.email}
+                        {u.idNumber}
                       </td>
                       <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500">
                         <span className="px-2 inline-flex text-xs leading-5 font-semibold rounded-full bg-green-100 text-green-800">
@@ -339,14 +434,27 @@ export default function AdminPage() {
                         </span>
                       </td>
                       <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500">
-                        {u.role === 'admin' ? (
-                          <span className="px-2 inline-flex text-xs leading-5 font-semibold rounded-full bg-purple-100 text-purple-800">
-                            Admin
-                          </span>
-                        ) : (
-                          <span className="px-2 inline-flex text-xs leading-5 font-semibold rounded-full bg-blue-100 text-blue-800">
-                            User
-                          </span>
+                        <select
+                          value={u.role}
+                          onChange={(e) => handleRoleChange(u._id, e.target.value)}
+                          className="px-2 py-1 text-sm border rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500"
+                          disabled={u.role === 'admin'}
+                        >
+                          <option value="student">Student</option>
+                          <option value="teacher">Teacher</option>
+                          <option value="ateneoStaff">Ateneo Staff</option>
+                          <option value="cashier">Cashier</option>
+                          <option value="admin">Admin</option>
+                        </select>
+                      </td>
+                      <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500">
+                        {u.role !== 'admin' && (
+                          <button
+                            onClick={() => handleSaveRole(u._id)}
+                            className="text-blue-600 hover:text-blue-900"
+                          >
+                            Save
+                          </button>
                         )}
                       </td>
                     </tr>

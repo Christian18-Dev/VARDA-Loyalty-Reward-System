@@ -97,7 +97,13 @@ export default function Register() {
       }
 
       login(data);
-      navigate('/student'); // default role is student
+      // Navigate based on role
+      if (data.role === 'cashier') {
+        navigate('/cashier');
+      } else {
+        // All other roles (student, teacher, ateneoStaff) go to student page
+        navigate('/student');
+      }
     } catch (err) {
       console.error('Registration error:', err.response?.data);
       setErrorMessage(err.response?.data?.message || 'Registration failed');

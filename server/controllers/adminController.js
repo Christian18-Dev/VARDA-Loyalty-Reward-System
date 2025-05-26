@@ -53,3 +53,35 @@ export const getClaimedRewards = async (req, res) => {
     res.status(500).json({ message: 'Server error' });
   }
 };
+
+export const updateUserRole = async (req, res) => {
+  try {
+    const { userId } = req.params;
+    const { role } = req.body;
+
+    // Validate role
+    const validRoles = ['student', 'teacher', 'ateneoStaff', 'cashier'];
+    if (!validRoles.includes(role)) {
+      return res.status(400).json({ message: 'Invalid role' });
+    }
+
+    // Find user and prevent admin role changes
+    const user = await User.findById(userId);
+    if (!user) {
+      return res.status(404).json({ message: 'User not found' });
+    }
+
+    if (user.role === 'admin') {
+      return res.status(403).json({ message: 'Cannot change admin role' });
+    }
+
+    // Update the role
+    user.role = role;
+    await user.save();
+
+    res.json({ message: 'Role updated successfully', user });
+  } catch (error) {
+    console.error('Error updating user role:', error);
+    res.status(500).json({ message: 'Error updating user role' });
+  }
+};

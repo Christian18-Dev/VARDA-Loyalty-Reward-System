@@ -29,9 +29,13 @@ export default function Login() {
       });
 
       login(data);
-      if (data.role === 'student') navigate('/student');
-      else if (data.role === 'cashier') navigate('/cashier');
-      else if (data.role === 'admin') navigate('/admin');
+      if (data.role === 'cashier') {
+        navigate('/cashier');
+      } else if (data.role === 'admin') {
+        navigate('/admin');
+      } else {
+        navigate('/student');
+      }
     } catch (err) {
       setErrorMessage(err.response?.data?.message || 'Invalid username or password');
     }
