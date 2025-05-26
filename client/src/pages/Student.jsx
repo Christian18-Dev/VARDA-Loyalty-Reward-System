@@ -1,6 +1,7 @@
 import { useEffect, useState } from 'react';
 import axios from 'axios';
 import { useAuth } from '../context/AuthContext';
+import { useNavigate } from 'react-router-dom';
 import { HomeIcon, TicketIcon, GiftIcon, LogoutIcon, ShoppingBagIcon } from '@heroicons/react/outline';
 import { motion } from 'framer-motion';
 import confetti from 'canvas-confetti';
@@ -14,7 +15,8 @@ import glassImage from '../assets/glassofwater.png';
 import saucerImage from '../assets/saucer.png';
 
 export default function StudentPage() {
-  const { user } = useAuth();
+  const { user, logout } = useAuth();
+  const navigate = useNavigate();
   const [points, setPoints] = useState(0);
   const [rewards, setRewards] = useState([]);
   const [code, setCode] = useState('');
@@ -146,8 +148,8 @@ export default function StudentPage() {
   };
 
   const handleLogout = () => {
-    localStorage.removeItem('user');
-    window.location.href = `${window.location.origin}/VARDA-Loyalty-Reward-System/#/login`;
+    logout();
+    navigate('/login');
   };
 
   const submitFeedback = async () => {

@@ -1,6 +1,7 @@
 import { useState, useEffect } from 'react';
 import axios from 'axios';
 import { useAuth } from '../context/AuthContext';
+import { useNavigate } from 'react-router-dom';
 import { 
   KeyIcon, 
   GiftIcon, 
@@ -17,6 +18,7 @@ import { motion, AnimatePresence } from 'framer-motion';
 
 export default function CashierPage() {
   const { user, logout } = useAuth();
+  const navigate = useNavigate();
   const [activeTab, setActiveTab] = useState('scanner');
   const [generatedCode, setGeneratedCode] = useState('');
   const [claimedRewards, setClaimedRewards] = useState([]);
@@ -382,6 +384,7 @@ export default function CashierPage() {
   const handleConfirmLogout = () => {
     logout();
     setShowLogoutModal(false);
+    navigate('/login');
   };
 
   const handleCancelLogout = () => {
