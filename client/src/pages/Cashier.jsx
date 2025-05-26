@@ -724,7 +724,7 @@ export default function CashierPage() {
                         onClick={() => handleReturnItem(item._id)}
                           className="px-4 py-2 text-sm font-medium text-white bg-green-500 rounded-lg hover:bg-green-600 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-green-500 transition-colors"
                       >
-                        Return
+                        Returned
                       </button>
                     </td>
                   </tr>

@@ -211,6 +211,13 @@ export default function StudentPage() {
 
   const handleConfirmOrder = async () => {
     const itemsToBorrow = availableItems.filter(item => item.cartQuantity > 0);
+    
+    // Check if there are any items to borrow
+    if (itemsToBorrow.length === 0) {
+      setErrorMessage('Your cart is empty. Please add items before confirming your borrow.');
+      return;
+    }
+
     const orderDetails = {
       studentName: user.name,
       studentId: user._id,
@@ -585,7 +592,7 @@ export default function StudentPage() {
         {currentPage === 'borrow' && (
           <motion.div variants={itemVariants} className="space-y-6">
             <div className="text-center">
-              <h2 className="text-2xl font-bold text-purple-800">Order Items</h2>
+              <h2 className="text-2xl font-bold text-purple-800">Borrow Items</h2>
               <p className="text-gray-600 mt-1">Select items to borrow for your needs</p>
             </div>
 
@@ -688,46 +695,98 @@ export default function StudentPage() {
                     </div>
 
                     <div className="flex-grow overflow-y-auto">
-                      {availableItems
-                        .filter(item => item.cartQuantity > 0)
-                        .map(item => (
-                          <div key={item.id} className="flex items-center space-x-4 p-4 bg-gray-50 rounded-xl mb-4">
-                            <img 
-                              src={item.image} 
-                              alt={item.name}
-                              className="w-20 h-20 object-cover rounded-lg"
-                            />
-                            <div className="flex-grow">
-                              <h4 className="font-medium text-gray-800">{item.name}</h4>
-                              <div className="flex items-center space-x-2 mt-2">
-                                <button
-                                  onClick={() => handleRemoveFromCart(item.id)}
-                                  className="w-6 h-6 rounded-full flex items-center justify-center text-sm font-bold bg-red-500 text-white hover:bg-red-600"
-                                >
-                                  -
-                                </button>
-                                <span className="w-8 text-center">{item.cartQuantity}</span>
-                                <button
-                                  onClick={() => handleAddToCart(item.id)}
-                                  className="w-6 h-6 rounded-full flex items-center justify-center text-sm font-bold bg-green-500 text-white hover:bg-green-600"
-                                >
-                                  +
-                                </button>
-                              </div>
+                      {availableItems.some(item => item.cartQuantity > 0) ? (
+                        <>
+                          <div className="bg-purple-50 p-4 rounded-xl mb-4">
+                            <div className="flex justify-between items-center">
+                              <span className="text-purple-800 font-medium">Total Items:</span>
+                              <span className="text-purple-900 font-bold">
+                                {availableItems.reduce((total, item) => total + item.cartQuantity, 0)}
+                              </span>
                             </div>
                           </div>
-                        ))}
+
+                          {availableItems
+                            .filter(item => item.cartQuantity > 0)
+                            .map(item => (
+                              <div key={item.id} className="flex items-center space-x-4 p-4 bg-gray-50 rounded-xl mb-4">
+                                <img 
+                                  src={item.image} 
+                                  alt={item.name}
+                                  className="w-20 h-20 object-cover rounded-lg"
+                                />
+                                <div className="flex-grow">
+                                  <h4 className="font-medium text-gray-800">{item.name}</h4>
+                                  <p className="text-sm text-gray-600 mt-1">{item.description}</p>
+                                  <div className="flex items-center justify-between mt-2">
+                                    <div className="flex items-center space-x-2">
+                                      <button
+                                        onClick={() => handleRemoveFromCart(item.id)}
+                                        className="w-6 h-6 rounded-full flex items-center justify-center text-sm font-bold bg-red-500 text-white hover:bg-red-600"
+                                      >
+                                        -
+                                      </button>
+                                      <span className="w-8 text-center font-medium">{item.cartQuantity}</span>
+                                      <button
+                                        onClick={() => handleAddToCart(item.id)}
+                                        className="w-6 h-6 rounded-full flex items-center justify-center text-sm font-bold bg-green-500 text-white hover:bg-green-600"
+                                      >
+                                        +
+                                      </button>
+                                    </div>
+                                    <span className="text-sm font-medium text-gray-600">
+                                      {item.isSet ? 'Complete Set' : 'Individual Item'}
+                                    </span>
+                                  </div>
+                                </div>
+                              </div>
+                            ))}
+                        </>
+                      ) : (
+                        <div className="flex flex-col items-center justify-center h-64 text-center">
+                          <svg xmlns="http://www.w3.org/2000/svg" className="h-16 w-16 text-gray-400 mb-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M3 3h2l.4 2M7 13h10l4-8H5.4M7 13L5.4 5M7 13l-2.293 2.293c-.63.63-.184 1.707.707 1.707H17m0 0a2 2 0 100 4 2 2 0 000-4zm-8 2a2 2 0 11-4 0 2 2 0 014 0z" />
+                          </svg>
+                          <h4 className="text-lg font-medium text-gray-600 mb-2">Your cart is empty</h4>
+                          <p className="text-gray-500">Add items to your cart to proceed with your borrow</p>
+                        </div>
+                      )}
                     </div>
 
-                    <div className="mt-6">
+                    <div className="mt-6 space-y-4">
+                      {availableItems.some(item => item.cartQuantity > 0) && (
+                        <div className="bg-gray-50 p-4 rounded-xl">
+                          <h4 className="font-medium text-gray-800 mb-2">Borrow Summary</h4>
+                          <div className="space-y-2">
+                            {availableItems
+                              .filter(item => item.cartQuantity > 0)
+                              .map(item => (
+                                <div key={item.id} className="flex justify-between text-sm">
+                                  <span className="text-gray-600">{item.name} x {item.cartQuantity}</span>
+                                  <span className="font-medium text-gray-800">
+                                    {item.isSet ? 'Complete Set' : 'Individual Item'}
+                                  </span>
+                                </div>
+                              ))}
+                          </div>
+                        </div>
+                      )}
+                      
                       <button
                         onClick={() => {
                           handleConfirmOrder();
                           setShowCart(false);
                         }}
-                        className="w-full py-4 bg-purple-600 text-white rounded-xl font-bold hover:bg-purple-700 transition-all"
+                        disabled={!availableItems.some(item => item.cartQuantity > 0)}
+                        className={`w-full py-4 rounded-xl font-bold transition-all ${
+                          availableItems.some(item => item.cartQuantity > 0)
+                            ? 'bg-purple-600 text-white hover:bg-purple-700'
+                            : 'bg-gray-300 text-gray-500 cursor-not-allowed'
+                        }`}
                       >
-                        Confirm Order
+                        {availableItems.some(item => item.cartQuantity > 0)
+                          ? 'Confirm Borrow'
+                          : 'Add Items to Cart'}
                       </button>
                     </div>
                   </div>
@@ -869,7 +928,7 @@ export default function StudentPage() {
                   <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M5 13l4 4L19 7" />
                 </svg>
               </div>
-              <h3 className="text-xl font-bold text-gray-800">Order Created!</h3>
+              <h3 className="text-xl font-bold text-gray-800">Borrow Created!</h3>
               <p className="text-gray-600">Show the QR code to the cashier</p>
               <button 
                 onClick={() => {
