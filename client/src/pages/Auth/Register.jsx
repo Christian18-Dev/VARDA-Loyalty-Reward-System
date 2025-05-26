@@ -2,6 +2,7 @@ import { useState } from 'react';
 import { useNavigate, Link } from 'react-router-dom';
 import { useAuth } from '../../context/AuthContext';
 import axios from 'axios';
+import logo from '../../assets/2gonzlogo.png';
 
 const API_BASE_URL = import.meta.env.VITE_API_BASE_URL;
 
@@ -146,14 +147,17 @@ export default function Register() {
   };
 
   return (
-    <div className="min-h-screen flex items-center justify-center bg-gradient-to-br from-green-100 to-blue-100 p-4">
-      <div className="max-w-md w-full bg-white rounded-3xl shadow-xl p-8 space-y-6">
-        <h1 className="text-3xl font-bold text-center text-green-700">Create Account 🌟</h1>
+    <div className="min-h-screen flex items-center justify-center bg-gradient-to-br from-[#0f172a] to-[#1e293b] p-4">
+      <div className="max-w-md w-full bg-gradient-to-br from-[#1e293b] to-[#334155] rounded-3xl shadow-xl p-8 space-y-6 border border-gray-700/50">
+        <div className="flex flex-col items-center">
+          <img src={logo} alt="2Gonz Logo" className="w-32 h-32 object-contain mb-4" />
+          <h1 className="text-3xl font-bold text-center text-white">Create Account </h1>
+        </div>
         <form onSubmit={handleSubmit} className="space-y-5">
           <div>
-            <label className="block mb-1 text-sm font-medium text-gray-700">Username</label>
+            <label className="block mb-1 text-sm font-medium text-gray-200">Username</label>
             <input
-              className="w-full px-4 py-2 border border-gray-300 rounded-xl focus:ring-2 focus:ring-green-400 focus:outline-none transition"
+              className="w-full px-4 py-2 bg-gray-800/50 border border-gray-700 rounded-xl focus:ring-2 focus:ring-blue-500 focus:outline-none transition text-white placeholder-gray-400"
               placeholder="Enter username"
               value={name}
               onChange={(e) => {
@@ -164,9 +168,9 @@ export default function Register() {
             />
           </div>
           <div>
-            <label className="block mb-1 text-sm font-medium text-gray-700">First Name</label>
+            <label className="block mb-1 text-sm font-medium text-gray-200">First Name</label>
             <input
-              className="w-full px-4 py-2 border border-gray-300 rounded-xl focus:ring-2 focus:ring-green-400 focus:outline-none transition"
+              className="w-full px-4 py-2 bg-gray-800/50 border border-gray-700 rounded-xl focus:ring-2 focus:ring-blue-500 focus:outline-none transition text-white placeholder-gray-400"
               placeholder="Enter your first name"
               value={firstName}
               onChange={(e) => {
@@ -177,9 +181,9 @@ export default function Register() {
             />
           </div>
           <div>
-            <label className="block mb-1 text-sm font-medium text-gray-700">Last Name</label>
+            <label className="block mb-1 text-sm font-medium text-gray-200">Last Name</label>
             <input
-              className="w-full px-4 py-2 border border-gray-300 rounded-xl focus:ring-2 focus:ring-green-400 focus:outline-none transition"
+              className="w-full px-4 py-2 bg-gray-800/50 border border-gray-700 rounded-xl focus:ring-2 focus:ring-blue-500 focus:outline-none transition text-white placeholder-gray-400"
               placeholder="Enter your last name"
               value={lastName}
               onChange={(e) => {
@@ -190,12 +194,12 @@ export default function Register() {
             />
           </div>
           <div>
-            <label className="block mb-1 text-sm font-medium text-gray-700">ID Number</label>
+            <label className="block mb-1 text-sm font-medium text-gray-200">ID Number</label>
             <input
               type="text"
               inputMode="numeric"
               pattern="[0-9]*"
-              className="w-full px-4 py-2 border border-gray-300 rounded-xl focus:ring-2 focus:ring-green-400 focus:outline-none transition"
+              className="w-full px-4 py-2 bg-gray-800/50 border border-gray-700 rounded-xl focus:ring-2 focus:ring-blue-500 focus:outline-none transition text-white placeholder-gray-400"
               placeholder="Enter your ID Number"
               value={idNumber}
               onChange={handleIdNumberChange}
@@ -204,11 +208,11 @@ export default function Register() {
             />
           </div>
           <div>
-            <label className="block mb-1 text-sm font-medium text-gray-700">Password</label>
+            <label className="block mb-1 text-sm font-medium text-gray-200">Password</label>
             <div className="relative">
               <input
                 type={showPassword ? "text" : "password"}
-                className="w-full px-4 py-2 border border-gray-300 rounded-xl focus:ring-2 focus:ring-green-400 focus:outline-none transition"
+                className="w-full px-4 py-2 bg-gray-800/50 border border-gray-700 rounded-xl focus:ring-2 focus:ring-blue-500 focus:outline-none transition text-white placeholder-gray-400"
                 placeholder="Enter password"
                 value={password}
                 onChange={(e) => {
@@ -220,7 +224,7 @@ export default function Register() {
               <button
                 type="button"
                 onClick={() => setShowPassword(!showPassword)}
-                className="absolute inset-y-0 right-0 pr-3 flex items-center text-gray-600 hover:text-gray-800"
+                className="absolute inset-y-0 right-0 pr-3 flex items-center text-gray-400 hover:text-gray-200"
               >
                 {showPassword ? (
                   <svg xmlns="http://www.w3.org/2000/svg" className="h-5 w-5" viewBox="0 0 20 20" fill="currentColor">
@@ -237,11 +241,11 @@ export default function Register() {
             </div>
           </div>
           <div>
-            <label className="block mb-1 text-sm font-medium text-gray-700">Confirm Password</label>
+            <label className="block mb-1 text-sm font-medium text-gray-200">Confirm Password</label>
             <div className="relative">
               <input
                 type={showConfirmPassword ? "text" : "password"}
-                className="w-full px-4 py-2 border border-gray-300 rounded-xl focus:ring-2 focus:ring-green-400 focus:outline-none transition"
+                className="w-full px-4 py-2 bg-gray-800/50 border border-gray-700 rounded-xl focus:ring-2 focus:ring-blue-500 focus:outline-none transition text-white placeholder-gray-400"
                 placeholder="Confirm password"
                 value={confirmPassword}
                 onChange={(e) => {
@@ -253,7 +257,7 @@ export default function Register() {
               <button
                 type="button"
                 onClick={() => setShowConfirmPassword(!showConfirmPassword)}
-                className="absolute inset-y-0 right-0 pr-3 flex items-center text-gray-600 hover:text-gray-800"
+                className="absolute inset-y-0 right-0 pr-3 flex items-center text-gray-400 hover:text-gray-200"
               >
                 {showConfirmPassword ? (
                   <svg xmlns="http://www.w3.org/2000/svg" className="h-5 w-5" viewBox="0 0 20 20" fill="currentColor">
@@ -269,55 +273,52 @@ export default function Register() {
               </button>
             </div>
           </div>
-          <div className="flex items-start space-x-3">
+          <div className="flex items-center space-x-2">
             <input
               type="checkbox"
               id="terms"
               checked={termsAccepted}
-              onChange={(e) => {
-                setTermsAccepted(e.target.checked);
-                setErrorMessage('');
-              }}
-              className="mt-1 h-4 w-4 text-green-600 focus:ring-green-500 border-gray-300 rounded"
+              onChange={(e) => setTermsAccepted(e.target.checked)}
+              className="w-4 h-4 text-blue-500 border-gray-600 rounded focus:ring-blue-500 bg-gray-700"
             />
-            <label htmlFor="terms" className="text-sm text-gray-600">
+            <label htmlFor="terms" className="text-sm text-gray-300">
               I accept the{' '}
               <button
                 type="button"
                 onClick={() => setShowTerms(true)}
-                className="text-green-600 hover:text-green-700 font-medium underline"
+                className="text-blue-400 hover:text-blue-300 hover:underline"
               >
                 Terms and Conditions
-              </button>
-              {' '}and{' '}
+              </button>{' '}
+              and{' '}
               <button
                 type="button"
                 onClick={() => setShowPrivacy(true)}
-                className="text-green-600 hover:text-green-700 font-medium underline"
+                className="text-blue-400 hover:text-blue-300 hover:underline"
               >
                 Privacy Policy
               </button>
             </label>
           </div>
           {errorMessage && (
-            <div className="p-3 bg-red-50 border-l-4 border-red-500 rounded-lg flex items-start space-x-2">
+            <div className="p-3 bg-red-900/50 border-l-4 border-red-500 rounded-lg flex items-start space-x-2">
               <svg xmlns="http://www.w3.org/2000/svg" className="h-5 w-5 text-red-500 mt-0.5" viewBox="0 0 20 20" fill="currentColor">
                 <path fillRule="evenodd" d="M18 10a8 8 0 11-16 0 8 8 0 0116 0zm-7 4a1 1 0 11-2 0 1 1 0 012 0zm-1-9a1 1 0 00-1 1v4a1 1 0 102 0V6a1 1 0 00-1-1z" clipRule="evenodd" />
               </svg>
-              <span className="text-red-700 font-medium">{errorMessage}</span>
+              <span className="text-red-200 font-medium">{errorMessage}</span>
             </div>
           )}
           <button
             type="submit"
-            className="w-full bg-green-600 hover:bg-green-700 text-white font-semibold py-2 rounded-xl transition shadow-md"
+            className="w-full bg-blue-600 hover:bg-blue-700 text-white font-semibold py-2 rounded-xl transition shadow-md"
           >
             Register
           </button>
         </form>
 
-        <div className="text-center text-sm text-gray-600 mt-4">
+        <div className="text-center text-sm text-gray-400 mt-4">
           Already have an account?{' '}
-          <Link to="/login" className="text-green-600 hover:underline font-semibold">
+          <Link to="/login" className="text-blue-400 hover:text-blue-300 hover:underline font-semibold">
             Login
           </Link>
         </div>
