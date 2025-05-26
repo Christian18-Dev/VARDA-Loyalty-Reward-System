@@ -1162,9 +1162,9 @@ function SettingsPage({ user, onBack }) {
       )}
       {section === 'about' && (
         <div className="space-y-4">
-          <h3 className="text-lg font-semibold text-gray-900">About VARDA</h3>
+          <h3 className="text-lg font-semibold text-gray-900">About 2gonz</h3>
           <p className="text-gray-600">
-            VARDA is a loyalty reward system designed to encourage sustainable practices
+            2gonz is a loyalty reward system designed to encourage sustainable practices
             by rewarding students for borrowing and returning items properly.
           </p>
         </div>
@@ -1173,8 +1173,7 @@ function SettingsPage({ user, onBack }) {
         <div className="space-y-4">
           <h3 className="text-lg font-semibold text-gray-900">Need Help?</h3>
           <p className="text-gray-600">
-            If you need assistance, please contact the system administrator or visit
-            the help desk at the library.
+            If you need assistance, please head towards the cashier for assistance.
           </p>
         </div>
       )}
