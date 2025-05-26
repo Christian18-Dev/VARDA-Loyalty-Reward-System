@@ -7,6 +7,8 @@ const API_BASE_URL = import.meta.env.VITE_API_BASE_URL;
 
 export default function Register() {
   const [name, setName] = useState('');
+  const [firstName, setFirstName] = useState('');
+  const [lastName, setLastName] = useState('');
   const [password, setPassword] = useState('');
   const [confirmPassword, setConfirmPassword] = useState('');
   const [showPassword, setShowPassword] = useState(false);
@@ -31,6 +33,14 @@ export default function Register() {
   const validateForm = () => {
     if (!name.trim()) {
       setErrorMessage('Please enter a username');
+      return false;
+    }
+    if (!firstName.trim()) {
+      setErrorMessage('Please enter your First Name');
+      return false;
+    }
+    if (!lastName.trim()) {
+      setErrorMessage('Please enter your Last Name');
       return false;
     }
     if (!idNumber.trim()) {
@@ -65,16 +75,31 @@ export default function Register() {
     }
 
     try {
-      const { data } = await axios.post(`${API_BASE_URL}/api/auth/register`, {
+      const userData = {
         name,
+        firstName,
+        lastName,
         password,
         idNumber,
         termsAccepted: true
-      });
+      };
+      
+      console.log('Sending registration data:', userData);
+      
+      const { data } = await axios.post(`${API_BASE_URL}/api/auth/register`, userData);
+      console.log('Registration response:', data);
+
+      // Verify that firstName and lastName are in the response
+      if (!data.firstName || !data.lastName) {
+        console.error('Missing firstName or lastName in response:', data);
+        setErrorMessage('Registration failed: Missing user data');
+        return;
+      }
 
       login(data);
       navigate('/student'); // default role is student
     } catch (err) {
+      console.error('Registration error:', err.response?.data);
       setErrorMessage(err.response?.data?.message || 'Registration failed');
     }
   };
@@ -127,6 +152,32 @@ export default function Register() {
               value={name}
               onChange={(e) => {
                 setName(e.target.value);
+                setErrorMessage('');
+              }}
+              required
+            />
+          </div>
+          <div>
+            <label className="block mb-1 text-sm font-medium text-gray-700">First Name</label>
+            <input
+              className="w-full px-4 py-2 border border-gray-300 rounded-xl focus:ring-2 focus:ring-green-400 focus:outline-none transition"
+              placeholder="Enter your first name"
+              value={firstName}
+              onChange={(e) => {
+                setFirstName(e.target.value);
+                setErrorMessage('');
+              }}
+              required
+            />
+          </div>
+          <div>
+            <label className="block mb-1 text-sm font-medium text-gray-700">Last Name</label>
+            <input
+              className="w-full px-4 py-2 border border-gray-300 rounded-xl focus:ring-2 focus:ring-green-400 focus:outline-none transition"
+              placeholder="Enter your last name"
+              value={lastName}
+              onChange={(e) => {
+                setLastName(e.target.value);
                 setErrorMessage('');
               }}
               required
@@ -335,7 +386,7 @@ export default function Register() {
           We collect the following types of information:
         </p>
         <ul>
-          <li>Account information (username,ID Number, password)</li>
+          <li>Account information (username, First Name, Last Name, ID Number, password)</li>
           <li>Points and reward history</li>
           <li>Usage data and interactions with the system</li>
         </ul>
@@ -349,6 +400,7 @@ export default function Register() {
           <li>Process your points and rewards</li>
           <li>Send you important updates about the system</li>
           <li>Improve our services</li>
+          <li>Personalize your experience using your name</li>
         </ul>
 
         <h2>3. Data Security</h2>

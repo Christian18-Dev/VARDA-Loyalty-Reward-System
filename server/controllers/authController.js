@@ -11,7 +11,9 @@ const generateToken = (user) => {
 };
 
 export const registerUser = async (req, res) => {
-  const { name, password, termsAccepted, idNumber } = req.body;
+  const { name, firstName, lastName, password, termsAccepted, idNumber } = req.body;
+  
+  console.log('Received registration data:', { name, firstName, lastName, idNumber });
   
   if (!termsAccepted) {
     return res.status(400).json({ message: 'Terms and conditions must be accepted' });
@@ -19,6 +21,10 @@ export const registerUser = async (req, res) => {
 
   if (!idNumber) {
     return res.status(400).json({ message: 'ID Number is required' });
+  }
+
+  if (!firstName || !lastName) {
+    return res.status(400).json({ message: 'First Name and Last Name are required' });
   }
 
   const existing = await User.findOne({ $or: [{ name }, { idNumber }] });
@@ -32,21 +38,46 @@ export const registerUser = async (req, res) => {
   }
 
   const hashed = await bcrypt.hash(password, 10);
-  const user = await User.create({ 
+  const userData = { 
     name, 
+    firstName,
+    lastName,
     password: hashed,
     idNumber,
     termsAccepted: true,
     termsAcceptedAt: new Date()
-  });
+  };
+  
+  console.log('Creating user with data:', { ...userData, password: '[HIDDEN]' });
+  
+  try {
+    const user = await User.create(userData);
+    console.log('Created user:', { 
+      _id: user._id,
+      name: user.name,
+      firstName: user.firstName,
+      lastName: user.lastName,
+      idNumber: user.idNumber,
+      role: user.role
+    });
 
-  res.status(201).json({
-    _id: user._id,
-    name: user.name,
-    idNumber: user.idNumber,
-    role: user.role,
-    token: generateToken(user),
-  });
+    // Create response object with all user data
+    const responseData = {
+      _id: user._id,
+      name: user.name,
+      firstName: user.firstName,
+      lastName: user.lastName,
+      idNumber: user.idNumber,
+      role: user.role,
+      token: generateToken(user)
+    };
+
+    console.log('Sending response:', responseData);
+    res.status(201).json(responseData);
+  } catch (error) {
+    console.error('Error creating user:', error);
+    res.status(500).json({ message: 'Error creating user', error: error.message });
+  }
 };
 
 export const loginUser = async (req, res) => {
@@ -61,6 +92,8 @@ export const loginUser = async (req, res) => {
     res.status(200).json({
       _id: user._id,
       name: user.name,
+      firstName: user.firstName,
+      lastName: user.lastName,
       role: user.role,
       token: generateToken(user),
     });
