@@ -508,13 +508,13 @@ export default function CashierPage() {
       </div>
 
       {/* Main Content */}
-      <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-6 mt-[144px]">
+      <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-6 mt-[144px] min-h-[calc(100vh-144px)] flex flex-col">
         {/* Scanner Tab */}
         {activeTab === 'scanner' && (
           <motion.div
             initial={{ opacity: 0, y: 20 }}
             animate={{ opacity: 1, y: 0 }}
-            className="bg-white rounded-2xl shadow-lg p-4 sm:p-6"
+            className="bg-white rounded-2xl shadow-lg p-4 sm:p-6 flex-1 flex flex-col"
           >
             <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center mb-6 space-y-4 sm:space-y-0">
               <div>
@@ -531,35 +531,35 @@ export default function CashierPage() {
               >
                 <CameraIcon className="w-5 h-5" />
                 <span>{scanning ? 'Stop Scanning' : 'Start Scanning'}</span>
-            </button>
-          </div>
+              </button>
+            </div>
 
-          {scanning && (
-              <div className="relative">
-                <div id="reader" className="max-w-md mx-auto rounded-xl overflow-hidden shadow-lg"></div>
+            {scanning && (
+              <div className="relative flex-1 flex items-center justify-center">
+                <div id="reader" className="w-full max-w-md rounded-xl overflow-hidden shadow-lg"></div>
                 <div className="absolute inset-0 pointer-events-none border-2 border-purple-500 rounded-xl"></div>
               </div>
-          )}
+            )}
 
-          {/* Messages */}
-          {error && (
-            <motion.div
-              initial={{ opacity: 0, y: -10 }}
-              animate={{ opacity: 1, y: 0 }}
-                className="mt-4 p-4 bg-red-50 text-red-700 rounded-xl border border-red-200"
-            >
-              {error}
-            </motion.div>
-          )}
-          {success && (
-            <motion.div
-              initial={{ opacity: 0, y: -10 }}
-              animate={{ opacity: 1, y: 0 }}
-                className="mt-4 p-4 bg-green-50 text-green-700 rounded-xl border border-green-200"
-            >
-              {success}
-            </motion.div>
-          )}
+            {/* Messages */}
+            {error && (
+              <motion.div
+                initial={{ opacity: 0, y: -10 }}
+                animate={{ opacity: 1, y: 0 }}
+                  className="mt-4 p-4 bg-red-50 text-red-700 rounded-xl border border-red-200"
+              >
+                {error}
+              </motion.div>
+            )}
+            {success && (
+              <motion.div
+                initial={{ opacity: 0, y: -10 }}
+                animate={{ opacity: 1, y: 0 }}
+                  className="mt-4 p-4 bg-green-50 text-green-700 rounded-xl border border-green-200"
+              >
+                {success}
+              </motion.div>
+            )}
           </motion.div>
         )}
 
