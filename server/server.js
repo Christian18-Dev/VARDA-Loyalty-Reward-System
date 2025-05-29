@@ -7,6 +7,7 @@ import studentRoutes from './routes/studentRoutes.js';
 import rewardRoutes from './routes/rewardRoutes.js';
 import cashierRoutes from './routes/cashierRoutes.js';
 import codeRoutes from './routes/codeRoutes.js';
+import conciergeRoutes from './routes/conciergeRoutes.js';
 import mongoose from 'mongoose';
 import { MongoClient } from 'mongodb'; // Corrected import
 
@@ -28,7 +29,8 @@ const allowedOrigins = [
   "http://www.2gonz.com",
   "https://2gonz.com",
   "http://localhost:5000",
-  "http://localhost:5173" // Add Vite's default development server
+  "http://localhost:5173",
+  "http://localhost:3001"
 ];
 
 app.use(cors({
@@ -71,6 +73,7 @@ app.use('/api/student', studentRoutes);
 app.use('/api/rewards', rewardRoutes);
 app.use('/api/cashier', cashierRoutes);
 app.use('/api/code', codeRoutes);
+app.use('/api/concierge', conciergeRoutes);
 
 // Routes
 app.get('/', (req, res) => res.send('API is running...'));

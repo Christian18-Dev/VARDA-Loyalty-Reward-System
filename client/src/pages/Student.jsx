@@ -13,6 +13,7 @@ import plateImage from '../assets/plate.png';
 import bowlImage from '../assets/bowl.png';
 import glassImage from '../assets/glassofwater.png'; 
 import saucerImage from '../assets/saucer.png';
+import twoGonzLogo from '../assets/2gonzlogo.png';
 
 export default function StudentPage() {
   const { user, logout } = useAuth();
@@ -87,14 +88,16 @@ export default function StudentPage() {
   const [qrData, setQrData] = useState(null);
   const [showCart, setShowCart] = useState(false);
   const [showSuccessModal, setShowSuccessModal] = useState(false);
+  const [showReturnQRModal, setShowReturnQRModal] = useState(false);
+  const [returnQRData, setReturnQRData] = useState(null);
 
   const baseUrl = import.meta.env.VITE_API_BASE_URL;
+  const token = user.token;
 
   useEffect(() => {
     const fetchData = async () => {
       setIsLoading(true);
       try {
-        const token = user.token;
         const [pointsRes, rewardsRes] = await Promise.all([
           axios.get(`${baseUrl}/api/student/points`, {
             headers: { Authorization: `Bearer ${token}` },
@@ -115,6 +118,30 @@ export default function StudentPage() {
 
     fetchData();
   }, [user.token]);
+
+  const fetchBorrowedItems = async () => {
+    try {
+      const res = await axios.get(`${baseUrl}/api/student/borrowed-items`, {
+        headers: { Authorization: `Bearer ${token}` },
+      });
+      const items = res.data.data;
+      const sortedBorrowed = items
+        .filter(item => item.status === 'borrowed')
+        .sort((a, b) => new Date(b.borrowTime) - new Date(a.borrowTime));
+      setBorrowedItems(sortedBorrowed);
+    } catch (err) {
+      console.error('Error fetching borrowed items:', err);
+      setErrorMessage('Failed to fetch borrowed items');
+    }
+  };
+
+  useEffect(() => {
+    if (currentPage === 'borrow' || currentPage === 'home') {
+      fetchBorrowedItems();
+      const pollInterval = setInterval(fetchBorrowedItems, 3000);
+      return () => clearInterval(pollInterval);
+    }
+  }, [currentPage, token]);
 
   const handleCodeSubmit = async () => {
     if (!code.trim()) {
@@ -264,6 +291,9 @@ export default function StudentPage() {
       setAvailableItems(prevItems => 
         prevItems.map(item => ({ ...item, cartQuantity: 0 }))
       );
+
+      // Fetch updated borrowed items
+      await fetchBorrowedItems();
     } catch (error) {
       console.error('Error creating order:', error);
       setErrorMessage('Failed to create order. Please try again.');
@@ -284,18 +314,15 @@ export default function StudentPage() {
     setTimeout(() => setSuccessMessage(''), 3000);
   };
 
-  const handleReturn = (itemId) => {
-    setAvailableItems(prevItems =>
-      prevItems.map(item => {
-        if (item.id === itemId) {
-          return { ...item, borrowed: item.borrowed - 1 };
-        }
-        return item;
-      })
-    );
-    setBorrowedItems(prev => prev.filter(item => item.id !== itemId));
-    setSuccessMessage('Item returned successfully!');
-    setTimeout(() => setSuccessMessage(''), 3000);
+  const handleReturn = (item) => {
+    const returnData = {
+      type: 'return',
+      studentId: user._id,
+      items: item.items,
+      timestamp: new Date().toISOString()
+    };
+    setReturnQRData(JSON.stringify(returnData));
+    setShowReturnQRModal(true);
   };
 
   // Animation variants
@@ -354,7 +381,7 @@ export default function StudentPage() {
         {currentPage === 'home' && (
           <motion.div variants={itemVariants} className="space-y-6">
             <motion.div 
-              className="relative mx-auto p-3 sm:p-4 md:p-6 w-full max-w-md bg-gradient-to-br from-indigo-600 via-purple-700 to-purple-800 rounded-2xl shadow-2xl text-white overflow-hidden"
+              className="relative mx-auto p-3 sm:p-4 md:p-6 w-full max-w-md bg-gradient-to-br from-purple-500 via-purple-700 to-purple-500 rounded-2xl shadow-2xl text-white overflow-hidden"
               whileHover={{ scale: 1.02 }}
               whileTap={{ scale: 0.98 }}
               style={{
@@ -369,7 +396,10 @@ export default function StudentPage() {
               <div className="relative z-10 flex flex-col justify-between h-full">
                 {/* Card issuer and chip */}
                 <div className="flex justify-between items-start">
-                  <div className="text-xs font-medium text-white/80">LOYALTY CARD</div>
+                  <div className="flex items-center space-x-3">
+                    <img src={twoGonzLogo} alt="2gonz Logo" className="h-8 sm:h-10 md:h-12 w-auto" />
+                    <div className="text-xs sm:text-sm font-medium text-white/80">LOYALTY CARD</div>
+                  </div>
                   <div className="w-8 sm:w-10 h-6 sm:h-8 bg-gradient-to-br from-yellow-300 to-yellow-500 rounded-md flex items-center justify-center">
                     <div className="w-6 sm:w-8 h-4 sm:h-6 bg-gradient-to-br from-yellow-400 to-yellow-600 rounded-sm border border-yellow-200/50 flex items-center justify-center">
                       <div className="w-4 sm:w-5 h-3 sm:h-4 bg-gradient-to-br from-yellow-500 to-yellow-700 rounded-xs border border-yellow-300/50"></div>
@@ -456,6 +486,40 @@ export default function StudentPage() {
                 <span className="mt-2 font-medium text-gray-200">Borrow</span>
               </motion.button>
             </div>
+
+            {/* Borrowed Items Section */}
+            {borrowedItems.length > 0 && (
+              <motion.div 
+                initial={{ opacity: 0, y: 20 }}
+                animate={{ opacity: 1, y: 0 }}
+                className="mt-8 bg-[#1e293b] p-6 rounded-2xl shadow-lg border border-gray-700/50"
+              >
+                <h3 className="text-xl font-semibold text-gray-200 mb-4">Your Borrowed Items</h3>
+                <div className="space-y-4">
+                  {borrowedItems.map((item) => (
+                    <motion.div 
+                      key={item._id}
+                      initial={{ opacity: 0, y: 20 }}
+                      animate={{ opacity: 1, y: 0 }}
+                      className="flex items-center justify-between p-4 bg-gray-800/50 rounded-xl"
+                    >
+                      <div className="flex items-center space-x-4">
+                        <div>
+                          <h4 className="font-medium text-gray-200">{item.items.map(i => i.name).join(', ')}</h4>
+                          <p className="text-sm text-gray-400">Borrowed on: {new Date(item.borrowTime).toLocaleString()}</p>
+                        </div>
+                      </div>
+                      <button
+                        onClick={() => handleReturn(item)}
+                        className="px-4 py-2 bg-green-600 text-white rounded-lg hover:bg-green-700 transition-colors"
+                      >
+                        Return
+                      </button>
+                    </motion.div>
+                  ))}
+                </div>
+              </motion.div>
+            )}
           </motion.div>
         )}
 
@@ -463,6 +527,7 @@ export default function StudentPage() {
         {currentPage === 'claim' && (
           <motion.div variants={itemVariants} className="space-y-6">
             <div className="text-center">
+              <img src={twoGonzLogo} alt="2gonz Logo" className="h-16 sm:h-20 mx-auto mb-8" />
               <h2 className="text-2xl font-bold text-blue-400">Redeem Your Code</h2>
             </div>
             
@@ -553,6 +618,7 @@ export default function StudentPage() {
         {currentPage === 'rewards' && (
           <motion.div variants={itemVariants} className="space-y-6">
             <div className="text-center">
+              <img src={twoGonzLogo} alt="2gonz Logo" className="h-16 sm:h-20 mx-auto mb-8" />
               <h2 className="text-2xl font-bold text-blue-400">Rewards Available!</h2>
               <p className="text-gray-400 mt-1">Redeem your points for awesome rewards!</p>
             </div>
@@ -618,6 +684,7 @@ export default function StudentPage() {
         {currentPage === 'borrow' && (
           <motion.div variants={itemVariants} className="space-y-6">
             <div className="text-center">
+              <img src={twoGonzLogo} alt="2gonz Logo" className="h-16 sm:h-20 mx-auto mb-8" />
               <h2 className="text-2xl font-bold text-blue-400">Borrow Items</h2>
               <p className="text-gray-400 mt-1">Select items to borrow for your needs</p>
             </div>
@@ -823,31 +890,24 @@ export default function StudentPage() {
             {/* Borrowed Items */}
             {borrowedItems.length > 0 && (
               <div className="bg-[#1e293b] p-6 rounded-2xl shadow-lg mt-6 border border-gray-700/50">
-                <h3 className="text-xl font-semibold text-gray-200 mb-4">Your Orders</h3>
+                <h3 className="text-xl font-semibold text-gray-200 mb-4">Your Borrowed Items</h3>
                 <div className="space-y-4">
                   {borrowedItems.map((item) => (
                     <motion.div 
-                      key={item.id}
+                      key={item._id}
                       initial={{ opacity: 0, y: 20 }}
                       animate={{ opacity: 1, y: 0 }}
                       className="flex items-center justify-between p-4 bg-gray-800/50 rounded-xl"
                     >
                       <div className="flex items-center space-x-4">
-                        <img 
-                          src={item.image} 
-                          alt={item.name}
-                          className="w-16 h-16 object-cover rounded-lg"
-                        />
                         <div>
-                          <h4 className="font-medium text-gray-200">{item.name}</h4>
-                          <p className="text-sm text-gray-400">
-                            Ordered: {new Date(item.borrowTime).toLocaleString()}
-                          </p>
+                          <h4 className="font-medium text-gray-200">{item.items.map(i => i.name).join(', ')}</h4>
+                          <p className="text-sm text-gray-400">Borrowed on: {new Date(item.borrowTime).toLocaleString()}</p>
                         </div>
                       </div>
                       <button
-                        onClick={() => handleReturn(item.id)}
-                        className="px-4 py-2 bg-blue-600 text-white rounded-lg font-medium hover:bg-blue-700"
+                        onClick={() => handleReturn(item)}
+                        className="px-4 py-2 bg-green-600 text-white rounded-lg hover:bg-green-700 transition-colors"
                       >
                         Return
                       </button>
@@ -966,6 +1026,29 @@ export default function StudentPage() {
                 OK
               </button>
             </div>
+          </motion.div>
+        </div>
+      )}
+
+      {/* Return QR Code Modal */}
+      {showReturnQRModal && (
+        <div className="fixed inset-0 bg-black/50 backdrop-blur-sm z-50 flex items-center justify-center">
+          <motion.div 
+            initial={{ opacity: 0, scale: 0.95 }}
+            animate={{ opacity: 1, scale: 1 }}
+            className="bg-[#1e293b] p-6 rounded-2xl shadow-xl border border-gray-700/50 max-w-md w-full mx-4"
+          >
+            <h3 className="text-xl font-semibold text-gray-200 mb-4">Return QR Code</h3>
+            <p className="text-gray-400 mb-4">Show this QR code to the concierge to return your items.</p>
+            <div className="bg-white p-4 rounded-xl mb-4 flex justify-center">
+              <QRCodeSVG value={returnQRData} size={200} />
+            </div>
+            <button
+              onClick={() => setShowReturnQRModal(false)}
+              className="w-full px-4 py-2 bg-gray-700 text-white rounded-lg hover:bg-gray-600 transition-colors"
+            >
+              Close
+            </button>
           </motion.div>
         </div>
       )}

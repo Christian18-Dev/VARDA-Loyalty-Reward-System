@@ -1,4 +1,5 @@
-import BorrowedItem from '../models/BorrowedItem.js';
+import { BorrowedItemHistory } from '../models/BorrowedItemHistory.js';
+import { ReturnedItemHistory } from '../models/ReturnedItemHistory.js';
 import User from '../models/User.js';
 
 export const createBorrowedItem = async (req, res) => {
@@ -16,7 +17,8 @@ export const createBorrowedItem = async (req, res) => {
       });
     }
 
-    const borrowedItem = new BorrowedItem({
+    // Create borrowed item record
+    const borrowedItem = new BorrowedItemHistory({
       studentId: user._id,
       studentIdNumber: user.idNumber,
       items,
@@ -25,7 +27,7 @@ export const createBorrowedItem = async (req, res) => {
     });
 
     await borrowedItem.save();
-    console.log('Created borrowed item:', borrowedItem);
+    console.log('Created borrowed item record');
 
     res.status(201).json({
       success: true,
@@ -42,12 +44,42 @@ export const createBorrowedItem = async (req, res) => {
 
 export const getBorrowedItems = async (req, res) => {
   try {
-    const borrowedItems = await BorrowedItem.find()
-      .sort({ borrowTime: -1 }); // Sort by borrow time, newest first
+    const { startDate, endDate } = req.query;
+    let query = {};
+
+    // Filter by user's ID for student, teacher, and ateneo staff roles
+    if (req.user && ['student', 'teacher', 'ateneostaff'].includes(req.user.role.toLowerCase())) {
+      query.studentId = req.user._id;
+    }
+
+    if (startDate && endDate) {
+      query.borrowTime = {
+        $gte: new Date(startDate),
+        $lte: new Date(endDate)
+      };
+    }
+
+    // Get all borrowed items
+    const borrowedItems = await BorrowedItemHistory.find(query)
+      .sort({ borrowTime: -1 });
+
+    // Get all returned items
+    const returnedItems = await ReturnedItemHistory.find({
+      studentId: { $in: borrowedItems.map(item => item.studentId) }
+    });
+
+    // Filter out items that have been returned
+    const activeBorrowedItems = borrowedItems.filter(borrowedItem => {
+      return !returnedItems.some(returnedItem => 
+        returnedItem.studentId.toString() === borrowedItem.studentId.toString() &&
+        returnedItem.borrowTime.getTime() === borrowedItem.borrowTime.getTime() &&
+        returnedItem.items[0].name === borrowedItem.items[0].name
+      );
+    });
     
     res.status(200).json({
       success: true,
-      data: borrowedItems
+      data: activeBorrowedItems
     });
   } catch (error) {
     console.error('Error fetching borrowed items:', error);
@@ -63,7 +95,7 @@ export const returnBorrowedItem = async (req, res) => {
     const { id } = req.params;
     console.log('Processing return for item ID:', id);
 
-    const borrowedItem = await BorrowedItem.findById(id);
+    const borrowedItem = await BorrowedItemHistory.findById(id);
     console.log('Found borrowed item:', borrowedItem);
     
     if (!borrowedItem) {
@@ -73,58 +105,156 @@ export const returnBorrowedItem = async (req, res) => {
       });
     }
 
-    if (borrowedItem.status === 'returned') {
+    // Check if item is already in ReturnedItemHistory
+    const existingReturn = await ReturnedItemHistory.findOne({
+      studentId: borrowedItem.studentId,
+      'items.name': borrowedItem.items[0].name,
+      borrowTime: borrowedItem.borrowTime
+    });
+
+    if (existingReturn) {
       return res.status(400).json({
         success: false,
         message: 'Item is already returned'
       });
     }
 
-    // Update borrowed item status
-    borrowedItem.status = 'returned';
-    borrowedItem.returnTime = new Date();
-    await borrowedItem.save();
-    console.log('Updated borrowed item status to returned');
+    const returnTime = new Date();
 
-    // Add points to user's account
-    try {
-      console.log('Looking for user with ID:', borrowedItem.studentId);
-      const user = await User.findById(borrowedItem.studentId);
-      
-      if (user) {
-        console.log('Found user:', user.idNumber, 'Current points:', user.points);
-        // Ensure points is a number
-        const currentPoints = Number(user.points) || 0;
-        user.points = currentPoints + 1;
-        await user.save();
-        console.log('Updated user points. New points:', user.points);
-      } else {
-        console.log('User not found for studentId:', borrowedItem.studentId);
-        // Try to find user by ID number if needed
-        const alternativeUser = await User.findOne({ idNumber: borrowedItem.studentIdNumber });
-        if (alternativeUser) {
-          console.log('Found user by ID number:', alternativeUser.idNumber);
-          const currentPoints = Number(alternativeUser.points) || 0;
-          alternativeUser.points = currentPoints + 1;
-          await alternativeUser.save();
-          console.log('Updated user points. New points:', alternativeUser.points);
-        }
-      }
-    } catch (userError) {
-      console.error('Error updating user points:', userError);
-      // Continue with the return process even if points update fails
-    }
+    // Create returned history record
+    const returnedItemHistory = new ReturnedItemHistory({
+      studentId: borrowedItem.studentId,
+      studentIdNumber: borrowedItem.studentIdNumber,
+      items: borrowedItem.items,
+      borrowTime: borrowedItem.borrowTime,
+      returnTime: returnTime,
+      status: 'returned'
+    });
+    await returnedItemHistory.save();
 
     res.status(200).json({
       success: true,
-      data: borrowedItem,
-      pointsAdded: true
+      data: returnedItemHistory
     });
   } catch (error) {
     console.error('Error returning borrowed item:', error);
     res.status(500).json({
       success: false,
       message: 'Error returning borrowed item'
+    });
+  }
+};
+
+export const getBorrowedItemHistory = async (req, res) => {
+  try {
+    const { startDate, endDate } = req.query;
+    let query = {};
+
+    if (startDate && endDate) {
+      query.borrowTime = {
+        $gte: new Date(startDate),
+        $lte: new Date(endDate)
+      };
+    }
+
+    const history = await BorrowedItemHistory.find(query)
+      .sort({ borrowTime: -1 });
+    
+    res.status(200).json({
+      success: true,
+      data: history
+    });
+  } catch (error) {
+    console.error('Error fetching borrowed item history:', error);
+    res.status(500).json({
+      success: false,
+      message: 'Error fetching borrowed item history'
+    });
+  }
+};
+
+export const getReturnedItemHistory = async (req, res) => {
+  try {
+    const { startDate, endDate } = req.query;
+    let query = {};
+
+    if (startDate && endDate) {
+      query.returnTime = {
+        $gte: new Date(startDate),
+        $lte: new Date(endDate)
+      };
+    }
+
+    const history = await ReturnedItemHistory.find(query)
+      .sort({ returnTime: -1 });
+    
+    res.status(200).json({
+      success: true,
+      data: history
+    });
+  } catch (error) {
+    console.error('Error fetching returned item history:', error);
+    res.status(500).json({
+      success: false,
+      message: 'Error fetching returned item history'
+    });
+  }
+};
+
+export const processReturnQR = async (req, res) => {
+  try {
+    const { studentId, items } = req.body;
+    console.log('Processing return QR for student ID:', studentId);
+
+    // Find the borrowed item for this student
+    const borrowedItem = await BorrowedItemHistory.findOne({
+      studentId,
+      'items.name': items[0].name
+    });
+
+    if (!borrowedItem) {
+      return res.status(404).json({
+        success: false,
+        message: 'No borrowed item found for this student'
+      });
+    }
+
+    // Check if item is already in ReturnedItemHistory
+    const existingReturn = await ReturnedItemHistory.findOne({
+      studentId: borrowedItem.studentId,
+      'items.name': borrowedItem.items[0].name,
+      borrowTime: borrowedItem.borrowTime
+    });
+
+    if (existingReturn) {
+      return res.status(400).json({
+        success: false,
+        message: 'Item is already returned'
+      });
+    }
+
+    const returnTime = new Date();
+
+    // Create returned history record
+    const returnedItemHistory = new ReturnedItemHistory({
+      studentId: borrowedItem.studentId,
+      studentIdNumber: borrowedItem.studentIdNumber,
+      items: borrowedItem.items,
+      borrowTime: borrowedItem.borrowTime,
+      returnTime: returnTime,
+      status: 'returned'
+    });
+    await returnedItemHistory.save();
+
+    res.status(200).json({
+      success: true,
+      data: returnedItemHistory
+    });
+  } catch (error) {
+    console.error('Error processing return QR:', error);
+    res.status(500).json({
+      success: false,
+      message: 'Error processing return QR'
     });
   }
 }; 

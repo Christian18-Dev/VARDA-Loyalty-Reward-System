@@ -40,8 +40,33 @@ export const createReward = async (req, res) => {
 };
 
 export const getUsers = async (req, res) => {
-  const users = await User.find({}, 'idNumber points role');
-  res.json(users);
+  try {
+    const page = parseInt(req.query.page) || 1;
+    const limit = parseInt(req.query.limit) || 10;
+    const search = req.query.search || '';
+
+    // Create search query
+    const searchQuery = search ? { idNumber: { $regex: search, $options: 'i' } } : {};
+
+    // Get total count for pagination
+    const total = await User.countDocuments(searchQuery);
+
+    // Get paginated users
+    const users = await User.find(searchQuery, 'idNumber points role')
+      .skip((page - 1) * limit)
+      .limit(limit)
+      .sort({ idNumber: 1 });
+
+    res.json({
+      users,
+      currentPage: page,
+      totalPages: Math.ceil(total / limit),
+      totalUsers: total
+    });
+  } catch (error) {
+    console.error('Error fetching users:', error);
+    res.status(500).json({ message: 'Error fetching users' });
+  }
 };
 
 export const getClaimedRewards = async (req, res) => {
@@ -60,7 +85,7 @@ export const updateUserRole = async (req, res) => {
     const { role } = req.body;
 
     // Validate role
-    const validRoles = ['student', 'teacher', 'ateneoStaff', 'cashier'];
+    const validRoles = ['student', 'teacher', 'ateneoStaff', 'cashier', 'concierge'];
     if (!validRoles.includes(role)) {
       return res.status(400).json({ message: 'Invalid role' });
     }

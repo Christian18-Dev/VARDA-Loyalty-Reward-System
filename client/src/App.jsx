@@ -6,6 +6,7 @@ import Register from './pages/Auth/Register';
 import StudentPage from './pages/Student';
 import CashierPage from './pages/Cashier';
 import AdminPage from './pages/Admin';
+import ConciergePage from './pages/Concierge';
 
 function ProtectedRoute({ children, role }) {
   const { user } = useAuth();
@@ -50,6 +51,14 @@ function App() {
           element={
             <ProtectedRoute role="admin">
               <AdminPage />
+            </ProtectedRoute>
+          }
+        />
+        <Route
+          path="/concierge"
+          element={
+            <ProtectedRoute role="concierge">
+              <ConciergePage />
             </ProtectedRoute>
           }
         />

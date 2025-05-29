@@ -13,10 +13,12 @@
   },
   "dependencies": {
     "@heroicons/react": "^1.0.6",
+    "@react-pdf/renderer": "^4.3.0",
     "@tailwindcss/vite": "^4.1.4",
     "autoprefixer": "^10.4.21",
     "axios": "^1.8.4",
     "canvas-confetti": "^1.9.3",
+    "exceljs": "^4.4.0",
     "framer-motion": "^12.9.2",
     "html5-qrcode": "^2.3.8",
     "postcss": "^8.5.3",

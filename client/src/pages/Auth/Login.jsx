@@ -37,6 +37,8 @@ export default function Login() {
         navigate('/cashier');
       } else if (data.role === 'admin') {
         navigate('/admin');
+      } else if (data.role === 'concierge') {
+        navigate('/concierge');
       } else {
         navigate('/student');
       }

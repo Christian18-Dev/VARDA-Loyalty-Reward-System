@@ -96,6 +96,8 @@ export default function Register() {
       // Navigate based on role
       if (data.role === 'cashier') {
         navigate('/cashier');
+      } else if (data.role === 'concierge') {
+        navigate('/concierge');
       } else {
         // All other roles (student, teacher, ateneoStaff) go to student page
         navigate('/student');

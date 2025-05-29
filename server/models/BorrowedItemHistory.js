@@ -1,6 +1,6 @@
 import mongoose from 'mongoose';
 
-const borrowedItemSchema = new mongoose.Schema({
+const borrowedItemHistorySchema = new mongoose.Schema({
   studentId: {
     type: mongoose.Schema.Types.ObjectId,
     ref: 'User',
@@ -17,23 +17,26 @@ const borrowedItemSchema = new mongoose.Schema({
     },
     quantity: {
       type: Number,
-      required: true
+      required: true,
+      min: 1
     }
   }],
-  status: {
-    type: String,
-    enum: ['borrowed', 'returned'],
-    default: 'borrowed'
-  },
   borrowTime: {
     type: Date,
     default: Date.now
   },
   returnTime: {
     type: Date
+  },
+  status: {
+    type: String,
+    enum: ['borrowed', 'returned'],
+    default: 'borrowed'
   }
-}, { timestamps: true });
+}, {
+  timestamps: true
+});
 
-const BorrowedItem = mongoose.model('BorrowedItem', borrowedItemSchema);
+const BorrowedItemHistory = mongoose.model('BorrowedItemHistory', borrowedItemHistorySchema);
 
-export default BorrowedItem;
+export { BorrowedItemHistory }; 

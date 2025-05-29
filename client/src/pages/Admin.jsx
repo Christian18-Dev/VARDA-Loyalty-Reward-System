@@ -15,39 +15,75 @@ export default function AdminPage() {
   const [mobileMenuOpen, setMobileMenuOpen] = useState(false);
   const [error, setError] = useState('');
   const [success, setSuccess] = useState('');
+  
+  // Add new state for pagination and search
+  const [currentPage, setCurrentPage] = useState(1);
+  const [totalPages, setTotalPages] = useState(1);
+  const [totalUsers, setTotalUsers] = useState(0);
+  const [searchTerm, setSearchTerm] = useState('');
+  const [isSearching, setIsSearching] = useState(false);
 
   const token = user.token;
   const baseUrl = import.meta.env.VITE_API_BASE_URL;
 
+  // Update fetchData to handle pagination and search
+  const fetchData = async (page = 1, search = '') => {
+    try {
+      setIsLoading(true);
+
+      const [statsRes, usersRes, claimedRes] = await Promise.all([
+        axios.get(`${baseUrl}/api/admin/stats`, {
+          headers: { Authorization: `Bearer ${token}` },
+        }),
+        axios.get(`${baseUrl}/api/admin/users?page=${page}&limit=10&search=${search}`, {
+          headers: { Authorization: `Bearer ${token}` },
+        }),
+        axios.get(`${baseUrl}/api/admin/claimed-rewards`, {
+          headers: { Authorization: `Bearer ${token}` },
+        })
+      ]);
+
+      setStats(statsRes.data);
+      setUsers(usersRes.data.users);
+      setCurrentPage(usersRes.data.currentPage);
+      setTotalPages(usersRes.data.totalPages);
+      setTotalUsers(usersRes.data.totalUsers);
+      setClaimedRewards(claimedRes.data);
+    } catch (error) {
+      console.error("Error fetching data:", error);
+      setError("Failed to fetch data. Please try again.");
+    } finally {
+      setIsLoading(false);
+    }
+  };
+
   useEffect(() => {
-    const fetchData = async () => {
-      try {
-        setIsLoading(true);
-
-        const [statsRes, usersRes, claimedRes] = await Promise.all([
-          axios.get(`${baseUrl}/api/admin/stats`, {
-            headers: { Authorization: `Bearer ${token}` },
-          }),
-          axios.get(`${baseUrl}/api/admin/users`, {
-            headers: { Authorization: `Bearer ${token}` },
-          }),
-          axios.get(`${baseUrl}/api/admin/claimed-rewards`, {
-            headers: { Authorization: `Bearer ${token}` },
-          })
-        ]);
-
-        setStats(statsRes.data);
-        setUsers(usersRes.data);
-        setClaimedRewards(claimedRes.data);
-      } catch (error) {
-        console.error("Error fetching data:", error);
-      } finally {
-        setIsLoading(false);
-      }
-    };
-
     fetchData();
   }, [token, baseUrl]);
+
+  // Add search handler with debounce
+  useEffect(() => {
+    const timer = setTimeout(() => {
+      if (searchTerm) {
+        setIsSearching(true);
+        fetchData(1, searchTerm);
+      }
+    }, 500);
+
+    return () => clearTimeout(timer);
+  }, [searchTerm]);
+
+  // Add page change handler
+  const handlePageChange = (newPage) => {
+    setCurrentPage(newPage);
+    fetchData(newPage, searchTerm);
+  };
+
+  // Add search input handler
+  const handleSearch = (e) => {
+    setSearchTerm(e.target.value);
+    setCurrentPage(1);
+  };
 
   const handleCreateReward = async () => {
     if (!rewards.name.trim() || !rewards.cost) {
@@ -396,7 +432,23 @@ export default function AdminPage() {
         {activeTab === 'users' && (
           <div className="bg-white shadow rounded-lg overflow-hidden">
             <div className="px-6 py-4 border-b border-gray-200">
-              <h2 className="text-xl font-semibold text-gray-800">User Management</h2>
+              <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center space-y-4 sm:space-y-0">
+                <h2 className="text-xl font-semibold text-gray-800">User Management</h2>
+                <div className="w-full sm:w-64">
+                  <div className="relative">
+                    <input
+                      type="text"
+                      placeholder="Search by ID number..."
+                      value={searchTerm}
+                      onChange={handleSearch}
+                      className="w-full px-4 py-2 pl-10 border border-gray-300 rounded-xl focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+                    />
+                    <svg className="w-5 h-5 text-gray-400 absolute left-3 top-2.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z" />
+                    </svg>
+                  </div>
+                </div>
+              </div>
             </div>
             <div className="overflow-x-auto">
               <table className="min-w-full divide-y divide-gray-200">
@@ -438,6 +490,7 @@ export default function AdminPage() {
                           <option value="teacher">Teacher</option>
                           <option value="ateneoStaff">Ateneo Staff</option>
                           <option value="cashier">Cashier</option>
+                          <option value="concierge">Concierge</option>
                           <option value="admin">Admin</option>
                         </select>
                       </td>
@@ -455,7 +508,50 @@ export default function AdminPage() {
                   ))}
                 </tbody>
               </table>
+              {users.length === 0 && (
+                <div className="text-center py-12">
+                  <p className="text-gray-500">No users found.</p>
+                </div>
+              )}
             </div>
+            {/* Pagination */}
+            {totalPages > 1 && (
+              <div className="px-6 py-4 border-t border-gray-200">
+                <div className="flex items-center justify-between">
+                  <div className="text-sm text-gray-700">
+                    Showing <span className="font-medium">{(currentPage - 1) * 10 + 1}</span> to{' '}
+                    <span className="font-medium">
+                      {Math.min(currentPage * 10, totalUsers)}
+                    </span>{' '}
+                    of <span className="font-medium">{totalUsers}</span> users
+                  </div>
+                  <div className="flex space-x-2">
+                    <button
+                      onClick={() => handlePageChange(currentPage - 1)}
+                      disabled={currentPage === 1}
+                      className={`px-3 py-1 rounded-md ${
+                        currentPage === 1
+                          ? 'bg-gray-100 text-gray-400 cursor-not-allowed'
+                          : 'bg-white text-gray-700 hover:bg-gray-50 border border-gray-300'
+                      }`}
+                    >
+                      Previous
+                    </button>
+                    <button
+                      onClick={() => handlePageChange(currentPage + 1)}
+                      disabled={currentPage === totalPages}
+                      className={`px-3 py-1 rounded-md ${
+                        currentPage === totalPages
+                          ? 'bg-gray-100 text-gray-400 cursor-not-allowed'
+                          : 'bg-white text-gray-700 hover:bg-gray-50 border border-gray-300'
+                      }`}
+                    >
+                      Next
+                    </button>
+                  </div>
+                </div>
+              </div>
+            )}
           </div>
         )}
 

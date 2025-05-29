@@ -6,39 +6,20 @@ import {
   KeyIcon, 
   GiftIcon, 
   LogoutIcon, 
-  CameraIcon, 
-  ArrowLeftIcon, 
-  ArrowRightIcon,
   ExclamationIcon,
   ClipboardCopyIcon,
   CheckIcon
 } from '@heroicons/react/outline';
-import { Html5Qrcode } from 'html5-qrcode';
 import { motion, AnimatePresence } from 'framer-motion';
 
 export default function CashierPage() {
   const { user, logout } = useAuth();
   const navigate = useNavigate();
-  const [activeTab, setActiveTab] = useState('scanner');
+  const [activeTab, setActiveTab] = useState('generator');
   const [generatedCode, setGeneratedCode] = useState('');
   const [claimedRewards, setClaimedRewards] = useState([]);
-  const [scanning, setScanning] = useState(false);
-  const [borrowedItems, setBorrowedItems] = useState([]);
   const [error, setError] = useState('');
   const [success, setSuccess] = useState('');
-  const [html5QrCode, setHtml5QrCode] = useState(null);
-  const [lastScannedCode, setLastScannedCode] = useState('');
-  const [isCooldown, setIsCooldown] = useState(false);
-  const [scannedCodes, setScannedCodes] = useState(() => {
-    // Initialize from localStorage if available
-    const savedCodes = localStorage.getItem('scannedCodes');
-    return savedCodes ? new Set(JSON.parse(savedCodes)) : new Set();
-  });
-  const [returnedItems, setReturnedItems] = useState([]);
-  const [borrowedSearchTerm, setBorrowedSearchTerm] = useState('');
-  const [returnedSearchTerm, setReturnedSearchTerm] = useState('');
-  const [currentBorrowedPage, setCurrentBorrowedPage] = useState(1);
-  const [currentReturnedPage, setCurrentReturnedPage] = useState(1);
   const [currentRewardsPage, setCurrentRewardsPage] = useState(1);
   const [rewardsSearchTerm, setRewardsSearchTerm] = useState('');
   const itemsPerPage = 5;
@@ -48,185 +29,6 @@ export default function CashierPage() {
 
   const baseUrl = import.meta.env.VITE_API_BASE_URL;
   const token = user.token;
-
-  const fetchBorrowedItems = async () => {
-    try {
-      const res = await axios.get(`${baseUrl}/api/cashier/borrowed-items`, {
-        headers: { Authorization: `Bearer ${token}` },
-      });
-      const items = res.data.data;
-      // Sort borrowed items by borrow time (newest first)
-      const sortedBorrowed = items
-        .filter(item => item.status === 'borrowed')
-        .sort((a, b) => new Date(b.borrowTime) - new Date(a.borrowTime));
-      // Sort returned items by return time (newest first)
-      const sortedReturned = items
-        .filter(item => item.status === 'returned')
-        .sort((a, b) => new Date(b.returnTime) - new Date(a.returnTime));
-      
-      setBorrowedItems(sortedBorrowed);
-      setReturnedItems(sortedReturned);
-    } catch (err) {
-      console.error('Error fetching borrowed items:', err);
-      setError('Failed to fetch borrowed items');
-    }
-  };
-
-  // Filter items based on search terms
-  const filteredBorrowedItems = borrowedItems.filter(item =>
-    item?.studentIdNumber?.toLowerCase().includes(borrowedSearchTerm.toLowerCase())
-  );
-
-  const filteredReturnedItems = returnedItems.filter(item =>
-    item?.studentIdNumber?.toLowerCase().includes(returnedSearchTerm.toLowerCase())
-  );
-
-  // Pagination calculations
-  const totalBorrowedPages = Math.ceil(filteredBorrowedItems.length / itemsPerPage);
-  const totalReturnedPages = Math.ceil(filteredReturnedItems.length / itemsPerPage);
-
-  const paginatedBorrowedItems = filteredBorrowedItems.slice(
-    (currentBorrowedPage - 1) * itemsPerPage,
-    currentBorrowedPage * itemsPerPage
-  );
-
-  const paginatedReturnedItems = filteredReturnedItems.slice(
-    (currentReturnedPage - 1) * itemsPerPage,
-    currentReturnedPage * itemsPerPage
-  );
-
-  // Handle page changes
-  const handleBorrowedPageChange = (page) => {
-    setCurrentBorrowedPage(page);
-  };
-
-  const handleReturnedPageChange = (page) => {
-    setCurrentReturnedPage(page);
-  };
-
-  // Handle search
-  const handleBorrowedSearch = (e) => {
-    setBorrowedSearchTerm(e.target.value);
-    setCurrentBorrowedPage(1);
-  };
-
-  const handleReturnedSearch = (e) => {
-    setReturnedSearchTerm(e.target.value);
-    setCurrentReturnedPage(1);
-  };
-
-  // Filter rewards based on search term
-  const filteredRewards = claimedRewards.filter(reward => 
-    reward?.name?.toLowerCase().includes(rewardsSearchTerm.toLowerCase()) ||
-    reward?.reward?.toLowerCase().includes(rewardsSearchTerm.toLowerCase())
-  );
-
-  // Pagination calculations for rewards
-  const totalRewardsPages = Math.ceil(filteredRewards.length / itemsPerPage);
-  const paginatedRewards = filteredRewards.slice(
-    (currentRewardsPage - 1) * itemsPerPage,
-    currentRewardsPage * itemsPerPage
-  );
-
-  // Handle rewards page change
-  const handleRewardsPageChange = (page) => {
-    setCurrentRewardsPage(page);
-  };
-
-  // Handle rewards search
-  const handleRewardsSearch = (e) => {
-    setRewardsSearchTerm(e.target.value);
-    setCurrentRewardsPage(1);
-  };
-
-  // Set up polling for active tab
-  useEffect(() => {
-    let pollInterval;
-
-    const startPolling = () => {
-      // Clear any existing interval
-      if (pollInterval) {
-        clearInterval(pollInterval);
-      }
-
-      // Set up new interval based on active tab
-      switch (activeTab) {
-        case 'borrowed':
-        case 'returned':
-          pollInterval = setInterval(fetchBorrowedItems, 3000);
-          break;
-        case 'rewards':
-          pollInterval = setInterval(fetchClaimed, 3000);
-          break;
-        default:
-          break;
-      }
-    };
-
-    // Start polling when component mounts or tab changes
-    startPolling();
-
-    // Cleanup interval on component unmount or tab change
-    return () => {
-      if (pollInterval) {
-      clearInterval(pollInterval);
-      }
-    };
-  }, [activeTab, token]);
-
-  // Initial fetch for all data
-  useEffect(() => {
-    fetchBorrowedItems();
-    fetchClaimed();
-  }, [token]);
-
-  const startScanner = async () => {
-    try {
-      const qrCode = new Html5Qrcode("reader");
-      setHtml5QrCode(qrCode);
-
-      await qrCode.start(
-        { facingMode: "environment" },
-        {
-          fps: 10,
-          qrbox: { width: 250, height: 250 },
-          aspectRatio: 1.0,
-          disableFlip: false,
-          delayBetweenScanAttempts: 1000
-        },
-        (decodedText) => {
-          handleScan(decodedText);
-          stopScanner();
-        },
-        (errorMessage) => {
-          // Ignore errors during scanning
-        }
-      );
-    } catch (err) {
-      console.error('Error starting scanner:', err);
-      setError('Failed to start camera');
-      setScanning(false);
-    }
-  };
-
-  const stopScanner = async () => {
-    if (html5QrCode) {
-      try {
-        await html5QrCode.stop();
-        setHtml5QrCode(null);
-      } catch (err) {
-        console.error('Error stopping scanner:', err);
-      }
-    }
-  };
-
-  useEffect(() => {
-    if (scanning) {
-      startScanner();
-    } else {
-      stopScanner();
-    }
-  }, [scanning]);
 
   const handleGenerateCode = async () => {
     try {
@@ -282,99 +84,40 @@ export default function CashierPage() {
     }
   };
 
-  // Save scanned codes to localStorage whenever it changes
+  // Set up polling for rewards tab
   useEffect(() => {
-    localStorage.setItem('scannedCodes', JSON.stringify([...scannedCodes]));
-  }, [scannedCodes]);
-
-  const handleScan = async (decodedText) => {
-    try {
-      // Stop scanning immediately to prevent multiple scans
-      setScanning(false);
-      
-      // Check if we're in cooldown
-      if (isCooldown) {
-        return;
-      }
-
-      const orderData = JSON.parse(decodedText);
-      
-      // Create a unique identifier using studentId and timestamp
-      const scanIdentifier = `${orderData.studentId}-${orderData.timestamp}`;
-
-      // Check if this specific QR code has been scanned before
-      if (scannedCodes.has(scanIdentifier)) {
-        setError('This QR code has already been scanned.');
-        setTimeout(() => setError(''), 5000);
-        return;
-      }
-
-      // Set cooldown and add identifier to scanned set
-      setIsCooldown(true);
-      setScannedCodes(prev => new Set([...prev, scanIdentifier]));
-      
-      // Save to database
-      const response = await axios.post(
-        `${baseUrl}/api/cashier/scan-item`,
-        {
-          items: orderData.items,
-          studentName: orderData.studentName,
-          studentId: orderData.studentId
-        },
-        {
-          headers: { Authorization: `Bearer ${token}` },
-        }
-      );
-
-      // Update local state with the saved item at the beginning of the list
-      setBorrowedItems(prev => [response.data.data, ...prev]);
-
-      setSuccess('QR Code scanned successfully! Items have been borrowed.');
-      setTimeout(() => setError(''), 5000);
-
-      // Reset cooldown after 5 seconds
-      setTimeout(() => {
-        setIsCooldown(false);
-      }, 5000);
-
-    } catch (err) {
-      console.error('Error scanning QR code:', err);
-      setError('Invalid QR Code or failed to save');
-      setTimeout(() => setError(''), 5000);
+    let pollInterval;
+    if (activeTab === 'rewards') {
+      fetchClaimed();
+      pollInterval = setInterval(fetchClaimed, 3000);
     }
-  };
-
-  const handleError = (err) => {
-    console.error(err);
-    setError('Error scanning QR Code');
-    setTimeout(() => setError(''), 3000);
-  };
-
-  const handleReturnItem = async (itemId) => {
-    try {
-      const response = await axios.put(
-        `${baseUrl}/api/cashier/return-item/${itemId}`,
-        {},
-        { headers: { Authorization: `Bearer ${token}` } }
-      );
-
-      // Update the local state
-      setBorrowedItems(prev => prev.filter(item => item._id !== itemId));
-      setReturnedItems(prev => [response.data.data, ...prev]);
+    return () => {
+      if (pollInterval) clearInterval(pollInterval);
+    };
+  }, [activeTab, token]);
       
-      setSuccess('Item returned successfully! Student earned 1 loyalty point.');
-      setTimeout(() => setSuccess(''), 5000);
-    } catch (err) {
-      console.error('Error returning item:', err);
-      setError(err.response?.data?.message || 'Failed to return item');
-      setTimeout(() => setError(''), 5000);
-    }
+  // Filter rewards based on search term
+  const filteredRewards = claimedRewards.filter(reward => 
+    reward?.name?.toLowerCase().includes(rewardsSearchTerm.toLowerCase()) ||
+    reward?.reward?.toLowerCase().includes(rewardsSearchTerm.toLowerCase())
+  );
+      
+  // Pagination calculations for rewards
+  const totalRewardsPages = Math.ceil(filteredRewards.length / itemsPerPage);
+  const paginatedRewards = filteredRewards.slice(
+    (currentRewardsPage - 1) * itemsPerPage,
+    currentRewardsPage * itemsPerPage
+  );
+
+  // Handle rewards page change
+  const handleRewardsPageChange = (page) => {
+    setCurrentRewardsPage(page);
   };
 
-  // Add a function to clear scanned codes (optional, can be used if needed)
-  const clearScannedCodes = () => {
-    setScannedCodes(new Set());
-    localStorage.removeItem('scannedCodes');
+  // Handle rewards search
+  const handleRewardsSearch = (e) => {
+    setRewardsSearchTerm(e.target.value);
+    setCurrentRewardsPage(1);
   };
 
   const handleLogoutClick = () => {
@@ -485,10 +228,7 @@ export default function CashierPage() {
       <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-4 bg-white fixed top-[72px] left-0 right-0 z-[90] shadow-sm">
         <div className="flex space-x-2 overflow-x-auto pb-2 scrollbar-hide">
           {[
-            { id: 'scanner', icon: CameraIcon, label: 'Scanner' },
             { id: 'generator', icon: KeyIcon, label: 'Generate Code' },
-            { id: 'borrowed', icon: ArrowLeftIcon, label: 'Borrowed' },
-            { id: 'returned', icon: ArrowRightIcon, label: 'Returned' },
             { id: 'rewards', icon: GiftIcon, label: 'Rewards' }
           ].map(({ id, icon: Icon, label }) => (
             <button
@@ -509,60 +249,6 @@ export default function CashierPage() {
 
       {/* Main Content */}
       <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-6 mt-[144px] min-h-[calc(100vh-144px)] flex flex-col">
-        {/* Scanner Tab */}
-        {activeTab === 'scanner' && (
-          <motion.div
-            initial={{ opacity: 0, y: 20 }}
-            animate={{ opacity: 1, y: 0 }}
-            className="bg-white rounded-2xl shadow-lg p-4 sm:p-6 flex-1 flex flex-col"
-          >
-            <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center mb-6 space-y-4 sm:space-y-0">
-              <div>
-                <h2 className="text-2xl font-bold text-gray-800">QR Scanner</h2>
-                <p className="text-gray-600 mt-1">Scan student QR codes to process requests</p>
-              </div>
-              <button
-                onClick={() => setScanning(!scanning)}
-                className={`w-full sm:w-auto px-6 py-3 rounded-xl transition-all flex items-center justify-center space-x-2 ${
-                  scanning
-                    ? 'bg-red-500 hover:bg-red-600 text-white'
-                    : 'bg-purple-600 hover:bg-purple-700 text-white'
-                }`}
-              >
-                <CameraIcon className="w-5 h-5" />
-                <span>{scanning ? 'Stop Scanning' : 'Start Scanning'}</span>
-              </button>
-            </div>
-
-            {scanning && (
-              <div className="relative flex-1 flex items-center justify-center">
-                <div id="reader" className="w-full max-w-md rounded-xl overflow-hidden shadow-lg"></div>
-                <div className="absolute inset-0 pointer-events-none border-2 border-purple-500 rounded-xl"></div>
-              </div>
-            )}
-
-            {/* Messages */}
-            {error && (
-              <motion.div
-                initial={{ opacity: 0, y: -10 }}
-                animate={{ opacity: 1, y: 0 }}
-                  className="mt-4 p-4 bg-red-50 text-red-700 rounded-xl border border-red-200"
-              >
-                {error}
-              </motion.div>
-            )}
-            {success && (
-              <motion.div
-                initial={{ opacity: 0, y: -10 }}
-                animate={{ opacity: 1, y: 0 }}
-                  className="mt-4 p-4 bg-green-50 text-green-700 rounded-xl border border-green-200"
-              >
-                {success}
-              </motion.div>
-            )}
-          </motion.div>
-        )}
-
         {/* Code Generator Tab */}
         {activeTab === 'generator' && (
           <motion.div
@@ -653,247 +339,6 @@ export default function CashierPage() {
           </motion.div>
         )}
 
-        {/* Borrowed Items Tab */}
-        {activeTab === 'borrowed' && (
-          <motion.div
-            initial={{ opacity: 0, y: 20 }}
-            animate={{ opacity: 1, y: 0 }}
-            className="bg-white rounded-2xl shadow-lg p-4 sm:p-6"
-          >
-            <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center mb-6 space-y-4 sm:space-y-0">
-              <div>
-                <h2 className="text-2xl font-bold text-gray-800">Borrowed Items</h2>
-                <p className="text-gray-600 mt-1">Track all currently borrowed items</p>
-              </div>
-              <div className="w-full sm:w-64">
-                <div className="relative">
-              <input
-                type="text"
-                placeholder="Search by student ID..."
-                value={borrowedSearchTerm}
-                onChange={handleBorrowedSearch}
-                    className="w-full px-4 py-2 pl-10 border border-gray-300 rounded-xl focus:ring-2 focus:ring-purple-500 focus:border-transparent"
-              />
-                  <svg className="w-5 h-5 text-gray-400 absolute left-3 top-2.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z" />
-                  </svg>
-                </div>
-              </div>
-            </div>
-            <div className="overflow-x-auto rounded-xl border border-gray-200">
-            <table className="min-w-full divide-y divide-gray-200">
-              <thead className="bg-gray-50">
-                <tr>
-                    <th className="px-4 sm:px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
-                    ID Number
-                  </th>
-                    <th className="px-4 sm:px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
-                    Items
-                  </th>
-                    <th className="px-4 sm:px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
-                    Borrow Time
-                  </th>
-                    <th className="px-4 sm:px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
-                    Status
-                  </th>
-                    <th className="px-4 sm:px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
-                    Action
-                  </th>
-                </tr>
-              </thead>
-              <tbody className="bg-white divide-y divide-gray-200">
-                {paginatedBorrowedItems.map((item) => (
-                    <tr key={item._id} className="hover:bg-gray-50">
-                      <td className="px-4 sm:px-6 py-4 whitespace-nowrap text-sm font-medium text-gray-900">
-                        {item.studentIdNumber}
-                      </td>
-                      <td className="px-4 sm:px-6 py-4 whitespace-nowrap text-sm text-gray-500">
-                        {item.items.map((i, index) => (
-                          <div key={index}>
-                            {i.name} (x{i.quantity})
-                          </div>
-                        ))}
-                      </td>
-                      <td className="px-4 sm:px-6 py-4 whitespace-nowrap text-sm text-gray-500">
-                        {new Date(item.borrowTime).toLocaleString()}
-                      </td>
-                      <td className="px-4 sm:px-6 py-4 whitespace-nowrap text-sm text-gray-500">
-                        <span className={`px-2 inline-flex text-xs leading-5 font-semibold rounded-full ${
-                          item.status === 'borrowed' ? 'bg-yellow-100 text-yellow-800' : 'bg-green-100 text-green-800'
-                        }`}>
-                          {item.status}
-                        </span>
-                      </td>
-                      <td className="px-4 sm:px-6 py-4 whitespace-nowrap text-sm text-gray-500">
-                        {item.status === 'borrowed' && (
-                          <button
-                            onClick={() => handleReturnItem(item._id)}
-                            className="text-blue-600 hover:text-blue-900"
-                          >
-                            Return
-                          </button>
-                        )}
-                      </td>
-                    </tr>
-                ))}
-              </tbody>
-            </table>
-            {paginatedBorrowedItems.length === 0 && (
-                <div className="text-center py-12">
-                  <p className="text-gray-500">No borrowed items found.</p>
-                </div>
-            )}
-            </div>
-            
-            {/* Pagination for Borrowed Items */}
-            {totalBorrowedPages > 1 && (
-              <div className="flex justify-center items-center mt-6 space-x-4">
-                <button
-                  onClick={() => handleBorrowedPageChange(Math.max(1, currentBorrowedPage - 1))}
-                  disabled={currentBorrowedPage === 1}
-                  className={`p-2 rounded-lg transition-colors ${
-                    currentBorrowedPage === 1
-                      ? 'text-gray-400 cursor-not-allowed'
-                      : 'text-gray-700 hover:bg-gray-100'
-                  }`}
-                >
-                  <ArrowLeftIcon className="w-5 h-5" />
-                </button>
-                <span className="text-gray-700 font-medium">
-                  Page {currentBorrowedPage} of {totalBorrowedPages}
-                </span>
-                  <button
-                  onClick={() => handleBorrowedPageChange(Math.min(totalBorrowedPages, currentBorrowedPage + 1))}
-                  disabled={currentBorrowedPage === totalBorrowedPages}
-                  className={`p-2 rounded-lg transition-colors ${
-                    currentBorrowedPage === totalBorrowedPages
-                      ? 'text-gray-400 cursor-not-allowed'
-                      : 'text-gray-700 hover:bg-gray-100'
-                    }`}
-                  >
-                  <ArrowRightIcon className="w-5 h-5" />
-                  </button>
-              </div>
-            )}
-          </motion.div>
-        )}
-
-        {/* Returned Items Tab */}
-        {activeTab === 'returned' && (
-          <motion.div
-            initial={{ opacity: 0, y: 20 }}
-            animate={{ opacity: 1, y: 0 }}
-            className="bg-white rounded-2xl shadow-lg p-4 sm:p-6"
-          >
-            <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center mb-6 space-y-4 sm:space-y-0">
-              <div>
-                <h2 className="text-2xl font-bold text-gray-800">Returned Items History</h2>
-                <p className="text-gray-600 mt-1">View history of all returned items</p>
-          </div>
-              <div className="w-full sm:w-64">
-                <div className="relative">
-              <input
-                type="text"
-                placeholder="Search by student ID..."
-                value={returnedSearchTerm}
-                onChange={handleReturnedSearch}
-                    className="w-full px-4 py-2 pl-10 border border-gray-300 rounded-xl focus:ring-2 focus:ring-purple-500 focus:border-transparent"
-              />
-                  <svg className="w-5 h-5 text-gray-400 absolute left-3 top-2.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z" />
-                  </svg>
-                </div>
-              </div>
-            </div>
-            <div className="overflow-x-auto rounded-xl border border-gray-200">
-            <table className="min-w-full divide-y divide-gray-200">
-              <thead className="bg-gray-50">
-                <tr>
-                    <th className="px-4 sm:px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
-                    ID Number
-                  </th>
-                    <th className="px-4 sm:px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
-                    Items
-                  </th>
-                    <th className="px-4 sm:px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
-                    Borrow Time
-                  </th>
-                    <th className="px-4 sm:px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
-                    Return Time
-                  </th>
-                    <th className="px-4 sm:px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
-                    Status
-                  </th>
-                </tr>
-              </thead>
-              <tbody className="bg-white divide-y divide-gray-200">
-                {paginatedReturnedItems.map((item) => (
-                    <tr key={item._id} className="hover:bg-gray-50">
-                      <td className="px-4 sm:px-6 py-4 whitespace-nowrap text-sm font-medium text-gray-900">
-                        {item.studentIdNumber}
-                      </td>
-                      <td className="px-4 sm:px-6 py-4 whitespace-nowrap text-sm text-gray-500">
-                        {item.items.map((i, index) => (
-                          <div key={index}>
-                            {i.name} (x{i.quantity})
-                          </div>
-                        ))}
-                      </td>
-                      <td className="px-4 sm:px-6 py-4 whitespace-nowrap text-sm text-gray-500">
-                        {new Date(item.borrowTime).toLocaleString()}
-                      </td>
-                      <td className="px-4 sm:px-6 py-4 whitespace-nowrap text-sm text-gray-500">
-                        {new Date(item.returnTime).toLocaleString()}
-                      </td>
-                      <td className="px-4 sm:px-6 py-4 whitespace-nowrap text-sm text-gray-500">
-                        <span className="px-2 inline-flex text-xs leading-5 font-semibold rounded-full bg-green-100 text-green-800">
-                          {item.status}
-                        </span>
-                      </td>
-                    </tr>
-                ))}
-              </tbody>
-            </table>
-            {paginatedReturnedItems.length === 0 && (
-                <div className="text-center py-12">
-                  <p className="text-gray-500">No returned items found.</p>
-                </div>
-            )}
-            </div>
-            
-            {/* Pagination for Returned Items */}
-            {totalReturnedPages > 1 && (
-              <div className="flex justify-center items-center mt-6 space-x-4">
-                <button
-                  onClick={() => handleReturnedPageChange(Math.max(1, currentReturnedPage - 1))}
-                  disabled={currentReturnedPage === 1}
-                  className={`p-2 rounded-lg transition-colors ${
-                    currentReturnedPage === 1
-                      ? 'text-gray-400 cursor-not-allowed'
-                      : 'text-gray-700 hover:bg-gray-100'
-                  }`}
-                >
-                  <ArrowLeftIcon className="w-5 h-5" />
-                </button>
-                <span className="text-gray-700 font-medium">
-                  Page {currentReturnedPage} of {totalReturnedPages}
-                </span>
-                  <button
-                  onClick={() => handleReturnedPageChange(Math.min(totalReturnedPages, currentReturnedPage + 1))}
-                  disabled={currentReturnedPage === totalReturnedPages}
-                  className={`p-2 rounded-lg transition-colors ${
-                    currentReturnedPage === totalReturnedPages
-                      ? 'text-gray-400 cursor-not-allowed'
-                      : 'text-gray-700 hover:bg-gray-100'
-                    }`}
-                  >
-                  <ArrowRightIcon className="w-5 h-5" />
-                  </button>
-              </div>
-            )}
-          </motion.div>
-        )}
-
         {/* Rewards Tab */}
         {activeTab === 'rewards' && (
           <motion.div
@@ -978,7 +423,9 @@ export default function CashierPage() {
                       : 'text-gray-700 hover:bg-gray-100'
                   }`}
                 >
-                  <ArrowLeftIcon className="w-5 h-5" />
+                  <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M15 19l-7-7 7-7" />
+                  </svg>
                 </button>
                 <span className="text-gray-700 font-medium">
                   Page {currentRewardsPage} of {totalRewardsPages}
@@ -991,10 +438,12 @@ export default function CashierPage() {
                       ? 'text-gray-400 cursor-not-allowed'
                       : 'text-gray-700 hover:bg-gray-100'
                   }`}
-                >
-                  <ArrowRightIcon className="w-5 h-5" />
-                </button>
-        </div>
+                    >
+                      <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M9 5l7 7-7 7" />
+                      </svg>
+                    </button>
+                  </div>
             )}
           </motion.div>
         )}

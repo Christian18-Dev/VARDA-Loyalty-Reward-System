@@ -48,3 +48,10 @@ export const cashierOnly = (req, res, next) => {
   }
   next();
 };
+
+export const conciergeOnly = (req, res, next) => {
+  if (req.user?.role !== 'concierge') {
+    return res.status(403).json({ message: 'Concierge access only' });
+  }
+  next();
+};

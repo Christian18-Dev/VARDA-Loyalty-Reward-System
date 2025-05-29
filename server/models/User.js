@@ -7,7 +7,7 @@ const userSchema = new mongoose.Schema({
   idNumber: { type: String, required: true, unique: true },
   role: {
     type: String,
-    enum: ['student', 'teacher', 'ateneoStaff', 'cashier', 'admin'],
+    enum: ['student', 'teacher', 'ateneoStaff', 'cashier', 'admin', 'concierge'],
     default: 'student'
   },
   points: { type: Number, default: 0 },   // Current available points
