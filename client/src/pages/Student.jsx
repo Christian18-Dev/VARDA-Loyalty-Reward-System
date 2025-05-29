@@ -886,36 +886,6 @@ export default function StudentPage() {
                 </motion.div>
               </div>
             )}
-
-            {/* Borrowed Items */}
-            {borrowedItems.length > 0 && (
-              <div className="bg-[#1e293b] p-6 rounded-2xl shadow-lg mt-6 border border-gray-700/50">
-                <h3 className="text-xl font-semibold text-gray-200 mb-4">Your Borrowed Items</h3>
-                <div className="space-y-4">
-                  {borrowedItems.map((item) => (
-                    <motion.div 
-                      key={item._id}
-                      initial={{ opacity: 0, y: 20 }}
-                      animate={{ opacity: 1, y: 0 }}
-                      className="flex items-center justify-between p-4 bg-gray-800/50 rounded-xl"
-                    >
-                      <div className="flex items-center space-x-4">
-                        <div>
-                          <h4 className="font-medium text-gray-200">{item.items.map(i => i.name).join(', ')}</h4>
-                          <p className="text-sm text-gray-400">Borrowed on: {new Date(item.borrowTime).toLocaleString()}</p>
-                        </div>
-                      </div>
-                      <button
-                        onClick={() => handleReturn(item)}
-                        className="px-4 py-2 bg-green-600 text-white rounded-lg hover:bg-green-700 transition-colors"
-                      >
-                        Return
-                      </button>
-                    </motion.div>
-                  ))}
-                </div>
-              </div>
-            )}
           </motion.div>
         )}
 
