@@ -509,7 +509,7 @@ export default function ConciergePage() {
       const queryParams = new URLSearchParams();
       if (startDate) queryParams.append('startDate', startDate);
       if (endDate) queryParams.append('endDate', endDate);
-      const endpoint = type === 'borrowed' ? 'borrowed-history' : 'returned-history';
+      const endpoint = type === 'borrowed' ? 'export/borrowed-items' : 'export/returned-items';
       
       // Add timeout to the request
       const res = await axios.get(`${baseUrl}/api/concierge/${endpoint}?${queryParams}`, {

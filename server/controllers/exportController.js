@@ -5,16 +5,18 @@ import { ReturnedItemHistory } from '../models/ReturnedItemHistory.js';
 export const exportBorrowedItems = async (req, res) => {
   try {
     const { startDate, endDate } = req.query;
+    console.log('Received date range:', { startDate, endDate });
     let query = { status: 'borrowed' };
 
     if (startDate && endDate) {
-      // Set start date to beginning of day (00:00:00)
-      const start = new Date(startDate);
-      start.setHours(0, 0, 0, 0);
+      // Create UTC dates to avoid timezone issues
+      const start = new Date(startDate + 'T00:00:00.000Z');
+      const end = new Date(endDate + 'T23:59:59.999Z');
 
-      // Set end date to end of day (23:59:59.999)
-      const end = new Date(endDate);
-      end.setHours(23, 59, 59, 999);
+      console.log('Query date range:', {
+        start: start.toISOString(),
+        end: end.toISOString()
+      });
 
       query.borrowTime = {
         $gte: start,
@@ -24,6 +26,11 @@ export const exportBorrowedItems = async (req, res) => {
 
     const borrowedItems = await BorrowedItemHistory.find(query)
       .sort({ borrowTime: -1 });
+
+    console.log('Found items:', borrowedItems.length);
+    if (borrowedItems.length > 0) {
+      console.log('Sample item borrow time:', borrowedItems[0].borrowTime);
+    }
 
     res.status(200).json({
       success: true,
@@ -42,16 +49,18 @@ export const exportBorrowedItems = async (req, res) => {
 export const exportReturnedItems = async (req, res) => {
   try {
     const { startDate, endDate } = req.query;
+    console.log('Received date range:', { startDate, endDate });
     let query = {};
 
     if (startDate && endDate) {
-      // Set start date to beginning of day (00:00:00)
-      const start = new Date(startDate);
-      start.setHours(0, 0, 0, 0);
+      // Create UTC dates to avoid timezone issues
+      const start = new Date(startDate + 'T00:00:00.000Z');
+      const end = new Date(endDate + 'T23:59:59.999Z');
 
-      // Set end date to end of day (23:59:59.999)
-      const end = new Date(endDate);
-      end.setHours(23, 59, 59, 999);
+      console.log('Query date range:', {
+        start: start.toISOString(),
+        end: end.toISOString()
+      });
 
       query.returnTime = {
         $gte: start,
@@ -61,6 +70,11 @@ export const exportReturnedItems = async (req, res) => {
 
     const returnedItems = await ReturnedItemHistory.find(query)
       .sort({ returnTime: -1 });
+
+    console.log('Found items:', returnedItems.length);
+    if (returnedItems.length > 0) {
+      console.log('Sample item return time:', returnedItems[0].returnTime);
+    }
 
     res.status(200).json({
       success: true,
