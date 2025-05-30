@@ -8,9 +8,17 @@ export const exportBorrowedItems = async (req, res) => {
     let query = { status: 'borrowed' };
 
     if (startDate && endDate) {
+      // Set start date to beginning of day (00:00:00)
+      const start = new Date(startDate);
+      start.setHours(0, 0, 0, 0);
+
+      // Set end date to end of day (23:59:59.999)
+      const end = new Date(endDate);
+      end.setHours(23, 59, 59, 999);
+
       query.borrowTime = {
-        $gte: new Date(startDate),
-        $lte: new Date(endDate)
+        $gte: start,
+        $lte: end
       };
     }
 
@@ -37,9 +45,17 @@ export const exportReturnedItems = async (req, res) => {
     let query = {};
 
     if (startDate && endDate) {
+      // Set start date to beginning of day (00:00:00)
+      const start = new Date(startDate);
+      start.setHours(0, 0, 0, 0);
+
+      // Set end date to end of day (23:59:59.999)
+      const end = new Date(endDate);
+      end.setHours(23, 59, 59, 999);
+
       query.returnTime = {
-        $gte: new Date(startDate),
-        $lte: new Date(endDate)
+        $gte: start,
+        $lte: end
       };
     }
 
