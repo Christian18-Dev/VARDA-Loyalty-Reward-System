@@ -319,7 +319,7 @@ export default function StudentPage() {
       type: 'return',
       studentId: user._id,
       items: item.items,
-      timestamp: new Date().toISOString()
+      timestamp: item.borrowTime
     };
     setReturnQRData(JSON.stringify(returnData));
     setShowReturnQRModal(true);

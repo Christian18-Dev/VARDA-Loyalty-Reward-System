@@ -203,33 +203,34 @@ export const getReturnedItemHistory = async (req, res) => {
 
 export const processReturnQR = async (req, res) => {
   try {
-    const { studentId, items } = req.body;
+    const { studentId, items, timestamp } = req.body;
     console.log('Processing return QR for student ID:', studentId);
 
-    // Find the borrowed item for this student
+    // Find the borrowed item for this student that matches the timestamp
     const borrowedItem = await BorrowedItemHistory.findOne({
       studentId,
-      'items.name': items[0].name
+      borrowTime: new Date(timestamp),
+      status: 'borrowed'
     });
 
     if (!borrowedItem) {
       return res.status(404).json({
         success: false,
-        message: 'No borrowed item found for this student'
+        message: 'No borrowed item found for this student with the given timestamp'
       });
     }
 
     // Check if item is already in ReturnedItemHistory
     const existingReturn = await ReturnedItemHistory.findOne({
       studentId: borrowedItem.studentId,
-      'items.name': borrowedItem.items[0].name,
-      borrowTime: borrowedItem.borrowTime
+      borrowTime: borrowedItem.borrowTime,
+      status: 'returned'
     });
 
     if (existingReturn) {
       return res.status(400).json({
         success: false,
-        message: 'Item is already returned'
+        message: 'This order has already been returned'
       });
     }
 
@@ -245,6 +246,10 @@ export const processReturnQR = async (req, res) => {
       status: 'returned'
     });
     await returnedItemHistory.save();
+
+    // Update the status of the borrowed item
+    borrowedItem.status = 'returned';
+    await borrowedItem.save();
 
     res.status(200).json({
       success: true,
