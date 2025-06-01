@@ -319,7 +319,12 @@ export default function StudentPage() {
       type: 'return',
       studentId: user._id,
       items: item.items,
-      timestamp: item.borrowTime
+      timestamp: item.borrowTime,
+      summary: {
+        totalItems: item.items.reduce((sum, i) => sum + i.quantity, 0),
+        itemDetails: item.items.map(i => `${i.name} (x${i.quantity})`).join(', '),
+        borrowDate: new Date(item.borrowTime).toLocaleString()
+      }
     };
     setReturnQRData(JSON.stringify(returnData));
     setShowReturnQRModal(true);
@@ -1010,6 +1015,23 @@ export default function StudentPage() {
           >
             <h3 className="text-xl font-semibold text-gray-200 mb-4">Return QR Code</h3>
             <p className="text-gray-400 mb-4">Show this QR code to the concierge to return your items.</p>
+            
+            {/* Summary Information */}
+            <div className="bg-gray-800/50 p-4 rounded-xl mb-4">
+              <h4 className="font-bold text-xl text-gray-200 mb-3">Return Summary:</h4>
+              <div className="space-y-3 text-lg">
+                <p className="text-gray-300">
+                  <span className="font-bold text-gray-200">Total Items:</span> {JSON.parse(returnQRData).summary.totalItems}
+                </p>
+                <p className="text-gray-300">
+                  <span className="font-bold text-gray-200">Items:</span> {JSON.parse(returnQRData).summary.itemDetails}
+                </p>
+                <p className="text-gray-300">
+                  <span className="font-bold text-gray-200">Borrowed on:</span> {JSON.parse(returnQRData).summary.borrowDate}
+                </p>
+              </div>
+            </div>
+
             <div className="bg-white p-4 rounded-xl mb-4 flex justify-center">
               <QRCodeSVG value={returnQRData} size={200} />
             </div>
