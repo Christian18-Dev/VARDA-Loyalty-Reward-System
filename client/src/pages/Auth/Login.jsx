@@ -58,13 +58,13 @@ export default function Login() {
         </div>
         <form onSubmit={handleSubmit} className="space-y-5">
           <div>
-            <label className="block mb-1 text-sm font-medium text-gray-200">ID Number</label>
+            <label className="block mb-1 text-sm font-medium text-gray-200">ID/Phone number</label>
             <input
               type="text"
               inputMode="numeric"
               pattern="[0-9]*"
               className="w-full px-4 py-2 bg-gray-800/50 border border-gray-700 rounded-xl focus:ring-2 focus:ring-blue-500 focus:outline-none transition text-white placeholder-gray-400"
-              placeholder="Enter your ID number"
+              placeholder="Enter your ID/Phone number"
               value={idNumber}
               onChange={(e) => {
                 const value = e.target.value;
@@ -133,11 +133,24 @@ export default function Login() {
           </button>
         </form>
 
-        <div className="text-center text-sm text-gray-400 mt-4">
-          Don't have an account?{' '}
-          <Link to="/register" className="text-blue-400 hover:text-blue-300 hover:underline font-semibold">
-            Register
-          </Link>
+        <div className="flex flex-col items-center space-y-2">
+          <div className="text-center text-sm text-gray-400">
+            Don't have an account?{' '}
+            <Link to="/register" className="text-blue-400 hover:text-blue-300 hover:underline font-semibold">
+              Register
+            </Link>
+          </div>
+          <div className="text-center text-sm text-gray-400">
+            Forgot password?{' '}
+            <a
+              href="https://web.facebook.com/people/VARDA-I-T-Support/61575392403660/"
+              target="_blank"
+              rel="noopener noreferrer"
+              className="text-blue-400 hover:text-blue-300 hover:underline font-semibold"
+            >
+              Contact Support
+            </a>
+          </div>
         </div>
       </div>
     </div>
