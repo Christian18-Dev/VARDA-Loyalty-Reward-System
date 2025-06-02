@@ -50,6 +50,10 @@ export default function Register() {
       setErrorMessage('Please enter a password');
       return false;
     }
+    if (password.length < 6) {
+      setErrorMessage('Password must be at least 6 characters long');
+      return false;
+    }
     if (!confirmPassword) {
       setErrorMessage('Please confirm your password');
       return false;
