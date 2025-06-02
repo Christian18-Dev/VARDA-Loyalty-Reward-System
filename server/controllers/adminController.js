@@ -1,6 +1,7 @@
 import User from '../models/User.js';
 import Reward from '../models/Reward.js';
 import ClaimedReward from '../models/ClaimedReward.js';
+import bcrypt from 'bcryptjs';
 
 export const getStats = async (req, res) => {
   try {
@@ -52,7 +53,8 @@ export const getUsers = async (req, res) => {
     const total = await User.countDocuments(searchQuery);
 
     // Get paginated users
-    const users = await User.find(searchQuery, 'idNumber points role')
+    const users = await User.find(searchQuery)
+      .select('idNumber points role firstName lastName')
       .skip((page - 1) * limit)
       .limit(limit)
       .sort({ idNumber: 1 });
@@ -108,5 +110,38 @@ export const updateUserRole = async (req, res) => {
   } catch (error) {
     console.error('Error updating user role:', error);
     res.status(500).json({ message: 'Error updating user role' });
+  }
+};
+
+export const updateUserPassword = async (req, res) => {
+  try {
+    const { userId } = req.params;
+    const { password } = req.body;
+
+    if (!password || password.length < 6) {
+      return res.status(400).json({ message: 'Password must be at least 6 characters long' });
+    }
+
+    // Find user and prevent admin password changes
+    const user = await User.findById(userId);
+    if (!user) {
+      return res.status(404).json({ message: 'User not found' });
+    }
+
+    if (user.role === 'admin') {
+      return res.status(403).json({ message: 'Cannot change admin password' });
+    }
+
+    // Hash the new password
+    const hashedPassword = await bcrypt.hash(password, 10);
+    
+    // Update the password
+    user.password = hashedPassword;
+    await user.save();
+
+    res.json({ message: 'Password updated successfully' });
+  } catch (error) {
+    console.error('Error updating password:', error);
+    res.status(500).json({ message: 'Error updating password' });
   }
 };

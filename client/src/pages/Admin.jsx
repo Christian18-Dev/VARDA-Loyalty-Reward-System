@@ -2,19 +2,36 @@ import { useEffect, useState } from 'react';
 import axios from 'axios';
 import { useAuth } from '../context/AuthContext';
 import { useNavigate } from 'react-router-dom';
+import { 
+  ChartBarIcon, 
+  UserGroupIcon, 
+  GiftIcon, 
+  ClipboardListIcon,
+  LogoutIcon,
+  ExclamationIcon
+} from '@heroicons/react/outline';
+import { motion, AnimatePresence } from 'framer-motion';
 
 export default function AdminPage() {
   const { user, logout } = useAuth();
   const navigate = useNavigate();
   const [stats, setStats] = useState({});
-  const [rewards, setRewards] = useState({ name: '', cost: '' });
+  const [rewards, setRewards] = useState({ name: '', cost: '', description: '' });
   const [users, setUsers] = useState([]);
   const [claimedRewards, setClaimedRewards] = useState([]);
+  const [availableRewards, setAvailableRewards] = useState([]);
   const [activeTab, setActiveTab] = useState('overview');
   const [isLoading, setIsLoading] = useState(true);
+  const [isPageLoading, setIsPageLoading] = useState(false);
   const [mobileMenuOpen, setMobileMenuOpen] = useState(false);
   const [error, setError] = useState('');
   const [success, setSuccess] = useState('');
+  const [showLogoutModal, setShowLogoutModal] = useState(false);
+  const [showDeleteModal, setShowDeleteModal] = useState(false);
+  const [rewardToDelete, setRewardToDelete] = useState(null);
+  const [showSuccessModal, setShowSuccessModal] = useState(false);
+  const [showErrorModal, setShowErrorModal] = useState(false);
+  const [modalMessage, setModalMessage] = useState('');
   
   // Add new state for pagination and search
   const [currentPage, setCurrentPage] = useState(1);
@@ -22,6 +39,18 @@ export default function AdminPage() {
   const [totalUsers, setTotalUsers] = useState(0);
   const [searchTerm, setSearchTerm] = useState('');
   const [isSearching, setIsSearching] = useState(false);
+  // Add rewards pagination state
+  const [rewardsCurrentPage, setRewardsCurrentPage] = useState(1);
+  const [rewardsTotalPages, setRewardsTotalPages] = useState(1);
+  const [rewardsPerPage] = useState(5); // Number of rewards per page
+
+  const [showPasswordModal, setShowPasswordModal] = useState(false);
+  const [showAdminCodeModal, setShowAdminCodeModal] = useState(false);
+  const [selectedUser, setSelectedUser] = useState(null);
+  const [newPassword, setNewPassword] = useState('');
+  const [confirmPassword, setConfirmPassword] = useState('');
+  const [adminCode, setAdminCode] = useState('');
+  const [passwordError, setPasswordError] = useState('');
 
   const token = user.token;
   const baseUrl = import.meta.env.VITE_API_BASE_URL;
@@ -29,9 +58,13 @@ export default function AdminPage() {
   // Update fetchData to handle pagination and search
   const fetchData = async (page = 1, search = '') => {
     try {
-      setIsLoading(true);
+      if (page === 1 && !search) {
+        setIsLoading(true);
+      } else {
+        setIsPageLoading(true);
+      }
 
-      const [statsRes, usersRes, claimedRes] = await Promise.all([
+      const [statsRes, usersRes, claimedRes, rewardsRes] = await Promise.all([
         axios.get(`${baseUrl}/api/admin/stats`, {
           headers: { Authorization: `Bearer ${token}` },
         }),
@@ -39,6 +72,9 @@ export default function AdminPage() {
           headers: { Authorization: `Bearer ${token}` },
         }),
         axios.get(`${baseUrl}/api/admin/claimed-rewards`, {
+          headers: { Authorization: `Bearer ${token}` },
+        }),
+        axios.get(`${baseUrl}/api/rewards`, {
           headers: { Authorization: `Bearer ${token}` },
         })
       ]);
@@ -49,11 +85,15 @@ export default function AdminPage() {
       setTotalPages(usersRes.data.totalPages);
       setTotalUsers(usersRes.data.totalUsers);
       setClaimedRewards(claimedRes.data);
+      setAvailableRewards(rewardsRes.data);
+      // Calculate total pages for rewards
+      setRewardsTotalPages(Math.ceil(rewardsRes.data.length / rewardsPerPage));
     } catch (error) {
       console.error("Error fetching data:", error);
       setError("Failed to fetch data. Please try again.");
     } finally {
       setIsLoading(false);
+      setIsPageLoading(false);
     }
   };
 
@@ -86,8 +126,9 @@ export default function AdminPage() {
   };
 
   const handleCreateReward = async () => {
-    if (!rewards.name.trim() || !rewards.cost) {
-      alert('Please fill all fields');
+    if (!rewards.name.trim() || !rewards.cost || !rewards.description.trim()) {
+      setModalMessage('Please fill all fields including the description');
+      setShowErrorModal(true);
       return;
     }
 
@@ -97,17 +138,34 @@ export default function AdminPage() {
         rewards,
         { headers: { Authorization: `Bearer ${token}` } }
       );
-      alert('Reward created successfully!');
-      setRewards({ name: '', cost: '' });
+      setRewards({ name: '', cost: '', description: '' });
+      // Refresh rewards list
+      const rewardsRes = await axios.get(`${baseUrl}/api/rewards`, {
+        headers: { Authorization: `Bearer ${token}` },
+      });
+      setAvailableRewards(rewardsRes.data);
+      setRewardsTotalPages(Math.ceil(rewardsRes.data.length / rewardsPerPage));
+      setModalMessage('Reward created successfully!');
+      setShowSuccessModal(true);
     } catch (error) {
-      alert('Error creating reward');
-      console.error(error);
+      console.error('Error creating reward:', error);
+      setModalMessage(error.response?.data?.message || 'Error creating reward');
+      setShowErrorModal(true);
     }
   };
 
-  const handleLogout = () => {
+  const handleLogoutClick = () => {
+    setShowLogoutModal(true);
+  };
+
+  const handleConfirmLogout = () => {
     logout();
+    setShowLogoutModal(false);
     navigate('/login');
+  };
+
+  const handleCancelLogout = () => {
+    setShowLogoutModal(false);
   };
 
   const closeMobileMenu = () => {
@@ -175,293 +233,894 @@ export default function AdminPage() {
     }
   };
 
+  const handleDeleteClick = (reward) => {
+    setRewardToDelete(reward);
+    setShowDeleteModal(true);
+  };
+
+  const handleConfirmDelete = async () => {
+    try {
+      await axios.delete(
+        `${baseUrl}/api/rewards/${rewardToDelete._id}`,
+        { headers: { Authorization: `Bearer ${token}` } }
+      );
+      // Refresh rewards list
+      const rewardsRes = await axios.get(`${baseUrl}/api/rewards`, {
+        headers: { Authorization: `Bearer ${token}` },
+      });
+      setAvailableRewards(rewardsRes.data);
+      setRewardsTotalPages(Math.ceil(rewardsRes.data.length / rewardsPerPage));
+      setShowDeleteModal(false);
+      setRewardToDelete(null);
+      setModalMessage('Reward deleted successfully!');
+      setShowSuccessModal(true);
+    } catch (error) {
+      console.error('Error deleting reward:', error);
+      setModalMessage(error.response?.data?.message || 'Error deleting reward. Please try again.');
+      setShowErrorModal(true);
+    }
+  };
+
+  const handleCancelDelete = () => {
+    setShowDeleteModal(false);
+    setRewardToDelete(null);
+  };
+
+  // Add rewards pagination handler
+  const handleRewardsPageChange = (newPage) => {
+    setRewardsCurrentPage(newPage);
+  };
+
+  // Calculate current rewards to display
+  const getCurrentRewards = () => {
+    const startIndex = (rewardsCurrentPage - 1) * rewardsPerPage;
+    const endIndex = startIndex + rewardsPerPage;
+    // Sort rewards by creation date (newest first) using _id which contains timestamp
+    const sortedRewards = [...availableRewards].sort((a, b) => b._id.localeCompare(a._id));
+    return sortedRewards.slice(startIndex, endIndex);
+  };
+
+  const handleCloseSuccessModal = () => {
+    setShowSuccessModal(false);
+    setModalMessage('');
+  };
+
+  const handleCloseErrorModal = () => {
+    setShowErrorModal(false);
+    setModalMessage('');
+  };
+
+  const handlePasswordChange = async () => {
+    if (!newPassword || newPassword.length < 6) {
+      setPasswordError('Password must be at least 6 characters long');
+      return;
+    }
+
+    if (newPassword !== confirmPassword) {
+      setPasswordError('Passwords do not match');
+      return;
+    }
+
+    // Show admin code modal instead of direct verification
+    setShowPasswordModal(false);
+    setShowAdminCodeModal(true);
+  };
+
+  const handleAdminCodeVerification = async () => {
+    if (!adminCode || adminCode !== '696969') {
+      setPasswordError('Invalid admin code');
+      return;
+    }
+
+    try {
+      await axios.put(
+        `${baseUrl}/api/admin/users/${selectedUser._id}/password`,
+        { password: newPassword },
+        { headers: { Authorization: `Bearer ${token}` } }
+      );
+      setShowAdminCodeModal(false);
+      setNewPassword('');
+      setConfirmPassword('');
+      setAdminCode('');
+      setPasswordError('');
+      setModalMessage('Password updated successfully!');
+      setShowSuccessModal(true);
+    } catch (error) {
+      console.error('Error updating password:', error);
+      setPasswordError(error.response?.data?.message || 'Error updating password');
+    }
+  };
+
+  const handleOpenPasswordModal = (user) => {
+    setSelectedUser(user);
+    setNewPassword('');
+    setConfirmPassword('');
+    setAdminCode('');
+    setPasswordError('');
+    setShowPasswordModal(true);
+  };
+
+  const handleClosePasswordModal = () => {
+    setShowPasswordModal(false);
+    setSelectedUser(null);
+    setNewPassword('');
+    setConfirmPassword('');
+    setAdminCode('');
+    setPasswordError('');
+  };
+
+  const handleCloseAdminCodeModal = () => {
+    setShowAdminCodeModal(false);
+    setAdminCode('');
+    setPasswordError('');
+  };
+
   if (isLoading) {
     return (
       <div className="flex justify-center items-center h-screen">
-        <div className="animate-spin rounded-full h-12 w-12 border-t-2 border-b-2 border-blue-500"></div>
+        <div className="animate-spin rounded-full h-12 w-12 border-t-2 border-b-2 border-purple-500"></div>
       </div>
     );
   }
 
   return (
-    <div className="min-h-screen bg-gray-50 relative">
-      <header className="bg-white shadow-sm sticky top-0 z-10">
-        <div className="max-w-7xl mx-auto px-4 py-4 sm:px-6 lg:px-8 flex justify-between items-center">
-          <div className="flex items-center">
+    <div className="min-h-screen bg-gradient-to-br from-indigo-50 via-purple-50 to-pink-50">
+      {/* Header with Welcome Message and Logout */}
+      <div className="bg-white shadow-lg fixed top-0 left-0 right-0 z-[100]">
+        <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
+          <div className="flex justify-between items-center py-4">
+            <div className="flex items-center space-x-3">
+              <div className="h-10 w-10 rounded-full bg-purple-600 flex items-center justify-center">
+                <span className="text-white font-bold text-lg">{user?.name?.[0] || 'U'}</span>
+              </div>
+              <div>
+                <h1 className="text-xl font-bold text-gray-800">Admin Dashboard</h1>
+                <p className="text-sm text-gray-600">Welcome, {user?.name || 'User'}</p>
+              </div>
+            </div>
             <button
-              type="button"
-              className="md:hidden p-2 rounded-md text-gray-500 hover:text-gray-600 hover:bg-gray-100 focus:outline-none focus:ring-2 focus:ring-inset focus:ring-blue-500"
-              onClick={() => setMobileMenuOpen(!mobileMenuOpen)}
-              aria-expanded={mobileMenuOpen}
-              aria-label="Toggle navigation"
+              onClick={handleLogoutClick}
+              className="flex items-center space-x-2 px-4 py-2 bg-red-500 text-white rounded-lg hover:bg-red-600 transition-colors shadow-sm"
             >
-              <svg className="h-6 w-6" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 6h16M4 12h16M4 18h16" />
-              </svg>
+              <LogoutIcon className="w-5 h-5" />
+              <span className="hidden sm:inline">Logout</span>
             </button>
-            <h1 className="text-2xl font-bold text-gray-900 ml-2">Points Reward System Admin</h1>
           </div>
-          
-          <button
-            onClick={handleLogout}
-            className="hidden md:block px-4 py-2 bg-red-600 text-white text-sm font-medium rounded-md hover:bg-red-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-red-500"
+        </div>
+      </div>
+
+      {/* Success Message */}
+      <AnimatePresence>
+        {success && (
+          <motion.div
+            initial={{ opacity: 0, y: -20 }}
+            animate={{ opacity: 1, y: 0 }}
+            exit={{ opacity: 0, y: -20 }}
+            className="fixed top-4 right-4 z-[100] bg-green-100 border border-green-400 text-green-700 px-4 py-3 rounded-lg shadow-lg"
           >
-            Logout
-          </button>
-        </div>
-      </header>
+            {success}
+          </motion.div>
+        )}
+      </AnimatePresence>
 
-      {error && (
-        <div className="max-w-7xl mx-auto px-4 py-2">
-          <div className="bg-red-50 border-l-4 border-red-400 p-4">
-            <div className="flex">
-              <div className="flex-shrink-0">
-                <svg className="h-5 w-5 text-red-400" viewBox="0 0 20 20" fill="currentColor">
-                  <path fillRule="evenodd" d="M10 18a8 8 0 100-16 8 8 0 000 16zM8.707 7.293a1 1 0 00-1.414 1.414L8.586 10l-1.293 1.293a1 1 0 101.414 1.414L10 11.414l1.293 1.293a1 1 0 001.414-1.414L11.414 10l1.293-1.293a1 1 0 00-1.414-1.414L10 8.586 8.707 7.293z" clipRule="evenodd" />
-                </svg>
-              </div>
-              <div className="ml-3">
-                <p className="text-sm text-red-700">{error}</p>
-              </div>
+      {/* Error Message */}
+      <AnimatePresence>
+        {error && (
+          <motion.div
+            initial={{ opacity: 0, y: -20 }}
+            animate={{ opacity: 1, y: 0 }}
+            exit={{ opacity: 0, y: -20 }}
+            className="fixed top-4 right-4 z-[100] bg-red-100 border border-red-400 text-red-700 px-4 py-3 rounded-lg shadow-lg"
+          >
+            {error}
+          </motion.div>
+        )}
+      </AnimatePresence>
+
+      {/* Success Modal */}
+      <AnimatePresence>
+        {showSuccessModal && (
+          <div className="fixed inset-0 z-[100] overflow-y-auto">
+            <div className="flex items-center justify-center min-h-screen px-4 pt-4 pb-20 text-center sm:block sm:p-0">
+              <motion.div
+                initial={{ opacity: 0 }}
+                animate={{ opacity: 1 }}
+                exit={{ opacity: 0 }}
+                className="fixed inset-0 backdrop-blur-sm bg-white/30 transition-opacity"
+                aria-hidden="true"
+                onClick={handleCloseSuccessModal}
+              />
+              <span className="hidden sm:inline-block sm:align-middle sm:h-screen" aria-hidden="true">&#8203;</span>
+              <motion.div
+                initial={{ opacity: 0, scale: 0.95 }}
+                animate={{ opacity: 1, scale: 1 }}
+                exit={{ opacity: 0, scale: 0.95 }}
+                className="relative inline-block align-bottom bg-white rounded-lg text-left overflow-hidden shadow-xl transform transition-all sm:my-8 sm:align-middle sm:max-w-lg sm:w-full"
+                role="dialog"
+                aria-modal="true"
+                aria-labelledby="modal-headline"
+              >
+                <div className="bg-white px-4 pt-5 pb-4 sm:p-6 sm:pb-4">
+                  <div className="sm:flex sm:items-start">
+                    <div className="mx-auto flex-shrink-0 flex items-center justify-center h-12 w-12 rounded-full bg-green-100 sm:mx-0 sm:h-10 sm:w-10">
+                      <svg className="h-6 w-6 text-green-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M5 13l4 4L19 7" />
+                      </svg>
+                    </div>
+                    <div className="mt-3 text-center sm:mt-0 sm:ml-4 sm:text-left">
+                      <h3 className="text-lg leading-6 font-medium text-gray-900" id="modal-headline">
+                        Success
+                      </h3>
+                      <div className="mt-2">
+                        <p className="text-sm text-gray-500">
+                          {modalMessage}
+                        </p>
+                      </div>
+                    </div>
+                  </div>
+                </div>
+                <div className="bg-gray-50 px-4 py-3 sm:px-6 sm:flex sm:flex-row-reverse">
+                  <button
+                    type="button"
+                    onClick={handleCloseSuccessModal}
+                    className="w-full inline-flex justify-center rounded-md border border-transparent shadow-sm px-4 py-2 bg-green-600 text-base font-medium text-white hover:bg-green-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-green-500 sm:ml-3 sm:w-auto sm:text-sm"
+                  >
+                    Close
+                  </button>
+                </div>
+              </motion.div>
             </div>
           </div>
-        </div>
-      )}
+        )}
+      </AnimatePresence>
 
-      {success && (
-        <div className="max-w-7xl mx-auto px-4 py-2">
-          <div className="bg-green-50 border-l-4 border-green-400 p-4">
-            <div className="flex">
-              <div className="flex-shrink-0">
-                <svg className="h-5 w-5 text-green-400" viewBox="0 0 20 20" fill="currentColor">
-                  <path fillRule="evenodd" d="M10 18a8 8 0 100-16 8 8 0 000 16zm3.707-9.293a1 1 0 00-1.414-1.414L9 10.586 7.707 9.293a1 1 0 00-1.414 1.414l2 2a1 1 0 001.414 0l4-4z" clipRule="evenodd" />
-                </svg>
-              </div>
-              <div className="ml-3">
-                <p className="text-sm text-green-700">{success}</p>
-              </div>
+      {/* Error Modal */}
+      <AnimatePresence>
+        {showErrorModal && (
+          <div className="fixed inset-0 z-[100] overflow-y-auto">
+            <div className="flex items-center justify-center min-h-screen px-4 pt-4 pb-20 text-center sm:block sm:p-0">
+              <motion.div
+                initial={{ opacity: 0 }}
+                animate={{ opacity: 1 }}
+                exit={{ opacity: 0 }}
+                className="fixed inset-0 backdrop-blur-sm bg-white/30 transition-opacity"
+                aria-hidden="true"
+                onClick={handleCloseErrorModal}
+              />
+              <span className="hidden sm:inline-block sm:align-middle sm:h-screen" aria-hidden="true">&#8203;</span>
+              <motion.div
+                initial={{ opacity: 0, scale: 0.95 }}
+                animate={{ opacity: 1, scale: 1 }}
+                exit={{ opacity: 0, scale: 0.95 }}
+                className="relative inline-block align-bottom bg-white rounded-lg text-left overflow-hidden shadow-xl transform transition-all sm:my-8 sm:align-middle sm:max-w-lg sm:w-full"
+                role="dialog"
+                aria-modal="true"
+                aria-labelledby="modal-headline"
+              >
+                <div className="bg-white px-4 pt-5 pb-4 sm:p-6 sm:pb-4">
+                  <div className="sm:flex sm:items-start">
+                    <div className="mx-auto flex-shrink-0 flex items-center justify-center h-12 w-12 rounded-full bg-red-100 sm:mx-0 sm:h-10 sm:w-10">
+                      <ExclamationIcon className="h-6 w-6 text-red-600" aria-hidden="true" />
+                    </div>
+                    <div className="mt-3 text-center sm:mt-0 sm:ml-4 sm:text-left">
+                      <h3 className="text-lg leading-6 font-medium text-gray-900" id="modal-headline">
+                        Error
+                      </h3>
+                      <div className="mt-2">
+                        <p className="text-sm text-gray-500">
+                          {modalMessage}
+                        </p>
+                      </div>
+                    </div>
+                  </div>
+                </div>
+                <div className="bg-gray-50 px-4 py-3 sm:px-6 sm:flex sm:flex-row-reverse">
+                  <button
+                    type="button"
+                    onClick={handleCloseErrorModal}
+                    className="w-full inline-flex justify-center rounded-md border border-transparent shadow-sm px-4 py-2 bg-red-600 text-base font-medium text-white hover:bg-red-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-red-500 sm:ml-3 sm:w-auto sm:text-sm"
+                  >
+                    Close
+                  </button>
+                </div>
+              </motion.div>
             </div>
           </div>
-        </div>
-      )}
+        )}
+      </AnimatePresence>
 
-      {/* Mobile Menu - Overlay with close button */}
-      {mobileMenuOpen && (
-        <div className="md:hidden fixed inset-0 z-20">
-          {/* Semi-transparent overlay */}
-          <div 
-            className="fixed inset-0 bg-black bg-opacity-50"
-            onClick={closeMobileMenu}
-          ></div>
-          
-          {/* Menu container */}
-          <div className="fixed left-0 top-0 h-full w-64 bg-white shadow-lg transform transition-transform duration-300 ease-in-out">
-            <div className="flex flex-col h-full">
-              {/* Menu header with close button */}
-              <div className="px-4 py-4 border-b border-gray-200 flex justify-between items-center">
-                <h2 className="text-xl font-bold text-gray-900">Menu</h2>
-                <button
-                  onClick={closeMobileMenu}
-                  className="p-1 rounded-md text-gray-500 hover:text-gray-600 hover:bg-gray-100 focus:outline-none focus:ring-2 focus:ring-inset focus:ring-blue-500"
-                  aria-label="Close menu"
-                >
-                  <svg className="h-6 w-6" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
-                  </svg>
-                </button>
-              </div>
-              
-              {/* Menu items */}
-              <nav className="flex-1 overflow-y-auto">
-                <ul className="divide-y divide-gray-200">
-                  <li>
-                    <button
-                      onClick={() => handleTabChange('overview')}
-                      className={`w-full text-left px-4 py-3 ${activeTab === 'overview' ? 'bg-blue-50 text-blue-600' : 'text-gray-700 hover:bg-gray-50'}`}
-                    >
-                      Overview
-                    </button>
-                  </li>
-                  <li>
-                    <button
-                      onClick={() => handleTabChange('users')}
-                      className={`w-full text-left px-4 py-3 ${activeTab === 'users' ? 'bg-blue-50 text-blue-600' : 'text-gray-700 hover:bg-gray-50'}`}
-                    >
-                      Users
-                    </button>
-                  </li>
-                  <li>
-                    <button
-                      onClick={() => handleTabChange('rewards')}
-                      className={`w-full text-left px-4 py-3 ${activeTab === 'rewards' ? 'bg-blue-50 text-blue-600' : 'text-gray-700 hover:bg-gray-50'}`}
-                    >
-                      Rewards
-                    </button>
-                  </li>
-                  <li>
-                    <button
-                      onClick={() => handleTabChange('claims')}
-                      className={`w-full text-left px-4 py-3 ${activeTab === 'claims' ? 'bg-blue-50 text-blue-600' : 'text-gray-700 hover:bg-gray-50'}`}
-                    >
-                      Claims
-                    </button>
-                  </li>
-                </ul>
-              </nav>
-              
-              {/* Logout button at bottom */}
-              <div className="p-4 border-t border-gray-200">
-                <button
-                  onClick={() => {
-                    closeMobileMenu();
-                    handleLogout();
-                  }}
-                  className="w-full px-4 py-2 bg-red-600 text-white font-medium rounded-md hover:bg-red-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-red-500"
-                >
-                  Logout
-                </button>
-              </div>
+      {/* Logout Confirmation Modal */}
+      <AnimatePresence>
+        {showLogoutModal && (
+          <div className="fixed inset-0 z-[100] overflow-y-auto">
+            <div className="flex items-center justify-center min-h-screen px-4 pt-4 pb-20 text-center sm:block sm:p-0">
+              <motion.div
+                initial={{ opacity: 0 }}
+                animate={{ opacity: 1 }}
+                exit={{ opacity: 0 }}
+                className="fixed inset-0 backdrop-blur-sm bg-white/30 transition-opacity"
+                aria-hidden="true"
+                onClick={handleCancelLogout}
+              />
+              <span className="hidden sm:inline-block sm:align-middle sm:h-screen" aria-hidden="true">&#8203;</span>
+              <motion.div
+                initial={{ opacity: 0, scale: 0.95 }}
+                animate={{ opacity: 1, scale: 1 }}
+                exit={{ opacity: 0, scale: 0.95 }}
+                className="relative inline-block align-bottom bg-white rounded-lg text-left overflow-hidden shadow-xl transform transition-all sm:my-8 sm:align-middle sm:max-w-lg sm:w-full"
+                role="dialog"
+                aria-modal="true"
+                aria-labelledby="modal-headline"
+              >
+                <div className="bg-white px-4 pt-5 pb-4 sm:p-6 sm:pb-4">
+                  <div className="sm:flex sm:items-start">
+                    <div className="mx-auto flex-shrink-0 flex items-center justify-center h-12 w-12 rounded-full bg-red-100 sm:mx-0 sm:h-10 sm:w-10">
+                      <ExclamationIcon className="h-6 w-6 text-red-600" aria-hidden="true" />
+                    </div>
+                    <div className="mt-3 text-center sm:mt-0 sm:ml-4 sm:text-left">
+                      <h3 className="text-lg leading-6 font-medium text-gray-900" id="modal-headline">
+                        Confirm Logout
+                      </h3>
+                      <div className="mt-2">
+                        <p className="text-sm text-gray-500">
+                          Are you sure you want to logout? You will need to login again to access the admin dashboard.
+                        </p>
+                      </div>
+                    </div>
+                  </div>
+                </div>
+                <div className="bg-gray-50 px-4 py-3 sm:px-6 sm:flex sm:flex-row-reverse">
+                  <button
+                    type="button"
+                    onClick={handleConfirmLogout}
+                    className="w-full inline-flex justify-center rounded-md border border-transparent shadow-sm px-4 py-2 bg-red-600 text-base font-medium text-white hover:bg-red-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-red-500 sm:ml-3 sm:w-auto sm:text-sm"
+                  >
+                    Logout
+                  </button>
+                  <button
+                    type="button"
+                    onClick={handleCancelLogout}
+                    className="mt-3 w-full inline-flex justify-center rounded-md border border-gray-300 shadow-sm px-4 py-2 bg-white text-base font-medium text-gray-700 hover:bg-gray-50 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-indigo-500 sm:mt-0 sm:ml-3 sm:w-auto sm:text-sm"
+                  >
+                    Cancel
+                  </button>
+                </div>
+              </motion.div>
             </div>
           </div>
-        </div>
-      )}
+        )}
+      </AnimatePresence>
 
-      <main className="max-w-7xl mx-auto px-4 py-6 sm:px-6 lg:px-8">
-        {/* Desktop Navigation */}
-        <nav className="mb-8 hidden md:block">
-          <div className="border-b border-gray-200">
-            <ul className="flex flex-wrap -mb-px">
-              <li className="mr-2">
-                <button
-                  onClick={() => setActiveTab('overview')}
-                  className={`inline-block p-4 ${activeTab === 'overview' ? 'text-blue-600 border-b-2 border-blue-600' : 'text-gray-500 hover:text-gray-600 hover:border-gray-300'}`}
-                >
-                  Overview
-                </button>
-              </li>
-              <li className="mr-2">
-                <button
-                  onClick={() => setActiveTab('users')}
-                  className={`inline-block p-4 ${activeTab === 'users' ? 'text-blue-600 border-b-2 border-blue-600' : 'text-gray-500 hover:text-gray-600 hover:border-gray-300'}`}
-                >
-                  Users
-                </button>
-              </li>
-              <li className="mr-2">
-                <button
-                  onClick={() => setActiveTab('rewards')}
-                  className={`inline-block p-4 ${activeTab === 'rewards' ? 'text-blue-600 border-b-2 border-blue-600' : 'text-gray-500 hover:text-gray-600 hover:border-gray-300'}`}
-                >
-                  Rewards
-                </button>
-              </li>
-              <li className="mr-2">
-                <button
-                  onClick={() => setActiveTab('claims')}
-                  className={`inline-block p-4 ${activeTab === 'claims' ? 'text-blue-600 border-b-2 border-blue-600' : 'text-gray-500 hover:text-gray-600 hover:border-gray-300'}`}
-                >
-                  Claims
-                </button>
-              </li>
-            </ul>
+      {/* Delete Confirmation Modal */}
+      <AnimatePresence>
+        {showDeleteModal && (
+          <div className="fixed inset-0 z-[100] overflow-y-auto">
+            <div className="flex items-center justify-center min-h-screen px-4 pt-4 pb-20 text-center sm:block sm:p-0">
+              <motion.div
+                initial={{ opacity: 0 }}
+                animate={{ opacity: 1 }}
+                exit={{ opacity: 0 }}
+                className="fixed inset-0 backdrop-blur-sm bg-white/30 transition-opacity"
+                aria-hidden="true"
+                onClick={handleCancelDelete}
+              />
+              <span className="hidden sm:inline-block sm:align-middle sm:h-screen" aria-hidden="true">&#8203;</span>
+              <motion.div
+                initial={{ opacity: 0, scale: 0.95 }}
+                animate={{ opacity: 1, scale: 1 }}
+                exit={{ opacity: 0, scale: 0.95 }}
+                className="relative inline-block align-bottom bg-white rounded-lg text-left overflow-hidden shadow-xl transform transition-all sm:my-8 sm:align-middle sm:max-w-lg sm:w-full"
+                role="dialog"
+                aria-modal="true"
+                aria-labelledby="modal-headline"
+              >
+                <div className="bg-white px-4 pt-5 pb-4 sm:p-6 sm:pb-4">
+                  <div className="sm:flex sm:items-start">
+                    <div className="mx-auto flex-shrink-0 flex items-center justify-center h-12 w-12 rounded-full bg-red-100 sm:mx-0 sm:h-10 sm:w-10">
+                      <ExclamationIcon className="h-6 w-6 text-red-600" aria-hidden="true" />
+                    </div>
+                    <div className="mt-3 text-center sm:mt-0 sm:ml-4 sm:text-left">
+                      <h3 className="text-lg leading-6 font-medium text-gray-900" id="modal-headline">
+                        Delete Reward
+                      </h3>
+                      <div className="mt-2">
+                        <p className="text-sm text-gray-500">
+                          Are you sure you want to delete the reward "{rewardToDelete?.name}"? This action cannot be undone.
+                        </p>
+                      </div>
+                    </div>
+                  </div>
+                </div>
+                <div className="bg-gray-50 px-4 py-3 sm:px-6 sm:flex sm:flex-row-reverse">
+                  <button
+                    type="button"
+                    onClick={handleConfirmDelete}
+                    className="w-full inline-flex justify-center rounded-md border border-transparent shadow-sm px-4 py-2 bg-red-600 text-base font-medium text-white hover:bg-red-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-red-500 sm:ml-3 sm:w-auto sm:text-sm"
+                  >
+                    Delete
+                  </button>
+                  <button
+                    type="button"
+                    onClick={handleCancelDelete}
+                    className="mt-3 w-full inline-flex justify-center rounded-md border border-gray-300 shadow-sm px-4 py-2 bg-white text-base font-medium text-gray-700 hover:bg-gray-50 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-indigo-500 sm:mt-0 sm:ml-3 sm:w-auto sm:text-sm"
+                  >
+                    Cancel
+                  </button>
+                </div>
+              </motion.div>
+            </div>
           </div>
-        </nav>
+        )}
+      </AnimatePresence>
 
+      {/* Password Change Modal */}
+      <AnimatePresence>
+        {showPasswordModal && (
+          <div className="fixed inset-0 z-[100] overflow-y-auto">
+            <div className="flex items-center justify-center min-h-screen px-4 pt-4 pb-20 text-center sm:block sm:p-0">
+              <motion.div
+                initial={{ opacity: 0 }}
+                animate={{ opacity: 1 }}
+                exit={{ opacity: 0 }}
+                className="fixed inset-0 backdrop-blur-sm bg-white/30 transition-opacity"
+                aria-hidden="true"
+                onClick={handleClosePasswordModal}
+              />
+              <span className="hidden sm:inline-block sm:align-middle sm:h-screen" aria-hidden="true">&#8203;</span>
+              <motion.div
+                initial={{ opacity: 0, scale: 0.95 }}
+                animate={{ opacity: 1, scale: 1 }}
+                exit={{ opacity: 0, scale: 0.95 }}
+                className="relative inline-block align-bottom bg-white rounded-lg text-left overflow-hidden shadow-xl transform transition-all sm:my-8 sm:align-middle sm:max-w-lg sm:w-full"
+                role="dialog"
+                aria-modal="true"
+                aria-labelledby="modal-headline"
+              >
+                <div className="bg-white px-4 pt-5 pb-4 sm:p-6 sm:pb-4">
+                  <div className="sm:flex sm:items-start">
+                    <div className="mt-3 text-center sm:mt-0 sm:ml-4 sm:text-left w-full">
+                      <h3 className="text-lg leading-6 font-medium text-gray-900" id="modal-headline">
+                        Change Password for {selectedUser?.firstName} {selectedUser?.lastName}
+                      </h3>
+                      <div className="mt-4 space-y-4">
+                        <div>
+                          <label htmlFor="new-password" className="block text-sm font-medium text-gray-700">
+                            New Password
+                          </label>
+                          <input
+                            type="password"
+                            id="new-password"
+                            value={newPassword}
+                            onChange={(e) => setNewPassword(e.target.value)}
+                            placeholder="Enter new password"
+                            className="mt-1 w-full px-4 py-2 border border-gray-300 rounded-xl focus:ring-2 focus:ring-purple-500 focus:border-transparent"
+                          />
+                        </div>
+                        <div>
+                          <label htmlFor="confirm-password" className="block text-sm font-medium text-gray-700">
+                            Confirm Password
+                          </label>
+                          <input
+                            type="password"
+                            id="confirm-password"
+                            value={confirmPassword}
+                            onChange={(e) => setConfirmPassword(e.target.value)}
+                            placeholder="Confirm new password"
+                            className="mt-1 w-full px-4 py-2 border border-gray-300 rounded-xl focus:ring-2 focus:ring-purple-500 focus:border-transparent"
+                          />
+                        </div>
+                        {passwordError && (
+                          <p className="mt-2 text-sm text-red-600">{passwordError}</p>
+                        )}
+                      </div>
+                    </div>
+                  </div>
+                </div>
+                <div className="bg-gray-50 px-4 py-3 sm:px-6 sm:flex sm:flex-row-reverse">
+                  <button
+                    type="button"
+                    onClick={handlePasswordChange}
+                    className="w-full inline-flex justify-center rounded-md border border-transparent shadow-sm px-4 py-2 bg-purple-600 text-base font-medium text-white hover:bg-purple-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-purple-500 sm:ml-3 sm:w-auto sm:text-sm"
+                  >
+                    Update Password
+                  </button>
+                  <button
+                    type="button"
+                    onClick={handleClosePasswordModal}
+                    className="mt-3 w-full inline-flex justify-center rounded-md border border-gray-300 shadow-sm px-4 py-2 bg-white text-base font-medium text-gray-700 hover:bg-gray-50 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-purple-500 sm:mt-0 sm:ml-3 sm:w-auto sm:text-sm"
+                  >
+                    Cancel
+                  </button>
+                </div>
+              </motion.div>
+            </div>
+          </div>
+        )}
+      </AnimatePresence>
+
+      {/* Admin Code Verification Modal */}
+      <AnimatePresence>
+        {showAdminCodeModal && (
+          <div className="fixed inset-0 z-[100] overflow-y-auto">
+            <div className="flex items-center justify-center min-h-screen px-4 pt-4 pb-20 text-center sm:block sm:p-0">
+              <motion.div
+                initial={{ opacity: 0 }}
+                animate={{ opacity: 1 }}
+                exit={{ opacity: 0 }}
+                className="fixed inset-0 backdrop-blur-sm bg-white/30 transition-opacity"
+                aria-hidden="true"
+                onClick={handleCloseAdminCodeModal}
+              />
+              <span className="hidden sm:inline-block sm:align-middle sm:h-screen" aria-hidden="true">&#8203;</span>
+              <motion.div
+                initial={{ opacity: 0, scale: 0.95 }}
+                animate={{ opacity: 1, scale: 1 }}
+                exit={{ opacity: 0, scale: 0.95 }}
+                className="relative inline-block align-bottom bg-white rounded-lg text-left overflow-hidden shadow-xl transform transition-all sm:my-8 sm:align-middle sm:max-w-lg sm:w-full"
+                role="dialog"
+                aria-modal="true"
+                aria-labelledby="modal-headline"
+              >
+                <div className="bg-white px-4 pt-5 pb-4 sm:p-6 sm:pb-4">
+                  <div className="sm:flex sm:items-start">
+                    <div className="mt-3 text-center sm:mt-0 sm:ml-4 sm:text-left w-full">
+                      <h3 className="text-lg leading-6 font-medium text-gray-900" id="modal-headline">
+                        Admin Verification Required
+                      </h3>
+                      <div className="mt-4">
+                        <p className="text-sm text-gray-500 mb-4">
+                          Please enter the admin code to confirm the password change for {selectedUser?.firstName} {selectedUser?.lastName}
+                        </p>
+                        <div>
+                          <label htmlFor="admin-code" className="block text-sm font-medium text-gray-700">
+                            Admin Code
+                          </label>
+                          <input
+                            type="password"
+                            id="admin-code"
+                            value={adminCode}
+                            onChange={(e) => setAdminCode(e.target.value)}
+                            placeholder="Enter admin code"
+                            className="mt-1 w-full px-4 py-2 border border-gray-300 rounded-xl focus:ring-2 focus:ring-purple-500 focus:border-transparent"
+                          />
+                        </div>
+                        {passwordError && (
+                          <p className="mt-2 text-sm text-red-600">{passwordError}</p>
+                        )}
+                      </div>
+                    </div>
+                  </div>
+                </div>
+                <div className="bg-gray-50 px-4 py-3 sm:px-6 sm:flex sm:flex-row-reverse">
+                  <button
+                    type="button"
+                    onClick={handleAdminCodeVerification}
+                    className="w-full inline-flex justify-center rounded-md border border-transparent shadow-sm px-4 py-2 bg-purple-600 text-base font-medium text-white hover:bg-purple-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-purple-500 sm:ml-3 sm:w-auto sm:text-sm"
+                  >
+                    Verify & Update
+                  </button>
+                  <button
+                    type="button"
+                    onClick={handleCloseAdminCodeModal}
+                    className="mt-3 w-full inline-flex justify-center rounded-md border border-gray-300 shadow-sm px-4 py-2 bg-white text-base font-medium text-gray-700 hover:bg-gray-50 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-purple-500 sm:mt-0 sm:ml-3 sm:w-auto sm:text-sm"
+                  >
+                    Cancel
+                  </button>
+                </div>
+              </motion.div>
+            </div>
+          </div>
+        )}
+      </AnimatePresence>
+
+      {/* Tab Navigation */}
+      <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-4 bg-white fixed top-[72px] left-0 right-0 z-[90] shadow-sm">
+        <div className="flex space-x-2 overflow-x-auto pb-2 scrollbar-hide">
+          {[
+            { id: 'overview', icon: ChartBarIcon, label: 'Overview' },
+            { id: 'users', icon: UserGroupIcon, label: 'Users' },
+            { id: 'rewards', icon: GiftIcon, label: 'Rewards' },
+            { id: 'claims', icon: ClipboardListIcon, label: 'Claims' }
+          ].map(({ id, icon: Icon, label }) => (
+            <button
+              key={id}
+              onClick={() => setActiveTab(id)}
+              className={`flex items-center space-x-2 px-4 py-2.5 rounded-xl whitespace-nowrap transition-all ${
+                activeTab === id
+                  ? 'bg-purple-600 text-white shadow-md'
+                  : 'bg-white text-gray-700 hover:bg-gray-50'
+              }`}
+            >
+              <Icon className="w-5 h-5" />
+              <span>{label}</span>
+            </button>
+          ))}
+        </div>
+      </div>
+
+      {/* Main Content */}
+      <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-6 mt-[144px] min-h-[calc(100vh-144px)] flex flex-col">
         {/* Overview Tab */}
         {activeTab === 'overview' && (
-          <div className="bg-white shadow rounded-lg p-6 mb-8">
-            <h2 className="text-xl font-semibold mb-6 text-gray-800">System Overview</h2>
+          <motion.div
+            initial={{ opacity: 0, y: 20 }}
+            animate={{ opacity: 1, y: 0 }}
+            className="bg-white rounded-2xl shadow-lg p-4 sm:p-6"
+          >
+            <div className="flex items-center space-x-3 mb-6">
+              <div className="p-2 bg-purple-100 rounded-lg">
+                <ChartBarIcon className="w-6 h-6 text-purple-600" />
+              </div>
+              <div>
+                <h2 className="text-2xl font-bold text-gray-800">System Overview</h2>
+                <p className="text-gray-600 mt-1">View system statistics and metrics</p>
+              </div>
+            </div>
             
-            <div className="grid grid-cols-1 md:grid-cols-3 gap-6 mb-8">
-              <div className="bg-blue-50 p-4 rounded-lg border border-blue-100">
+            <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
+              <div className="bg-gradient-to-br from-blue-50 to-indigo-50 p-6 rounded-xl border border-blue-100">
                 <h3 className="text-sm font-medium text-blue-800">Total Users</h3>
                 <p className="text-3xl font-bold text-blue-600">{stats.totalUsers || 0}</p>
               </div>
-              <div className="bg-green-50 p-4 rounded-lg border border-green-100">
+              <div className="bg-gradient-to-br from-green-50 to-emerald-50 p-6 rounded-xl border border-green-100">
                 <h3 className="text-sm font-medium text-green-800">Unused Points</h3>
                 <p className="text-3xl font-bold text-green-600">{stats.totalPointsUnused || 0}</p>
               </div>
-              <div className="bg-purple-50 p-4 rounded-lg border border-purple-100">
+              <div className="bg-gradient-to-br from-purple-50 to-pink-50 p-6 rounded-xl border border-purple-100">
                 <h3 className="text-sm font-medium text-purple-800">Used Points</h3>
                 <p className="text-3xl font-bold text-purple-600">{stats.totalPointsUsed || 0}</p>
               </div>
             </div>
+          </motion.div>
+        )}
 
-            <div className="bg-white p-6 rounded-lg border border-gray-200">
-              <h3 className="text-lg font-medium mb-4 text-gray-800">Create New Reward</h3>
-              <div className="flex flex-col sm:flex-row gap-4">
-                <div className="flex-grow">
-                  <label htmlFor="reward-name" className="block text-sm font-medium text-gray-700 mb-1">
-                    Reward Name
-                  </label>
-                  <input
-                    id="reward-name"
-                    className="w-full px-3 py-2 border border-gray-300 rounded-md shadow-sm focus:outline-none focus:ring-blue-500 focus:border-blue-500"
-                    placeholder="e.g. Free Coffee"
-                    value={rewards.name}
-                    onChange={(e) => setRewards({ ...rewards, name: e.target.value })}
-                  />
+        {/* Users Tab */}
+        {activeTab === 'users' && (
+          <motion.div
+            initial={{ opacity: 0, y: 20 }}
+            animate={{ opacity: 1, y: 0 }}
+            className="bg-white rounded-2xl shadow-lg p-4 sm:p-6"
+          >
+            <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center mb-6 space-y-4 sm:space-y-0">
+              <div className="flex items-center space-x-3">
+                <div className="p-2 bg-blue-100 rounded-lg">
+                  <UserGroupIcon className="w-6 h-6 text-blue-600" />
                 </div>
                 <div>
-                  <label htmlFor="reward-cost" className="block text-sm font-medium text-gray-700 mb-1">
-                    Point Cost
-                  </label>
+                  <h2 className="text-2xl font-bold text-gray-800">User Management</h2>
+                  <p className="text-gray-600 mt-1">Manage user roles and permissions</p>
+                </div>
+              </div>
+              <div className="w-full sm:w-64">
+                <div className="relative">
                   <input
-                    id="reward-cost"
-                    type="number"
-                    className="w-full px-3 py-2 border border-gray-300 rounded-md shadow-sm focus:outline-none focus:ring-blue-500 focus:border-blue-500"
-                    placeholder="e.g. 100"
-                    value={rewards.cost}
-                    onChange={(e) => setRewards({ ...rewards, cost: e.target.value })}
+                    type="text"
+                    placeholder="Search by ID number..."
+                    value={searchTerm}
+                    onChange={handleSearch}
+                    className="w-full px-4 py-2 pl-10 border border-gray-300 rounded-xl focus:ring-2 focus:ring-purple-500 focus:border-transparent"
+                  />
+                  <svg className="w-5 h-5 text-gray-400 absolute left-3 top-2.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z" />
+                  </svg>
+                </div>
+              </div>
+            </div>
+
+            <div className="overflow-x-auto">
+              {isPageLoading ? (
+                <div className="flex justify-center items-center py-8">
+                  <div className="animate-spin rounded-full h-8 w-8 border-t-2 border-b-2 border-purple-500"></div>
+                </div>
+              ) : (
+                <>
+                  <table className="min-w-full divide-y divide-gray-200">
+                    <thead className="bg-gray-50">
+                      <tr>
+                        <th scope="col" className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                          ID Number
+                        </th>
+                        <th scope="col" className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                          First Name
+                        </th>
+                        <th scope="col" className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                          Last Name
+                        </th>
+                        <th scope="col" className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                          Points
+                        </th>
+                        <th scope="col" className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                          Role
+                        </th>
+                        <th scope="col" className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                          Actions
+                        </th>
+                      </tr>
+                    </thead>
+                    <tbody className="bg-white divide-y divide-gray-200">
+                      {users.map((u) => (
+                        <tr key={u._id} className="hover:bg-gray-50">
+                          <td className="px-6 py-4 whitespace-nowrap text-sm font-medium text-gray-900">
+                            {u.idNumber}
+                          </td>
+                          <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500">
+                            {u.firstName}
+                          </td>
+                          <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500">
+                            {u.lastName}
+                          </td>
+                          <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500">
+                            <span className="px-2 inline-flex text-xs leading-5 font-semibold rounded-full bg-green-100 text-green-800">
+                              {u.points}
+                            </span>
+                          </td>
+                          <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500">
+                            <select
+                              value={u.role}
+                              onChange={(e) => handleRoleChange(u._id, e.target.value)}
+                              className="px-2 py-1 text-sm border rounded-xl focus:outline-none focus:ring-2 focus:ring-purple-500"
+                              disabled={u.role === 'admin'}
+                            >
+                              <option value="student">Student</option>
+                              <option value="teacher">Teacher</option>
+                              <option value="ateneoStaff">Ateneo Staff</option>
+                              <option value="cashier">Cashier</option>
+                              <option value="concierge">Concierge</option>
+                              <option value="admin">Admin</option>
+                            </select>
+                          </td>
+                          <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500 space-x-2">
+                            {u.role !== 'admin' && (
+                              <>
+                                <button
+                                  onClick={() => handleSaveRole(u._id)}
+                                  className="px-3 py-1 text-sm font-medium text-white bg-purple-600 rounded-lg hover:bg-purple-700 focus:outline-none focus:ring-2 focus:ring-purple-500 focus:ring-offset-2 transition-colors"
+                                >
+                                  Save
+                                </button>
+                                <button
+                                  onClick={() => handleOpenPasswordModal(u)}
+                                  className="px-3 py-1 text-sm font-medium text-white bg-blue-600 rounded-lg hover:bg-blue-700 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:ring-offset-2 transition-colors ml-2"
+                                >
+                                  Update
+                                </button>
+                              </>
+                            )}
+                          </td>
+                        </tr>
+                      ))}
+                    </tbody>
+                  </table>
+                  {users.length === 0 && (
+                    <div className="text-center py-12">
+                      <p className="text-gray-500">No users found.</p>
+                    </div>
+                  )}
+                </>
+              )}
+            </div>
+
+            {/* Pagination */}
+            {totalPages > 1 && (
+              <div className="flex justify-center items-center mt-6 space-x-4">
+                <button
+                  onClick={() => handlePageChange(Math.max(1, currentPage - 1))}
+                  disabled={currentPage === 1 || isPageLoading}
+                  className={`p-2 rounded-lg transition-colors ${
+                    currentPage === 1 || isPageLoading
+                      ? 'text-gray-400 cursor-not-allowed'
+                      : 'text-gray-700 hover:bg-gray-100'
+                  }`}
+                >
+                  <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M15 19l-7-7 7-7" />
+                  </svg>
+                </button>
+                <span className="text-gray-700 font-medium">
+                  Page {currentPage} of {totalPages}
+                </span>
+                <button
+                  onClick={() => handlePageChange(Math.min(totalPages, currentPage + 1))}
+                  disabled={currentPage === totalPages || isPageLoading}
+                  className={`p-2 rounded-lg transition-colors ${
+                    currentPage === totalPages || isPageLoading
+                      ? 'text-gray-400 cursor-not-allowed'
+                      : 'text-gray-700 hover:bg-gray-100'
+                  }`}
+                >
+                  <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M9 5l7 7-7 7" />
+                  </svg>
+                </button>
+              </div>
+            )}
+          </motion.div>
+        )}
+
+        {/* Rewards Tab */}
+        {activeTab === 'rewards' && (
+          <motion.div
+            initial={{ opacity: 0, y: 20 }}
+            animate={{ opacity: 1, y: 0 }}
+            className="bg-white rounded-2xl shadow-lg p-4 sm:p-6"
+          >
+            <div className="flex items-center space-x-3 mb-6">
+              <div className="p-2 bg-purple-100 rounded-lg">
+                <GiftIcon className="w-6 h-6 text-purple-600" />
+              </div>
+              <div>
+                <h2 className="text-2xl font-bold text-gray-800">Rewards Management</h2>
+                <p className="text-gray-600 mt-1">Create and manage rewards</p>
+              </div>
+            </div>
+
+            <div className="bg-gradient-to-br from-purple-50 to-indigo-50 p-6 rounded-xl border border-purple-100 mb-8">
+              <h3 className="text-lg font-medium mb-4 text-gray-800">Create New Reward</h3>
+              <div className="flex flex-col gap-4">
+                <div className="flex flex-col sm:flex-row gap-4">
+                  <div className="flex-grow">
+                    <label htmlFor="reward-name" className="block text-sm font-medium text-gray-700 mb-1">
+                      Reward Name
+                    </label>
+                    <input
+                      id="reward-name"
+                      className="w-full px-4 py-2 border border-gray-300 rounded-xl focus:ring-2 focus:ring-purple-500 focus:border-transparent"
+                      placeholder="e.g. Free Coffee"
+                      value={rewards.name}
+                      onChange={(e) => setRewards({ ...rewards, name: e.target.value })}
+                    />
+                  </div>
+                  <div>
+                    <label htmlFor="reward-cost" className="block text-sm font-medium text-gray-700 mb-1">
+                      Point Cost
+                    </label>
+                    <input
+                      id="reward-cost"
+                      type="number"
+                      className="w-full px-4 py-2 border border-gray-300 rounded-xl focus:ring-2 focus:ring-purple-500 focus:border-transparent"
+                      placeholder="e.g. 100"
+                      value={rewards.cost}
+                      onChange={(e) => setRewards({ ...rewards, cost: e.target.value })}
+                    />
+                  </div>
+                </div>
+                <div>
+                  <label htmlFor="reward-description" className="block text-sm font-medium text-gray-700 mb-1">
+                    Description
+                  </label>
+                  <textarea
+                    id="reward-description"
+                    className="w-full px-4 py-2 border border-gray-300 rounded-xl focus:ring-2 focus:ring-purple-500 focus:border-transparent"
+                    placeholder="Enter a description for the reward..."
+                    rows="3"
+                    value={rewards.description}
+                    onChange={(e) => setRewards({ ...rewards, description: e.target.value })}
                   />
                 </div>
                 <div className="self-end">
                   <button
                     onClick={handleCreateReward}
-                    className="px-4 py-2 bg-blue-600 text-white font-medium rounded-md hover:bg-blue-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-blue-500"
+                    className="px-6 py-2 bg-gradient-to-r from-purple-600 to-indigo-600 hover:from-purple-700 hover:to-indigo-700 text-white font-medium rounded-xl transition-all shadow-md hover:shadow-lg"
                   >
                     Create Reward
                   </button>
                 </div>
               </div>
             </div>
-          </div>
-        )}
 
-        {/* Users Tab */}
-        {activeTab === 'users' && (
-          <div className="bg-white shadow rounded-lg overflow-hidden">
-            <div className="px-6 py-4 border-b border-gray-200">
-              <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center space-y-4 sm:space-y-0">
-                <h2 className="text-xl font-semibold text-gray-800">User Management</h2>
-                <div className="w-full sm:w-64">
-                  <div className="relative">
-                    <input
-                      type="text"
-                      placeholder="Search by ID number..."
-                      value={searchTerm}
-                      onChange={handleSearch}
-                      className="w-full px-4 py-2 pl-10 border border-gray-300 rounded-xl focus:ring-2 focus:ring-blue-500 focus:border-transparent"
-                    />
-                    <svg className="w-5 h-5 text-gray-400 absolute left-3 top-2.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z" />
-                    </svg>
-                  </div>
-                </div>
-              </div>
-            </div>
+            {/* Rewards Table */}
             <div className="overflow-x-auto">
               <table className="min-w-full divide-y divide-gray-200">
                 <thead className="bg-gray-50">
                   <tr>
                     <th scope="col" className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
-                      ID Number
+                      Reward Name
                     </th>
                     <th scope="col" className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
-                      Points
+                      Point Cost
                     </th>
                     <th scope="col" className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
-                      Role
+                      Status
                     </th>
                     <th scope="col" className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
                       Actions
@@ -469,98 +1128,96 @@ export default function AdminPage() {
                   </tr>
                 </thead>
                 <tbody className="bg-white divide-y divide-gray-200">
-                  {users.map((u) => (
-                    <tr key={u._id} className="hover:bg-gray-50">
+                  {getCurrentRewards().map((reward) => (
+                    <tr key={reward._id} className="hover:bg-gray-50">
                       <td className="px-6 py-4 whitespace-nowrap text-sm font-medium text-gray-900">
-                        {u.idNumber}
+                        {reward.name}
                       </td>
                       <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500">
-                        <span className="px-2 inline-flex text-xs leading-5 font-semibold rounded-full bg-green-100 text-green-800">
-                          {u.points}
+                        <span className="px-2 inline-flex text-xs leading-5 font-semibold rounded-full bg-purple-100 text-purple-800">
+                          {reward.cost} points
                         </span>
                       </td>
                       <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500">
-                        <select
-                          value={u.role}
-                          onChange={(e) => handleRoleChange(u._id, e.target.value)}
-                          className="px-2 py-1 text-sm border rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500"
-                          disabled={u.role === 'admin'}
-                        >
-                          <option value="student">Student</option>
-                          <option value="teacher">Teacher</option>
-                          <option value="ateneoStaff">Ateneo Staff</option>
-                          <option value="cashier">Cashier</option>
-                          <option value="concierge">Concierge</option>
-                          <option value="admin">Admin</option>
-                        </select>
+                        <span className="px-2 inline-flex text-xs leading-5 font-semibold rounded-full bg-green-100 text-green-800">
+                          Active
+                        </span>
                       </td>
                       <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500">
-                        {u.role !== 'admin' && (
-                          <button
-                            onClick={() => handleSaveRole(u._id)}
-                            className="text-blue-600 hover:text-blue-900"
-                          >
-                            Save
-                          </button>
-                        )}
+                        <button
+                          onClick={() => handleDeleteClick(reward)}
+                          className="px-2 inline-flex text-xs leading-5 font-semibold rounded-full bg-red-100 text-red-800 hover:bg-red-200 transition-colors cursor-pointer"
+                        >
+                          Delete
+                        </button>
                       </td>
                     </tr>
                   ))}
+                  {availableRewards.length === 0 && (
+                    <tr>
+                      <td colSpan="4" className="px-6 py-4 text-center text-sm text-gray-500">
+                        No rewards available
+                      </td>
+                    </tr>
+                  )}
                 </tbody>
               </table>
-              {users.length === 0 && (
-                <div className="text-center py-12">
-                  <p className="text-gray-500">No users found.</p>
+
+              {/* Rewards Pagination */}
+              {rewardsTotalPages > 1 && (
+                <div className="flex justify-center items-center mt-6 space-x-4">
+                  <button
+                    onClick={() => handleRewardsPageChange(Math.max(1, rewardsCurrentPage - 1))}
+                    disabled={rewardsCurrentPage === 1}
+                    className={`p-2 rounded-lg transition-colors ${
+                      rewardsCurrentPage === 1
+                        ? 'text-gray-400 cursor-not-allowed'
+                        : 'text-gray-700 hover:bg-gray-100'
+                    }`}
+                  >
+                    <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M15 19l-7-7 7-7" />
+                    </svg>
+                  </button>
+                  <span className="text-gray-700 font-medium">
+                    Page {rewardsCurrentPage} of {rewardsTotalPages}
+                  </span>
+                  <button
+                    onClick={() => handleRewardsPageChange(Math.min(rewardsTotalPages, rewardsCurrentPage + 1))}
+                    disabled={rewardsCurrentPage === rewardsTotalPages}
+                    className={`p-2 rounded-lg transition-colors ${
+                      rewardsCurrentPage === rewardsTotalPages
+                        ? 'text-gray-400 cursor-not-allowed'
+                        : 'text-gray-700 hover:bg-gray-100'
+                    }`}
+                  >
+                    <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M9 5l7 7-7 7" />
+                    </svg>
+                  </button>
                 </div>
               )}
             </div>
-            {/* Pagination */}
-            {totalPages > 1 && (
-              <div className="px-6 py-4 border-t border-gray-200">
-                <div className="flex items-center justify-between">
-                  <div className="text-sm text-gray-700">
-                    Showing <span className="font-medium">{(currentPage - 1) * 10 + 1}</span> to{' '}
-                    <span className="font-medium">
-                      {Math.min(currentPage * 10, totalUsers)}
-                    </span>{' '}
-                    of <span className="font-medium">{totalUsers}</span> users
-                  </div>
-                  <div className="flex space-x-2">
-                    <button
-                      onClick={() => handlePageChange(currentPage - 1)}
-                      disabled={currentPage === 1}
-                      className={`px-3 py-1 rounded-md ${
-                        currentPage === 1
-                          ? 'bg-gray-100 text-gray-400 cursor-not-allowed'
-                          : 'bg-white text-gray-700 hover:bg-gray-50 border border-gray-300'
-                      }`}
-                    >
-                      Previous
-                    </button>
-                    <button
-                      onClick={() => handlePageChange(currentPage + 1)}
-                      disabled={currentPage === totalPages}
-                      className={`px-3 py-1 rounded-md ${
-                        currentPage === totalPages
-                          ? 'bg-gray-100 text-gray-400 cursor-not-allowed'
-                          : 'bg-white text-gray-700 hover:bg-gray-50 border border-gray-300'
-                      }`}
-                    >
-                      Next
-                    </button>
-                  </div>
-                </div>
-              </div>
-            )}
-          </div>
+          </motion.div>
         )}
 
         {/* Claims Tab */}
         {activeTab === 'claims' && (
-          <div className="bg-white shadow rounded-lg overflow-hidden">
-            <div className="px-6 py-4 border-b border-gray-200">
-              <h2 className="text-xl font-semibold text-gray-800">Claimed Rewards</h2>
+          <motion.div
+            initial={{ opacity: 0, y: 20 }}
+            animate={{ opacity: 1, y: 0 }}
+            className="bg-white rounded-2xl shadow-lg p-4 sm:p-6"
+          >
+            <div className="flex items-center space-x-3 mb-6">
+              <div className="p-2 bg-green-100 rounded-lg">
+                <ClipboardListIcon className="w-6 h-6 text-green-600" />
+              </div>
+              <div>
+                <h2 className="text-2xl font-bold text-gray-800">Claimed Rewards</h2>
+                <p className="text-gray-600 mt-1">View all claimed rewards by users</p>
+              </div>
             </div>
+
             <div className="overflow-x-auto">
               <table className="min-w-full divide-y divide-gray-200">
                 <thead className="bg-gray-50">
@@ -589,7 +1246,9 @@ export default function AdminPage() {
                         {claim.reward}
                       </td>
                       <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500">
-                        {claim.pointsUsed}
+                        <span className="px-2 inline-flex text-xs leading-5 font-semibold rounded-full bg-purple-100 text-purple-800">
+                          {claim.pointsUsed}
+                        </span>
                       </td>
                       <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500">
                         {new Date(claim.dateClaimed).toLocaleDateString('en-US', {
@@ -605,9 +1264,9 @@ export default function AdminPage() {
                 </tbody>
               </table>
             </div>
-          </div>
+          </motion.div>
         )}
-      </main>
+      </div>
     </div>
   );
 }
