@@ -37,7 +37,7 @@ export default function StudentPage() {
       id: 1,
       name: 'Complete Set',
       image: completeSetImage,
-      description: 'Complete dining set (1 Plate, 1 Spoon, 1 Fork, Tray)',
+      description: 'Complete dining set (1 Plate, 1 Spoon, 1 Fork, Glass, Tray)',
       cartQuantity: 0,
       isSet: true
     },
