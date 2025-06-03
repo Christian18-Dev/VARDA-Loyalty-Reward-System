@@ -193,7 +193,6 @@ export default function Register() {
         <div className="max-w-md w-full bg-gradient-to-br from-[#1e293b] to-[#334155] rounded-3xl shadow-xl p-8 space-y-6 border border-gray-700/50">
           <div className="flex flex-col items-center">
             <img src={logo} alt="2Gonz Logo" className="w-32 h-32 object-contain mb-4" />
-            <h1 className="text-3xl font-bold text-center text-white">Create {userType === 'guest' ? 'Guest' : 'Student'} Account</h1>
           </div>
           <form onSubmit={handleSubmit} className="space-y-5">
             <div>

@@ -8,8 +8,10 @@ import rewardRoutes from './routes/rewardRoutes.js';
 import cashierRoutes from './routes/cashierRoutes.js';
 import codeRoutes from './routes/codeRoutes.js';
 import conciergeRoutes from './routes/conciergeRoutes.js';
+import notificationRoutes from './routes/notificationRoutes.js';
 import mongoose from 'mongoose';
 import { MongoClient } from 'mongodb'; // Corrected import
+import { createOverdueNotifications } from './controllers/notificationController.js';
 
 dotenv.config();
 const app = express();
@@ -74,6 +76,7 @@ app.use('/api/rewards', rewardRoutes);
 app.use('/api/cashier', cashierRoutes);
 app.use('/api/code', codeRoutes);
 app.use('/api/concierge', conciergeRoutes);
+app.use('/api/notifications', notificationRoutes);
 
 // Routes
 app.get('/', (req, res) => res.send('API is running...'));
@@ -83,5 +86,8 @@ function startServer() {
     console.log(`✅ Server running on port ${PORT}`);
   });
 }
+
+// Set up automatic overdue notifications check
+setInterval(createOverdueNotifications, 60 * 60 * 1000); // Check every hour
 
 connectDB();

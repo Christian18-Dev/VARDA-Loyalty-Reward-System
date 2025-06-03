@@ -8,7 +8,10 @@ import {
   GiftIcon, 
   ClipboardListIcon,
   LogoutIcon,
-  ExclamationIcon
+  ExclamationIcon,
+  ArrowLeftIcon,
+  ArrowRightIcon,
+  BellIcon
 } from '@heroicons/react/outline';
 import { motion, AnimatePresence } from 'framer-motion';
 
@@ -52,15 +55,53 @@ export default function AdminPage() {
   const [adminCode, setAdminCode] = useState('');
   const [passwordError, setPasswordError] = useState('');
 
+  // Add new state for borrow and return
+  const [borrowedItems, setBorrowedItems] = useState([]);
+  const [borrowedSearchTerm, setBorrowedSearchTerm] = useState('');
+  const [currentBorrowedPage, setCurrentBorrowedPage] = useState(1);
+  const [returnedItems, setReturnedItems] = useState([]);
+  const [returnedSearchTerm, setReturnedSearchTerm] = useState('');
+  const [currentReturnedPage, setCurrentReturnedPage] = useState(1);
+  const [startDate, setStartDate] = useState('');
+  const [endDate, setEndDate] = useState('');
+  const itemsPerPage = 5;
+
+  const [showNotificationModal, setShowNotificationModal] = useState(false);
+  const [notificationMessage, setNotificationMessage] = useState('');
+  const [notificationType, setNotificationType] = useState('reminder');
+
+  // Add new state for notifications
+  const [selectedUsers, setSelectedUsers] = useState([]);
+
+  // Add new state for search input
+  const [searchInput, setSearchInput] = useState('');
+
+  // Add new state for filtered users
+  const [filteredUsers, setFilteredUsers] = useState([]);
+  const [showDropdown, setShowDropdown] = useState(false);
+
+  // Add new state for all users
+  const [allUsers, setAllUsers] = useState([]);
+  const [isLoadingUsers, setIsLoadingUsers] = useState(false);
+  const [userError, setUserError] = useState('');
+
+  // Add new state for notification messages
+  const [notificationSuccess, setNotificationSuccess] = useState('');
+  const [notificationError, setNotificationError] = useState('');
+
+  // Add new state for overview polling
+  const [isOverviewPolling, setIsOverviewPolling] = useState(false);
+
   const token = user.token;
   const baseUrl = import.meta.env.VITE_API_BASE_URL;
 
   // Update fetchData to handle pagination and search
   const fetchData = async (page = 1, search = '') => {
     try {
-      if (page === 1 && !search) {
+      // Only show loading state for initial load or user search, not during polling
+      if (page === 1 && !search && !isOverviewPolling) {
         setIsLoading(true);
-      } else {
+      } else if (search) {
         setIsPageLoading(true);
       }
 
@@ -92,14 +133,37 @@ export default function AdminPage() {
       console.error("Error fetching data:", error);
       setError("Failed to fetch data. Please try again.");
     } finally {
-      setIsLoading(false);
+      // Only clear loading states if we're not in polling mode
+      if (!isOverviewPolling) {
+        setIsLoading(false);
+      }
       setIsPageLoading(false);
     }
   };
 
+  // Add polling effect for overview tab
   useEffect(() => {
-    fetchData();
-  }, [token, baseUrl]);
+    let pollInterval;
+    
+    if (activeTab === 'overview') {
+      // Set polling state to true before initial fetch
+      setIsOverviewPolling(true);
+      // Initial fetch
+      fetchData();
+      // Set up polling every 10 seconds
+      pollInterval = setInterval(() => {
+        fetchData();
+      }, 10000); // 10 seconds
+    }
+
+    // Cleanup interval on unmount or tab change
+    return () => {
+      if (pollInterval) {
+        clearInterval(pollInterval);
+      }
+      setIsOverviewPolling(false);
+    };
+  }, [activeTab, token]);
 
   // Add search handler with debounce
   useEffect(() => {
@@ -355,7 +419,216 @@ export default function AdminPage() {
     setPasswordError('');
   };
 
-  if (isLoading) {
+  // Add new functions for borrow and return
+  const fetchBorrowedItems = async () => {
+    try {
+      const queryParams = new URLSearchParams();
+      if (startDate) queryParams.append('startDate', startDate);
+      if (endDate) queryParams.append('endDate', endDate);
+      
+      const res = await axios.get(`${baseUrl}/api/admin/borrowed-items?${queryParams}`, {
+        headers: { Authorization: `Bearer ${token}` },
+      });
+      const items = res.data.data;
+      const sortedBorrowed = items
+        .filter(item => item.status === 'borrowed')
+        .sort((a, b) => new Date(b.borrowTime) - new Date(a.borrowTime));
+      setBorrowedItems(sortedBorrowed);
+    } catch (err) {
+      setError('Failed to fetch borrowed items');
+    }
+  };
+
+  // Polling for borrowed tab
+  useEffect(() => {
+    let pollInterval;
+    if (activeTab === 'borrowed') {
+      fetchBorrowedItems();
+      pollInterval = setInterval(fetchBorrowedItems, 3000);
+    }
+    return () => {
+      if (pollInterval) clearInterval(pollInterval);
+    };
+  }, [activeTab, token]);
+
+  // Filter and paginate borrowed items
+  const filteredBorrowedItems = borrowedItems.filter(item =>
+    item?.studentIdNumber?.toLowerCase().includes(borrowedSearchTerm.toLowerCase())
+  );
+  const totalBorrowedPages = Math.ceil(filteredBorrowedItems.length / itemsPerPage);
+  const paginatedBorrowedItems = filteredBorrowedItems.slice(
+    (currentBorrowedPage - 1) * itemsPerPage,
+    currentBorrowedPage * itemsPerPage
+  );
+  const handleBorrowedPageChange = (page) => setCurrentBorrowedPage(page);
+  const handleBorrowedSearch = (e) => {
+    setBorrowedSearchTerm(e.target.value);
+    setCurrentBorrowedPage(1);
+  };
+
+  // Fetch returned items with date filter
+  const fetchReturnedItems = async () => {
+    try {
+      const queryParams = new URLSearchParams();
+      if (startDate) queryParams.append('startDate', startDate);
+      if (endDate) queryParams.append('endDate', endDate);
+      
+      const res = await axios.get(`${baseUrl}/api/admin/returned-history?${queryParams}`, {
+        headers: { Authorization: `Bearer ${token}` },
+      });
+      const items = res.data.data;
+      const sortedReturned = items.sort((a, b) => new Date(b.returnTime) - new Date(a.returnTime));
+      setReturnedItems(sortedReturned);
+    } catch (err) {
+      setError('Failed to fetch returned items');
+    }
+  };
+
+  // Polling for returned tab
+  useEffect(() => {
+    let pollInterval;
+    if (activeTab === 'returned') {
+      fetchReturnedItems();
+      pollInterval = setInterval(fetchReturnedItems, 3000);
+    }
+    return () => {
+      if (pollInterval) clearInterval(pollInterval);
+    };
+  }, [activeTab, token]);
+
+  // Filter and paginate returned items
+  const filteredReturnedItems = returnedItems.filter(item =>
+    item?.studentIdNumber?.toLowerCase().includes(returnedSearchTerm.toLowerCase())
+  );
+  const totalReturnedPages = Math.ceil(filteredReturnedItems.length / itemsPerPage);
+  const paginatedReturnedItems = filteredReturnedItems.slice(
+    (currentReturnedPage - 1) * itemsPerPage,
+    currentReturnedPage * itemsPerPage
+  );
+  const handleReturnedPageChange = (page) => setCurrentReturnedPage(page);
+  const handleReturnedSearch = (e) => {
+    setReturnedSearchTerm(e.target.value);
+    setCurrentReturnedPage(1);
+  };
+
+  const handleSendNotification = async () => {
+    try {
+      await axios.post(
+        `${baseUrl}/api/notifications`,
+        {
+          studentId: selectedUser.studentId,
+          message: notificationMessage,
+          type: notificationType,
+          relatedBorrowedItem: selectedUser._id
+        },
+        {
+          headers: { Authorization: `Bearer ${token}` }
+        }
+      );
+      setShowNotificationModal(false);
+      setSelectedUser(null);
+      setNotificationMessage('');
+      setNotificationType('reminder');
+      setSuccess('Notification sent successfully!');
+      setTimeout(() => setSuccess(''), 3000);
+    } catch (error) {
+      setError('Failed to send notification');
+    }
+  };
+
+  // Add function to handle sending notifications to multiple users
+  const handleSendNotifications = async () => {
+    try {
+      setIsLoading(true);
+      const promises = selectedUsers.map(user => 
+        axios.post(
+          `${baseUrl}/api/notifications`,
+          {
+            studentId: user._id,
+            message: notificationMessage,
+            type: notificationType
+          },
+          {
+            headers: { Authorization: `Bearer ${token}` }
+          }
+        )
+      );
+      
+      await Promise.all(promises);
+      setNotificationSuccess('Notifications sent successfully!');
+      setShowNotificationModal(false);
+      setSelectedUsers([]);
+      setNotificationMessage('');
+      setNotificationType('reminder');
+
+      // Clear success message after 1 seconds
+      setTimeout(() => {
+        setNotificationSuccess('');
+      }, 1000);
+    } catch (error) {
+      console.error('Error sending notifications:', error);
+      setNotificationError('Failed to send notifications. Please try again.');
+
+      // Clear error message after 1 seconds
+      setTimeout(() => {
+        setNotificationError('');
+      }, 1000);
+    } finally {
+      setIsLoading(false);
+    }
+  };
+
+  // Add function to fetch all users with proper error handling
+  const fetchAllUsers = async () => {
+    try {
+      setIsLoadingUsers(true);
+      setUserError('');
+      const response = await axios.get(`${baseUrl}/api/admin/users?limit=1000`, {
+        headers: { Authorization: `Bearer ${token}` },
+      });
+      setAllUsers(response.data.users);
+    } catch (error) {
+      console.error('Error fetching all users:', error);
+      setUserError('Failed to fetch users. Please try again.');
+    } finally {
+      setIsLoadingUsers(false);
+    }
+  };
+
+  // Add useEffect with cleanup
+  useEffect(() => {
+    let isMounted = true;
+
+    const loadUsers = async () => {
+      if (isMounted) {
+        await fetchAllUsers();
+      }
+    };
+
+    loadUsers();
+
+    return () => {
+      isMounted = false;
+    };
+  }, [token]);
+
+  // Add click outside handler to close dropdown
+  useEffect(() => {
+    const handleClickOutside = (event) => {
+      const dropdown = document.getElementById('user-search-dropdown');
+      const input = document.getElementById('user-search-input');
+      if (dropdown && input && !dropdown.contains(event.target) && !input.contains(event.target)) {
+        setShowDropdown(false);
+      }
+    };
+
+    document.addEventListener('mousedown', handleClickOutside);
+    return () => {
+      document.removeEventListener('mousedown', handleClickOutside);
+    };
+  }, []);
+
+  if (isLoading && !isOverviewPolling) {
     return (
       <div className="flex justify-center items-center h-screen">
         <div className="animate-spin rounded-full h-12 w-12 border-t-2 border-b-2 border-purple-500"></div>
@@ -813,6 +1086,63 @@ export default function AdminPage() {
         )}
       </AnimatePresence>
 
+      {/* Notification Modal */}
+      {showNotificationModal && (
+        <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50">
+          <div className="bg-white rounded-lg p-6 w-full max-w-md">
+            <h3 className="text-lg font-semibold mb-4">Send Notification</h3>
+            <div className="space-y-4">
+              <div>
+                <label className="block text-sm font-medium text-gray-700">Student ID</label>
+                <p className="mt-1 text-sm text-gray-900">{selectedUser?.studentIdNumber}</p>
+              </div>
+              <div>
+                <label className="block text-sm font-medium text-gray-700">Items</label>
+                <p className="mt-1 text-sm text-gray-900">
+                  {selectedUser?.items.map(i => `${i.name} (x${i.quantity})`).join(', ')}
+                </p>
+              </div>
+              <div>
+                <label className="block text-sm font-medium text-gray-700">Notification Type</label>
+                <select
+                  value={notificationType}
+                  onChange={(e) => setNotificationType(e.target.value)}
+                  className="mt-1 block w-full rounded-md border-gray-300 shadow-sm focus:border-blue-500 focus:ring-blue-500"
+                >
+                  <option value="reminder">Reminder</option>
+                  <option value="warning">Warning</option>
+                  <option value="overdue">Overdue</option>
+                </select>
+              </div>
+              <div>
+                <label className="block text-sm font-medium text-gray-700">Message</label>
+                <textarea
+                  value={notificationMessage}
+                  onChange={(e) => setNotificationMessage(e.target.value)}
+                  className="mt-1 block w-full rounded-md border-gray-300 shadow-sm focus:border-blue-500 focus:ring-blue-500"
+                  rows="4"
+                  placeholder="Enter notification message..."
+                />
+              </div>
+              <div className="flex justify-end space-x-3">
+                <button
+                  onClick={() => setShowNotificationModal(false)}
+                  className="px-4 py-2 text-sm font-medium text-gray-700 bg-gray-100 rounded-md hover:bg-gray-200"
+                >
+                  Cancel
+                </button>
+                <button
+                  onClick={handleSendNotification}
+                  className="px-4 py-2 text-sm font-medium text-white bg-blue-600 rounded-md hover:bg-blue-700"
+                >
+                  Send
+                </button>
+              </div>
+            </div>
+          </div>
+        </div>
+      )}
+
       {/* Tab Navigation */}
       <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-4 bg-white fixed top-[72px] left-0 right-0 z-[90] shadow-sm">
         <div className="flex space-x-2 overflow-x-auto pb-2 scrollbar-hide">
@@ -820,7 +1150,10 @@ export default function AdminPage() {
             { id: 'overview', icon: ChartBarIcon, label: 'Overview' },
             { id: 'users', icon: UserGroupIcon, label: 'Users' },
             { id: 'rewards', icon: GiftIcon, label: 'Rewards' },
-            { id: 'claims', icon: ClipboardListIcon, label: 'Claims' }
+            { id: 'claims', icon: ClipboardListIcon, label: 'Claims' },
+            { id: 'borrowed', icon: ArrowLeftIcon, label: 'Borrowed' },
+            { id: 'returned', icon: ArrowRightIcon, label: 'Returned' },
+            { id: 'notifications', icon: BellIcon, label: 'Notifications' }
           ].map(({ id, icon: Icon, label }) => (
             <button
               key={id}
@@ -1266,7 +1599,481 @@ export default function AdminPage() {
             </div>
           </motion.div>
         )}
+
+        {/* Borrowed Tab */}
+        {activeTab === 'borrowed' && (
+          <motion.div
+            initial={{ opacity: 0, y: 20 }}
+            animate={{ opacity: 1, y: 0 }}
+            className="bg-white rounded-2xl shadow-lg p-4 sm:p-6"
+          >
+            <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center mb-6 space-y-4 sm:space-y-0">
+              <div>
+                <h2 className="text-2xl font-bold text-gray-800">Borrowed Items</h2>
+                <p className="text-gray-600 mt-1">Track all currently borrowed items</p>
+              </div>
+              <div className="w-full sm:w-64">
+                <div className="relative">
+                  <input
+                    type="text"
+                    placeholder="Search by student ID..."
+                    value={borrowedSearchTerm}
+                    onChange={handleBorrowedSearch}
+                    className="w-full px-4 py-2 pl-10 border border-gray-300 rounded-xl focus:ring-2 focus:ring-purple-500 focus:border-transparent"
+                  />
+                  <svg className="w-5 h-5 text-gray-400 absolute left-3 top-2.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z" />
+                  </svg>
+                </div>
+              </div>
+            </div>
+            <div className="overflow-x-auto rounded-xl border border-gray-200">
+              <table className="min-w-full divide-y divide-gray-200">
+                <thead className="bg-gray-50">
+                  <tr>
+                    <th className="px-4 sm:px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                      ID Number
+                    </th>
+                    <th className="px-4 sm:px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                      Items
+                    </th>
+                    <th className="px-4 sm:px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                      Borrow Time
+                    </th>
+                    <th className="px-4 sm:px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                      Status
+                    </th>
+                  </tr>
+                </thead>
+                <tbody className="bg-white divide-y divide-gray-200">
+                  {paginatedBorrowedItems.map((item) => (
+                    <tr key={item._id} className="hover:bg-gray-50">
+                      <td className="px-4 sm:px-6 py-4 whitespace-nowrap text-sm font-medium text-gray-900">
+                        {item.studentIdNumber}
+                      </td>
+                      <td className="px-4 sm:px-6 py-4 whitespace-nowrap text-sm text-gray-500">
+                        {item.items.map((i, index) => (
+                          <div key={index}>
+                            {i.name} (x{i.quantity})
+                          </div>
+                        ))}
+                      </td>
+                      <td className="px-4 sm:px-6 py-4 whitespace-nowrap text-sm text-gray-500">
+                        {new Date(item.borrowTime).toLocaleString()}
+                      </td>
+                      <td className="px-4 sm:px-6 py-4 whitespace-nowrap text-sm text-gray-500">
+                        <span className={`px-2 inline-flex text-xs leading-5 font-semibold rounded-full bg-yellow-100 text-yellow-800`}>
+                          {item.status}
+                        </span>
+                      </td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+              {paginatedBorrowedItems.length === 0 && (
+                <div className="text-center py-12">
+                  <p className="text-gray-500">No borrowed items found.</p>
+                </div>
+              )}
+            </div>
+            {/* Pagination for Borrowed Items */}
+            {totalBorrowedPages > 1 && (
+              <div className="flex justify-center items-center mt-6 space-x-4">
+                <button
+                  onClick={() => handleBorrowedPageChange(Math.max(1, currentBorrowedPage - 1))}
+                  disabled={currentBorrowedPage === 1}
+                  className={`p-2 rounded-lg transition-colors ${
+                    currentBorrowedPage === 1
+                      ? 'text-gray-400 cursor-not-allowed'
+                      : 'text-gray-700 hover:bg-gray-100'
+                  }`}
+                >
+                  <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M15 19l-7-7 7-7" />
+                  </svg>
+                </button>
+                <span className="text-gray-700 font-medium">
+                  Page {currentBorrowedPage} of {totalBorrowedPages}
+                </span>
+                <button
+                  onClick={() => handleBorrowedPageChange(Math.min(totalBorrowedPages, currentBorrowedPage + 1))}
+                  disabled={currentBorrowedPage === totalBorrowedPages}
+                  className={`p-2 rounded-lg transition-colors ${
+                    currentBorrowedPage === totalBorrowedPages
+                      ? 'text-gray-400 cursor-not-allowed'
+                      : 'text-gray-700 hover:bg-gray-100'
+                  }`}
+                >
+                  <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M9 5l7 7-7 7" />
+                  </svg>
+                </button>
+              </div>
+            )}
+          </motion.div>
+        )}
+
+        {/* Returned Tab */}
+        {activeTab === 'returned' && (
+          <motion.div
+            initial={{ opacity: 0, y: 20 }}
+            animate={{ opacity: 1, y: 0 }}
+            className="bg-white rounded-2xl shadow-lg p-4 sm:p-6"
+          >
+            <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center mb-6 space-y-4 sm:space-y-0">
+              <div>
+                <h2 className="text-2xl font-bold text-gray-800">Returned Items History</h2>
+                <p className="text-gray-600 mt-1">View history of all returned items</p>
+              </div>
+              <div className="w-full sm:w-64">
+                <div className="relative">
+                  <input
+                    type="text"
+                    placeholder="Search by student ID..."
+                    value={returnedSearchTerm}
+                    onChange={handleReturnedSearch}
+                    className="w-full px-4 py-2 pl-10 border border-gray-300 rounded-xl focus:ring-2 focus:ring-purple-500 focus:border-transparent"
+                  />
+                  <svg className="w-5 h-5 text-gray-400 absolute left-3 top-2.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z" />
+                  </svg>
+                </div>
+              </div>
+            </div>
+            <div className="overflow-x-auto rounded-xl border border-gray-200">
+              <table className="min-w-full divide-y divide-gray-200">
+                <thead className="bg-gray-50">
+                  <tr>
+                    <th className="px-4 sm:px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                      ID Number
+                    </th>
+                    <th className="px-4 sm:px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                      Items
+                    </th>
+                    <th className="px-4 sm:px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                      Borrow Time
+                    </th>
+                    <th className="px-4 sm:px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                      Return Time
+                    </th>
+                    <th className="px-4 sm:px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                      Status
+                    </th>
+                  </tr>
+                </thead>
+                <tbody className="bg-white divide-y divide-gray-200">
+                  {paginatedReturnedItems.map((item) => (
+                    <tr key={item._id} className="hover:bg-gray-50">
+                      <td className="px-4 sm:px-6 py-4 whitespace-nowrap text-sm font-medium text-gray-900">
+                        {item.studentIdNumber}
+                      </td>
+                      <td className="px-4 sm:px-6 py-4 whitespace-nowrap text-sm text-gray-500">
+                        {item.items.map((i, index) => (
+                          <div key={index}>
+                            {i.name} (x{i.quantity})
+                          </div>
+                        ))}
+                      </td>
+                      <td className="px-4 sm:px-6 py-4 whitespace-nowrap text-sm text-gray-500">
+                        {new Date(item.borrowTime).toLocaleString()}
+                      </td>
+                      <td className="px-4 sm:px-6 py-4 whitespace-nowrap text-sm text-gray-500">
+                        {new Date(item.returnTime).toLocaleString()}
+                      </td>
+                      <td className="px-4 sm:px-6 py-4 whitespace-nowrap text-sm text-gray-500">
+                        <span className="px-2 inline-flex text-xs leading-5 font-semibold rounded-full bg-green-100 text-green-800">
+                          {item.status}
+                        </span>
+                      </td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+              {paginatedReturnedItems.length === 0 && (
+                <div className="text-center py-12">
+                  <p className="text-gray-500">No returned items found.</p>
+                </div>
+              )}
+            </div>
+            {/* Pagination for Returned Items */}
+            {totalReturnedPages > 1 && (
+              <div className="flex justify-center items-center mt-6 space-x-4">
+                <button
+                  onClick={() => handleReturnedPageChange(Math.max(1, currentReturnedPage - 1))}
+                  disabled={currentReturnedPage === 1}
+                  className={`p-2 rounded-lg transition-colors ${
+                    currentReturnedPage === 1
+                      ? 'text-gray-400 cursor-not-allowed'
+                      : 'text-gray-700 hover:bg-gray-100'
+                  }`}
+                >
+                  <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M15 19l-7-7 7-7" />
+                  </svg>
+                </button>
+                <span className="text-gray-700 font-medium">
+                  Page {currentReturnedPage} of {totalReturnedPages}
+                </span>
+                <button
+                  onClick={() => handleReturnedPageChange(Math.min(totalReturnedPages, currentReturnedPage + 1))}
+                  disabled={currentReturnedPage === totalReturnedPages}
+                  className={`p-2 rounded-lg transition-colors ${
+                    currentReturnedPage === totalReturnedPages
+                      ? 'text-gray-400 cursor-not-allowed'
+                      : 'text-gray-700 hover:bg-gray-100'
+                  }`}
+                >
+                  <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M9 5l7 7-7 7" />
+                  </svg>
+                </button>
+              </div>
+            )}
+          </motion.div>
+        )}
+
+        {/* Notifications Tab */}
+        {activeTab === 'notifications' && (
+          <motion.div
+            initial={{ opacity: 0, y: 20 }}
+            animate={{ opacity: 1, y: 0 }}
+            className="bg-white rounded-2xl shadow-lg p-4 sm:p-6"
+          >
+            <div className="flex items-center space-x-3 mb-6">
+              <div className="p-2 bg-purple-100 rounded-lg">
+                <BellIcon className="w-6 h-6 text-purple-600" />
       </div>
+              <div>
+                <h2 className="text-2xl font-bold text-gray-800">Send Notifications</h2>
+                <p className="text-gray-600 mt-1">Send notifications to multiple users</p>
+    </div>
+            </div>
+
+            <div className="bg-gradient-to-br from-purple-50 to-indigo-50 p-6 rounded-xl border border-purple-100 mb-8">
+              <div className="space-y-6">
+                {/* User Selection */}
+                <div>
+                  <h3 className="text-lg font-medium mb-4 text-gray-800">Select Student ID Numbers</h3>
+                  <div className="space-y-2">
+                    <div className="relative">
+                      <input
+                        id="user-search-input"
+                        type="text"
+                        placeholder="Search or select student ID numbers..."
+                        value={searchInput}
+                        onChange={(e) => {
+                          const value = e.target.value;
+                          setSearchInput(value);
+                          const searchTerm = value.toLowerCase();
+                          const filtered = allUsers.filter(user => 
+                            user.idNumber && user.idNumber.toLowerCase().includes(searchTerm)
+                          );
+                          setFilteredUsers(filtered);
+                          setShowDropdown(true);
+                        }}
+                        onFocus={() => setShowDropdown(true)}
+                        className="w-full p-4 rounded-lg border border-gray-200 focus:ring-2 focus:ring-purple-500 focus:border-transparent"
+                      />
+                      <div className="absolute right-3 top-1/2 transform -translate-y-1/2">
+                        <svg className="w-5 h-5 text-gray-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M19 9l-7 7-7-7" />
+                        </svg>
+                      </div>
+                      {/* Dropdown list */}
+                      {showDropdown && searchInput && filteredUsers.length > 0 && (
+                        <div 
+                          className="absolute z-50 w-full mt-1 bg-white rounded-lg shadow-lg border border-gray-200 max-h-60 overflow-y-auto"
+                          style={{ top: '100%' }}
+                        >
+                          {filteredUsers.map(user => (
+                            <div
+                              key={user._id}
+                              onClick={() => {
+                                if (!selectedUsers.some(u => u._id === user._id)) {
+                                  setSelectedUsers([...selectedUsers, user]);
+                                }
+                                setSearchInput('');
+                                setFilteredUsers([]);
+                                setShowDropdown(false);
+                              }}
+                              className="px-4 py-2 hover:bg-purple-50 cursor-pointer flex items-center justify-between"
+                            >
+                              <span className="text-gray-900">{user.idNumber}</span>
+                              <span className="text-gray-500 text-sm">{user.firstName} {user.lastName}</span>
+                            </div>
+                          ))}
+                        </div>
+                      )}
+                    </div>
+                    <div className="mt-2 flex flex-wrap gap-2">
+                      {selectedUsers.map(user => (
+                        <div
+                          key={user._id}
+                          className="flex items-center gap-2 bg-purple-100 text-purple-800 px-3 py-1 rounded-full"
+                        >
+                          <span>{user.idNumber}</span>
+                          <button
+                            onClick={() => setSelectedUsers(prev => prev.filter(u => u._id !== user._id))}
+                            className="text-purple-600 hover:text-purple-800"
+                          >
+                            ×
+                          </button>
+                        </div>
+                      ))}
+                    </div>
+                    <p className="text-sm text-gray-500">
+                      Type to search for student ID numbers. Click on a result to select it.
+                    </p>
+                  </div>
+                </div>
+
+                {/* Notification Type Selection */}
+                <div>
+                  <h3 className="text-lg font-medium mb-4 text-gray-800">Notification Type</h3>
+                  <div className="grid grid-cols-3 gap-4">
+                    {[
+                      { value: 'reminder', label: 'Reminder', color: 'blue' },
+                      { value: 'warning', label: 'Warning', color: 'red' },
+                      { value: 'overdue', label: 'Overdue', color: 'orange' }
+                    ].map((type) => (
+                      <button
+                        key={type.value}
+                        onClick={() => setNotificationType(type.value)}
+                        className={`p-4 rounded-lg border transition-all ${
+                          notificationType === type.value
+                            ? `bg-${type.color}-100 border-${type.color}-300`
+                            : 'bg-white border-gray-200 hover:border-gray-300'
+                        }`}
+                      >
+                        <p className={`font-medium text-${type.color}-600`}>{type.label}</p>
+                      </button>
+                    ))}
+                  </div>
+                </div>
+
+                {/* Message Input */}
+                <div>
+                  <h3 className="text-lg font-medium mb-4 text-gray-800">Message</h3>
+                  <textarea
+                    value={notificationMessage}
+                    onChange={(e) => setNotificationMessage(e.target.value)}
+                    placeholder="Enter your notification message..."
+                    className="w-full p-4 rounded-lg border border-gray-200 focus:ring-2 focus:ring-purple-500 focus:border-transparent"
+                    rows="4"
+                  />
+                </div>
+
+                {/* Send Button */}
+                <button
+                  onClick={handleSendNotifications}
+                  disabled={selectedUsers.length === 0 || !notificationMessage.trim()}
+                  className={`w-full py-3 rounded-lg font-bold transition-all ${
+                    selectedUsers.length === 0 || !notificationMessage.trim()
+                      ? 'bg-gray-300 text-gray-500 cursor-not-allowed'
+                      : 'bg-purple-600 text-white hover:bg-purple-700'
+                  }`}
+                >
+                  Send Notifications ({selectedUsers.length} selected)
+                </button>
+              </div>
+            </div>
+          </motion.div>
+        )}
+      </div>
+
+      {/* Notification Modal */}
+      {showNotificationModal && (
+        <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50">
+          <div className="bg-white rounded-lg p-6 w-full max-w-md">
+            <h3 className="text-lg font-semibold mb-4">Send Notification</h3>
+            <div className="space-y-4">
+              <div>
+                <label className="block text-sm font-medium text-gray-700">Student ID</label>
+                <p className="mt-1 text-sm text-gray-900">{selectedUser?.studentIdNumber}</p>
+              </div>
+              <div>
+                <label className="block text-sm font-medium text-gray-700">Items</label>
+                <p className="mt-1 text-sm text-gray-900">
+                  {selectedUser?.items.map(i => `${i.name} (x${i.quantity})`).join(', ')}
+                </p>
+              </div>
+              <div>
+                <label className="block text-sm font-medium text-gray-700">Notification Type</label>
+                <select
+                  value={notificationType}
+                  onChange={(e) => setNotificationType(e.target.value)}
+                  className="mt-1 block w-full rounded-md border-gray-300 shadow-sm focus:border-blue-500 focus:ring-blue-500"
+                >
+                  <option value="reminder">Reminder</option>
+                  <option value="warning">Warning</option>
+                  <option value="overdue">Overdue</option>
+                </select>
+              </div>
+              <div>
+                <label className="block text-sm font-medium text-gray-700">Message</label>
+                <textarea
+                  value={notificationMessage}
+                  onChange={(e) => setNotificationMessage(e.target.value)}
+                  className="mt-1 block w-full rounded-md border-gray-300 shadow-sm focus:border-blue-500 focus:ring-blue-500"
+                  rows="4"
+                  placeholder="Enter notification message..."
+                />
+              </div>
+              <div className="flex justify-end space-x-3">
+                <button
+                  onClick={() => setShowNotificationModal(false)}
+                  className="px-4 py-2 text-sm font-medium text-gray-700 bg-gray-100 rounded-md hover:bg-gray-200"
+                >
+                  Cancel
+                </button>
+                <button
+                  onClick={handleSendNotification}
+                  className="px-4 py-2 text-sm font-medium text-white bg-blue-600 rounded-md hover:bg-blue-700"
+                >
+                  Send
+                </button>
+              </div>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* Add notification messages */}
+      <AnimatePresence>
+        {notificationSuccess && (
+          <motion.div
+            initial={{ opacity: 0, scale: 0.9 }}
+            animate={{ opacity: 1, scale: 1 }}
+            exit={{ opacity: 0, scale: 0.9 }}
+            className="fixed top-1/2 left-1/2 transform -translate-x-1/2 -translate-y-1/2 z-[100] bg-green-100 border border-green-400 text-green-700 px-6 py-4 rounded-lg shadow-lg text-center min-w-[300px]"
+          >
+            <div className="flex items-center justify-center space-x-2">
+              <svg className="w-5 h-5 text-green-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M5 13l4 4L19 7" />
+              </svg>
+              <span>{notificationSuccess}</span>
+            </div>
+          </motion.div>
+        )}
+      </AnimatePresence>
+
+      <AnimatePresence>
+        {notificationError && (
+          <motion.div
+            initial={{ opacity: 0, scale: 0.9 }}
+            animate={{ opacity: 1, scale: 1 }}
+            exit={{ opacity: 0, scale: 0.9 }}
+            className="fixed top-1/2 left-1/2 transform -translate-x-1/2 -translate-y-1/2 z-[100] bg-red-100 border border-red-400 text-red-700 px-6 py-4 rounded-lg shadow-lg text-center min-w-[300px]"
+          >
+            <div className="flex items-center justify-center space-x-2">
+              <svg className="w-5 h-5 text-red-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M12 8v4m0 4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z" />
+              </svg>
+              <span>{notificationError}</span>
+            </div>
+          </motion.div>
+        )}
+      </AnimatePresence>
     </div>
   );
 }

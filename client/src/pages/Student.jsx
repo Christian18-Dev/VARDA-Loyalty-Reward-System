@@ -3,7 +3,7 @@ import axios from 'axios';
 import { useAuth } from '../context/AuthContext';
 import { useNavigate } from 'react-router-dom';
 import { HomeIcon, TicketIcon, GiftIcon, LogoutIcon, ShoppingBagIcon } from '@heroicons/react/outline';
-import { motion } from 'framer-motion';
+import { motion, AnimatePresence } from 'framer-motion';
 import confetti from 'canvas-confetti';
 import { QRCodeSVG } from 'qrcode.react';
 import completeSetImage from '../assets/completeset.png';
@@ -37,7 +37,7 @@ export default function StudentPage() {
       id: 1,
       name: 'Complete Set',
       image: completeSetImage,
-      description: 'Complete dining set (1 Plate, 1 Spoon, 1 Fork, Glass, Tray)',
+      description: 'Complete dining set (Plate, Bowl, Spoon, Fork, Glass, Tray)',
       cartQuantity: 0,
       isSet: true
     },
@@ -90,6 +90,9 @@ export default function StudentPage() {
   const [showSuccessModal, setShowSuccessModal] = useState(false);
   const [showReturnQRModal, setShowReturnQRModal] = useState(false);
   const [returnQRData, setReturnQRData] = useState(null);
+  const [notifications, setNotifications] = useState([]);
+  const [showNotification, setShowNotification] = useState(false);
+  const [currentNotification, setCurrentNotification] = useState(null);
 
   const baseUrl = import.meta.env.VITE_API_BASE_URL;
   const token = user.token;
@@ -340,6 +343,58 @@ export default function StudentPage() {
     hidden: { y: 20, opacity: 0 },
     visible: { y: 0, opacity: 1 },
   };
+
+  // Fetch notifications
+  const fetchNotifications = async () => {
+    try {
+      const res = await axios.get(`${baseUrl}/api/notifications/user`, {
+        headers: { Authorization: `Bearer ${token}` }
+      });
+      const newNotifications = res.data.data;
+      
+      // Check for unread notifications
+      const unreadNotifications = newNotifications.filter(n => !n.isRead);
+      if (unreadNotifications.length > 0) {
+        // Show the most recent unread notification
+        setCurrentNotification(unreadNotifications[0]);
+        setShowNotification(true);
+        // Mark it as read
+        handleMarkAsRead(unreadNotifications[0]._id);
+      }
+      
+      setNotifications(newNotifications);
+    } catch (error) {
+      console.error('Error fetching notifications:', error);
+    }
+  };
+
+  // Mark notification as read
+  const handleMarkAsRead = async (notificationId) => {
+    try {
+      await axios.put(
+        `${baseUrl}/api/notifications/${notificationId}/read`,
+        {},
+        {
+          headers: { Authorization: `Bearer ${token}` }
+        }
+      );
+      fetchNotifications();
+    } catch (error) {
+      console.error('Error marking notification as read:', error);
+    }
+  };
+
+  // Close notification
+  const handleCloseNotification = () => {
+    setShowNotification(false);
+    setCurrentNotification(null);
+  };
+
+  useEffect(() => {
+    fetchNotifications();
+    const interval = setInterval(fetchNotifications, 5000); // Poll every 5 seconds
+    return () => clearInterval(interval);
+  }, [token]);
 
   return (
     <div className="flex flex-col min-h-screen bg-gradient-to-br from-[#0f172a] to-[#1e293b]">
@@ -1105,6 +1160,104 @@ export default function StudentPage() {
           </div>
         </div>
       )}
+
+      {/* Notifications Button */}
+      <div className="relative">
+        <button
+          onClick={() => setShowNotification(!showNotification)}
+          className="relative p-2 text-gray-600 hover:text-gray-900"
+        >
+          <svg
+            className="w-6 h-6"
+            fill="none"
+            stroke="currentColor"
+            viewBox="0 0 24 24"
+          >
+            <path
+              strokeLinecap="round"
+              strokeLinejoin="round"
+              strokeWidth="2"
+              d="M15 17h5l-1.405-1.405A2.032 2.032 0 0118 14.158V11a6.002 6.002 0 00-4-5.659V5a2 2 0 10-4 0v.341C7.67 6.165 6 8.388 6 11v3.159c0 .538-.214 1.055-.595 1.436L4 17h5m6 0v1a3 3 0 11-6 0v-1m6 0H9"
+            />
+          </svg>
+          {notifications.filter(n => !n.isRead).length > 0 && (
+            <span className="absolute top-0 right-0 inline-flex items-center justify-center px-2 py-1 text-xs font-bold leading-none text-white transform translate-x-1/2 -translate-y-1/2 bg-red-600 rounded-full">
+              {notifications.filter(n => !n.isRead).length}
+            </span>
+          )}
+        </button>
+
+        {/* Notification Pop-up */}
+        <AnimatePresence>
+          {showNotification && currentNotification && (
+            <motion.div
+              initial={{ opacity: 0, scale: 0.9 }}
+              animate={{ opacity: 1, scale: 1 }}
+              exit={{ opacity: 0, scale: 0.9 }}
+              transition={{ type: "spring", stiffness: 300, damping: 25 }}
+              className="fixed top-1/2 left-1/2 transform -translate-x-1/2 -translate-y-1/2 z-50 w-full max-w-md px-4"
+            >
+              <div className={`relative overflow-hidden rounded-2xl shadow-2xl ${
+                currentNotification.type === 'warning' ? 'bg-gradient-to-r from-red-500 to-red-600' :
+                currentNotification.type === 'overdue' ? 'bg-gradient-to-r from-orange-500 to-orange-600' :
+                'bg-gradient-to-r from-blue-500 to-blue-600'
+              }`}>
+                {/* Decorative elements */}
+                <div className="absolute top-0 left-0 w-full h-1 bg-white/20"></div>
+                <div className="absolute top-0 right-0 w-32 h-32 bg-white/5 rounded-full transform translate-x-16 -translate-y-16"></div>
+                <div className="absolute bottom-0 left-0 w-32 h-32 bg-white/5 rounded-full transform -translate-x-16 translate-y-16"></div>
+
+                <div className="relative p-6">
+                  <div className="flex items-start space-x-4">
+                    <div className="flex-1 min-w-0">
+                      <div className="flex items-center justify-center space-x-2 mb-4">
+                        {/* Icon based on notification type */}
+                        <div className={`w-8 h-8 rounded-full flex items-center justify-center ${
+                          currentNotification.type === 'warning' ? 'bg-red-400/20' :
+                          currentNotification.type === 'overdue' ? 'bg-orange-400/20' :
+                          'bg-blue-400/20'
+                        }`}>
+                          {currentNotification.type === 'warning' ? (
+                            <svg className="w-5 h-5 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-3L13.732 4c-.77-1.333-2.694-1.333-3.464 0L3.34 16c-.77 1.333.192 3 1.732 3z" />
+                            </svg>
+                          ) : currentNotification.type === 'overdue' ? (
+                            <svg className="w-5 h-5 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M12 8v4l3 3m6-3a9 9 0 11-18 0 9 9 0 0118 0z" />
+                            </svg>
+                          ) : (
+                            <svg className="w-5 h-5 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M13 16h-1v-4h-1m1-4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z" />
+                            </svg>
+                          )}
+                        </div>
+                        <h3 className={`text-xl font-bold text-white`}>
+                          {currentNotification.type === 'warning' ? 'Warning' :
+                           currentNotification.type === 'overdue' ? 'Overdue Notice' :
+                           'Reminder'}
+                        </h3>
+                      </div>
+                      <div className="text-center">
+                        <p className="text-white/90 text-base leading-relaxed">
+                          {currentNotification.message}
+                        </p>
+                      </div>
+                    </div>
+                  </div>
+                  <div className="flex justify-end mt-4">
+                    <button
+                      onClick={handleCloseNotification}
+                      className="px-4 py-2 bg-gray-800 text-white rounded-lg hover:bg-gray-900 transition-colors"
+                    >
+                      Close
+                    </button>
+                  </div>
+                </div>
+              </div>
+            </motion.div>
+          )}
+        </AnimatePresence>
+      </div>
     </div>
   );
 }
