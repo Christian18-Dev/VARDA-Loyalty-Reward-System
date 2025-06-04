@@ -276,13 +276,13 @@ export default function StudentPage() {
 
     const timestamp = new Date().toISOString();
     const orderDetails = {
-      studentName: user.name,
       studentId: user._id,
+      studentIdNumber: user.idNumber,
       items: itemsToBorrow.map(item => ({
         name: item.name,
         quantity: item.cartQuantity
       })),
-      timestamp: timestamp // Add timestamp to the order details
+      timestamp: timestamp
     };
 
     try {
@@ -322,6 +322,7 @@ export default function StudentPage() {
     const returnData = {
       type: 'return',
       studentId: user._id,
+      studentIdNumber: user.idNumber,
       items: item.items,
       timestamp: item.borrowTime,
       summary: {

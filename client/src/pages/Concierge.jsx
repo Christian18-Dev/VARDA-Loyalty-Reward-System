@@ -228,7 +228,9 @@ export default function ConciergePage() {
           }
         );
         
-        showStatusMessage('success', 'Items returned successfully!');
+        // Create a summary of returned items with better formatting
+        const itemsSummary = orderData.items.map(item => `${item.name} (x${item.quantity})`).join('\n• ');
+        showStatusMessage('success', `✅ Items Returned Successfully!\n\n📚 ID Number: ${orderData.studentIdNumber}\n\n📦 Returned Items:\n• ${itemsSummary}`);
       } else {
         // Handle regular borrow QR code
         if (scannedCodes.has(scanIdentifier)) {
@@ -251,7 +253,9 @@ export default function ConciergePage() {
           }
         );
         
-        showStatusMessage('success', 'QR Code scanned successfully!');
+        // Create a summary of borrowed items with better formatting
+        const itemsSummary = orderData.items.map(item => `${item.name} (x${item.quantity})`).join('\n• ');
+        showStatusMessage('success', `✅ QR Code Scanned Successfully!\n\n📚 ID Number: ${orderData.studentIdNumber}\n\n📦 Borrowed Items:\n• ${itemsSummary}`);
       }
       
       // Set a longer cooldown period (10 seconds) to prevent rapid scanning
@@ -523,16 +527,75 @@ export default function ConciergePage() {
     );
   };
 
-  // Function to show status modal
+  // Update the showStatusMessage function to be smoother
   const showStatusMessage = (type, message) => {
+    // Update the modal data directly without closing/reopening
     setStatusModalData({ type, message });
     setShowStatusModal(true);
   };
 
-  // Function to close status modal
-  const closeStatusModal = () => {
-    setShowStatusModal(false);
-    setStatusModalData({ type: '', message: '' });
+  // Update the StatusModal component to be simpler without animations
+  const StatusModal = ({ isOpen, onClose, type, message }) => {
+    if (!isOpen) return null;
+
+    return (
+      <div className="fixed inset-0 z-[100] overflow-y-auto">
+        <div className="flex items-center justify-center min-h-screen px-4 pt-4 pb-20 text-center sm:block sm:p-0">
+          <div
+            className="fixed inset-0 backdrop-blur-sm bg-white/30"
+            aria-hidden="true"
+            onClick={onClose}
+          />
+          <span className="hidden sm:inline-block sm:align-middle sm:h-screen" aria-hidden="true">&#8203;</span>
+          <div
+            className="relative inline-block align-bottom bg-white rounded-2xl text-left overflow-hidden shadow-xl transform sm:my-8 sm:align-middle sm:max-w-lg sm:w-full"
+            role="dialog"
+            aria-modal="true"
+            aria-labelledby="modal-headline"
+          >
+            <div className="bg-white px-6 pt-6 pb-4 sm:p-8">
+              <div className="sm:flex sm:items-start">
+                <div 
+                  className={`mx-auto flex-shrink-0 flex items-center justify-center h-16 w-16 rounded-full sm:mx-0 sm:h-14 sm:w-14 ${
+                    type === 'success' ? 'bg-green-100' : 'bg-red-100'
+                  }`}
+                >
+                  {type === 'success' ? (
+                    <svg className="h-8 w-8 text-green-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M5 13l4 4L19 7" />
+                    </svg>
+                  ) : (
+                    <ExclamationIcon className="h-8 w-8 text-red-600" aria-hidden="true" />
+                  )}
+                </div>
+                <div className="mt-4 text-center sm:mt-0 sm:ml-6 sm:text-left flex-1">
+                  <h3 className={`text-2xl font-bold ${type === 'success' ? 'text-green-700' : 'text-red-700'}`} id="modal-headline">
+                    {type === 'success' ? 'Success!' : 'Error'}
+                  </h3>
+                  <div className="mt-4">
+                    <p className="text-lg text-gray-700 whitespace-pre-line font-medium leading-relaxed">
+                      {message}
+                    </p>
+                  </div>
+                </div>
+              </div>
+            </div>
+            <div className="bg-gray-50 px-6 py-4 sm:px-8 sm:flex sm:flex-row-reverse">
+              <button
+                onClick={onClose}
+                className={`w-full inline-flex justify-center rounded-xl border border-transparent shadow-sm px-6 py-3 text-lg font-semibold text-white focus:outline-none focus:ring-2 focus:ring-offset-2 transition-colors sm:ml-3 sm:w-auto ${
+                  type === 'success' 
+                    ? 'bg-green-600 hover:bg-green-700 focus:ring-green-500' 
+                    : 'bg-red-600 hover:bg-red-700 focus:ring-red-500'
+                }`}
+              >
+                Close
+              </button>
+            </div>
+          </div>
+        </div>
+      </div>
+    );
   };
 
   // Export logic with enhanced error handling
@@ -847,67 +910,12 @@ export default function ConciergePage() {
       {/* Status Modal */}
       <AnimatePresence>
         {showStatusModal && (
-          <div className="fixed inset-0 z-[100] overflow-y-auto">
-            <div className="flex items-center justify-center min-h-screen px-4 pt-4 pb-20 text-center sm:block sm:p-0">
-              <motion.div
-                initial={{ opacity: 0 }}
-                animate={{ opacity: 1 }}
-                exit={{ opacity: 0 }}
-                className="fixed inset-0 backdrop-blur-sm bg-white/30 transition-opacity"
-                aria-hidden="true"
-                onClick={closeStatusModal}
-              />
-              <span className="hidden sm:inline-block sm:align-middle sm:h-screen" aria-hidden="true">&#8203;</span>
-              <motion.div
-                initial={{ opacity: 0, scale: 0.95 }}
-                animate={{ opacity: 1, scale: 1 }}
-                exit={{ opacity: 0, scale: 0.95 }}
-                className="relative inline-block align-bottom bg-white rounded-lg text-left overflow-hidden shadow-xl transform transition-all sm:my-8 sm:align-middle sm:max-w-lg sm:w-full"
-                role="dialog"
-                aria-modal="true"
-                aria-labelledby="modal-headline"
-              >
-                <div className="bg-white px-4 pt-5 pb-4 sm:p-6 sm:pb-4">
-                  <div className="sm:flex sm:items-start">
-                    <div className={`mx-auto flex-shrink-0 flex items-center justify-center h-12 w-12 rounded-full sm:mx-0 sm:h-10 sm:w-10 ${
-                      statusModalData.type === 'success' ? 'bg-green-100' : 'bg-red-100'
-                    }`}>
-                      {statusModalData.type === 'success' ? (
-                        <svg className="h-6 w-6 text-green-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M5 13l4 4L19 7" />
-                        </svg>
-                      ) : (
-                        <ExclamationIcon className="h-6 w-6 text-red-600" aria-hidden="true" />
-                      )}
-                    </div>
-                    <div className="mt-3 text-center sm:mt-0 sm:ml-4 sm:text-left">
-                      <h3 className="text-lg leading-6 font-medium text-gray-900" id="modal-headline">
-                        {statusModalData.type === 'success' ? 'Success' : 'Error'}
-                      </h3>
-                      <div className="mt-2">
-                        <p className="text-sm text-gray-500">
-                          {statusModalData.message}
-                        </p>
-                      </div>
-                    </div>
-                  </div>
-                </div>
-                <div className="bg-gray-50 px-4 py-3 sm:px-6 sm:flex sm:flex-row-reverse">
-                  <button
-                    type="button"
-                    onClick={closeStatusModal}
-                    className={`w-full inline-flex justify-center rounded-md border border-transparent shadow-sm px-4 py-2 text-base font-medium text-white focus:outline-none focus:ring-2 focus:ring-offset-2 sm:ml-3 sm:w-auto sm:text-sm ${
-                      statusModalData.type === 'success' 
-                        ? 'bg-green-600 hover:bg-green-700 focus:ring-green-500' 
-                        : 'bg-red-600 hover:bg-red-700 focus:ring-red-500'
-                    }`}
-                  >
-                    Close
-                  </button>
-                </div>
-              </motion.div>
-            </div>
-          </div>
+          <StatusModal
+            isOpen={showStatusModal}
+            onClose={() => setShowStatusModal(false)}
+            type={statusModalData.type}
+            message={statusModalData.message}
+          />
         )}
       </AnimatePresence>
       {/* Tab Navigation */}
