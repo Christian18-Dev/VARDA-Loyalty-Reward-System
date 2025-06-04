@@ -273,4 +273,35 @@ export const processReturnQR = async (req, res) => {
       message: 'Error processing return QR'
     });
   }
+};
+
+export const deleteReturnedItem = async (req, res) => {
+  try {
+    const { id } = req.params;
+    console.log('Deleting returned item with ID:', id);
+
+    // Find the returned item first
+    const returnedItem = await ReturnedItemHistory.findById(id);
+    if (!returnedItem) {
+      return res.status(404).json({
+        success: false,
+        message: 'Returned item not found'
+      });
+    }
+
+    // Delete only the returned item record
+    await ReturnedItemHistory.findByIdAndDelete(id);
+    console.log('Successfully deleted returned item record');
+
+    res.status(200).json({
+      success: true,
+      message: 'Returned item record deleted successfully'
+    });
+  } catch (error) {
+    console.error('Error deleting returned item:', error);
+    res.status(500).json({
+      success: false,
+      message: 'Error deleting returned item'
+    });
+  }
 }; 

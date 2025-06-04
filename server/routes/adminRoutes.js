@@ -1,7 +1,7 @@
 import express from 'express';
 import { protect, admin } from '../middleware/authMiddleware.js';
 import { getStats, createReward, getUsers, getClaimedRewards, updateUserRole, updateUserPassword } from '../controllers/adminController.js';
-import { getBorrowedItems, getBorrowedItemHistory, getReturnedItemHistory } from '../controllers/borrowedItemController.js';
+import { getBorrowedItems, getBorrowedItemHistory, getReturnedItemHistory, deleteReturnedItem } from '../controllers/borrowedItemController.js';
 
 const router = express.Router();
 
@@ -16,5 +16,6 @@ router.put('/users/:userId/password', protect, admin, updateUserPassword);
 router.get('/borrowed-items', protect, admin, getBorrowedItems);
 router.get('/borrowed-history', protect, admin, getBorrowedItemHistory);
 router.get('/returned-history', protect, admin, getReturnedItemHistory);
+router.delete('/returned-history/:id', protect, admin, deleteReturnedItem);
 
 export default router;
