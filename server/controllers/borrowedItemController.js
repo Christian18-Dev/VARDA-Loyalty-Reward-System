@@ -62,20 +62,31 @@ export const getBorrowedItems = async (req, res) => {
     // Get all borrowed items
     const borrowedItems = await BorrowedItemHistory.find(query)
       .sort({ borrowTime: -1 });
+    
+    console.log('Total borrowed items found:', borrowedItems.length);
 
-    // Get all returned items
+    // Get all returned items for these borrowed items
     const returnedItems = await ReturnedItemHistory.find({
-      studentId: { $in: borrowedItems.map(item => item.studentId) }
+      studentId: { $in: borrowedItems.map(item => item.studentId) },
+      borrowTime: { $in: borrowedItems.map(item => item.borrowTime) }
     });
+
+    console.log('Total returned items found:', returnedItems.length);
+
+    // Create a Set of returned item keys for faster lookup
+    const returnedItemKeys = new Set(
+      returnedItems.map(item => 
+        `${item.studentId.toString()}-${item.borrowTime.getTime()}-${item.items[0].name}`
+      )
+    );
 
     // Filter out items that have been returned
     const activeBorrowedItems = borrowedItems.filter(borrowedItem => {
-      return !returnedItems.some(returnedItem => 
-        returnedItem.studentId.toString() === borrowedItem.studentId.toString() &&
-        returnedItem.borrowTime.getTime() === borrowedItem.borrowTime.getTime() &&
-        returnedItem.items[0].name === borrowedItem.items[0].name
-      );
+      const itemKey = `${borrowedItem.studentId.toString()}-${borrowedItem.borrowTime.getTime()}-${borrowedItem.items[0].name}`;
+      return !returnedItemKeys.has(itemKey);
     });
+
+    console.log('Active borrowed items after filtering:', activeBorrowedItems.length);
     
     res.status(200).json({
       success: true,
