@@ -193,10 +193,15 @@ export default function ConciergePage() {
 
   const handleScan = async (decodedText) => {
     try {
+      // Stop scanning immediately to prevent multiple scans
+      await stopScanner();
       setScanning(false);
+
       if (isCooldown) {
+        showStatusMessage('error', 'Please wait a moment before scanning again.');
         return;
       }
+
       const orderData = JSON.parse(decodedText);
       const scanIdentifier = `${orderData.studentId}-${orderData.timestamp}`;
       
@@ -249,13 +254,23 @@ export default function ConciergePage() {
         showStatusMessage('success', 'QR Code scanned successfully!');
       }
       
+      // Set a longer cooldown period (10 seconds) to prevent rapid scanning
       setTimeout(() => {
         setIsCooldown(false);
-      }, 5000);
+      }, 3000);
     } catch (err) {
       console.error('Error scanning QR code:', err);
       showStatusMessage('error', err.response?.data?.message || 'Invalid QR Code or failed to save');
     }
+  };
+
+  // Modify the scanning button click handler
+  const handleScanningToggle = async () => {
+    if (isCooldown) {
+      showStatusMessage('error', 'Please wait a moment before scanning again.');
+      return;
+    }
+    setScanning(!scanning);
   };
 
   const handleLogoutClick = () => {
@@ -933,7 +948,7 @@ export default function ConciergePage() {
                 <p className="text-gray-600 mt-1">Scan student QR codes to process requests</p>
               </div>
               <button
-                onClick={() => setScanning(!scanning)}
+                onClick={handleScanningToggle}
                 className={`w-full sm:w-auto px-6 py-3 rounded-xl transition-all flex items-center justify-center space-x-2 ${
                   scanning
                     ? 'bg-red-500 hover:bg-red-600 text-white'
