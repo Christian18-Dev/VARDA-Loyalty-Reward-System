@@ -62,6 +62,10 @@ export default function ConciergePage() {
     const savedCodes = localStorage.getItem('scannedCodes');
     return savedCodes ? new Set(JSON.parse(savedCodes)) : new Set();
   });
+  const [scannedReturnCodes, setScannedReturnCodes] = useState(() => {
+    const savedCodes = localStorage.getItem('scannedReturnCodes');
+    return savedCodes ? new Set(JSON.parse(savedCodes)) : new Set();
+  });
   const [showLogoutModal, setShowLogoutModal] = useState(false);
   const [borrowedItems, setBorrowedItems] = useState([]);
   const [borrowedSearchTerm, setBorrowedSearchTerm] = useState('');
@@ -196,16 +200,20 @@ export default function ConciergePage() {
       const orderData = JSON.parse(decodedText);
       const scanIdentifier = `${orderData.studentId}-${orderData.timestamp}`;
       
-      if (scannedCodes.has(scanIdentifier)) {
-        showStatusMessage('error', 'This QR code has already been scanned.');
-        return;
-      }
-      
-      setIsCooldown(true);
-      setScannedCodes(prev => new Set([...prev, scanIdentifier]));
-      
       // Check if this is a return QR code
       if (orderData.type === 'return') {
+        if (scannedReturnCodes.has(scanIdentifier)) {
+          showStatusMessage('error', 'This return QR code has already been scanned.');
+          return;
+        }
+        
+        setIsCooldown(true);
+        setScannedReturnCodes(prev => {
+          const newSet = new Set([...prev, scanIdentifier]);
+          localStorage.setItem('scannedReturnCodes', JSON.stringify([...newSet]));
+          return newSet;
+        });
+        
         // Make API call to process the return
         const response = await axios.post(
           `${baseUrl}/api/concierge/return-item`,
@@ -218,6 +226,18 @@ export default function ConciergePage() {
         showStatusMessage('success', 'Items returned successfully!');
       } else {
         // Handle regular borrow QR code
+        if (scannedCodes.has(scanIdentifier)) {
+          showStatusMessage('error', 'This borrow QR code has already been scanned.');
+          return;
+        }
+        
+        setIsCooldown(true);
+        setScannedCodes(prev => {
+          const newSet = new Set([...prev, scanIdentifier]);
+          localStorage.setItem('scannedCodes', JSON.stringify([...newSet]));
+          return newSet;
+        });
+        
         const response = await axios.post(
           `${baseUrl}/api/concierge/scan`,
           orderData,
@@ -245,6 +265,7 @@ export default function ConciergePage() {
     // Clear all local storage items
     localStorage.removeItem('cafeteria-user');
     localStorage.removeItem('scannedCodes');
+    localStorage.removeItem('scannedReturnCodes');
     
     // Stop scanner if active
     if (html5QrCode) {
@@ -253,6 +274,7 @@ export default function ConciergePage() {
     
     // Clear all state
     setScannedCodes(new Set());
+    setScannedReturnCodes(new Set());
     setBorrowedItems([]);
     setReturnedItems([]);
     setError('');

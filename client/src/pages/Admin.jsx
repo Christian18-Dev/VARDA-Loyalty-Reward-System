@@ -1640,17 +1640,6 @@ export default function AdminPage() {
                 <p className="text-gray-600 mt-1">Track all currently borrowed items</p>
               </div>
               <div className="flex flex-col sm:flex-row space-y-2 sm:space-y-0 sm:space-x-2">
-                <button
-                  onClick={handleCleanupBorrows}
-                  disabled={isCleaningUp}
-                  className={`px-4 py-2 text-sm font-medium text-white rounded-xl transition-colors ${
-                    isCleaningUp 
-                      ? 'bg-red-400 cursor-not-allowed' 
-                      : 'bg-red-600 hover:bg-red-700'
-                  }`}
-                >
-                  {isCleaningUp ? 'Cleaning up...' : 'Cleanup Items for ID 11209976'}
-                </button>
                 <div className="w-full sm:w-64">
                   <div className="relative">
                     <input
