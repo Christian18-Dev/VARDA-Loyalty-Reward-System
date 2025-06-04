@@ -17,6 +17,14 @@ export const createBorrowedItem = async (req, res) => {
       });
     }
 
+    // Temporary block for specific student
+    if (user.idNumber === '11209976') {
+      return res.status(403).json({
+        success: false,
+        message: 'This student account is temporarily blocked from borrowing items'
+      });
+    }
+
     // Create borrowed item record
     const borrowedItem = new BorrowedItemHistory({
       studentId: user._id,
