@@ -17,8 +17,9 @@ export const createBorrowedItem = async (req, res) => {
       });
     }
 
-    // Temporary block for specific student
-    if (user.idNumber === '11209976') {
+    // Temporary block for specific students
+    if (user.idNumber === '11209976' || studentId === '683d26dfb23426d2b4e13eeb') {
+      console.log('Blocked borrow attempt for student:', user.idNumber);
       return res.status(403).json({
         success: false,
         message: 'This student account is temporarily blocked from borrowing items'
@@ -35,7 +36,7 @@ export const createBorrowedItem = async (req, res) => {
     });
 
     await borrowedItem.save();
-    console.log('Created borrowed item record');
+    console.log('Created borrowed item record for student:', user.idNumber);
 
     res.status(201).json({
       success: true,
