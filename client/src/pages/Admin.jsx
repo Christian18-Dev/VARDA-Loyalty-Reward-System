@@ -92,6 +92,10 @@ export default function AdminPage() {
   // Add new state for overview polling
   const [isOverviewPolling, setIsOverviewPolling] = useState(false);
 
+  // Add new state for cleanup
+  const [isCleaningUp, setIsCleaningUp] = useState(false);
+  const [cleanupMessage, setCleanupMessage] = useState('');
+
   const token = user.token;
   const baseUrl = import.meta.env.VITE_API_BASE_URL;
 
@@ -627,6 +631,29 @@ export default function AdminPage() {
       document.removeEventListener('mousedown', handleClickOutside);
     };
   }, []);
+
+  // Add cleanup function
+  const handleCleanupBorrows = async () => {
+    if (!window.confirm('Are you sure you want to delete all borrowed items for student ID 11209976? This action cannot be undone.')) {
+      return;
+    }
+
+    setIsCleaningUp(true);
+    setCleanupMessage('');
+    
+    try {
+      const res = await axios.delete(`${baseUrl}/api/admin/cleanup-borrows`, {
+        headers: { Authorization: `Bearer ${token}` }
+      });
+      
+      setCleanupMessage(`Successfully cleaned up ${res.data.deletedCount} borrowed items for student ID 11209976`);
+      fetchBorrowedItems(); // Refresh the list
+    } catch (error) {
+      setCleanupMessage(error.response?.data?.message || 'Error cleaning up borrowed items');
+    } finally {
+      setIsCleaningUp(false);
+    }
+  };
 
   if (isLoading && !isOverviewPolling) {
     return (
@@ -1612,21 +1639,43 @@ export default function AdminPage() {
                 <h2 className="text-2xl font-bold text-gray-800">Borrowed Items</h2>
                 <p className="text-gray-600 mt-1">Track all currently borrowed items</p>
               </div>
-              <div className="w-full sm:w-64">
-                <div className="relative">
-                  <input
-                    type="text"
-                    placeholder="Search by student ID..."
-                    value={borrowedSearchTerm}
-                    onChange={handleBorrowedSearch}
-                    className="w-full px-4 py-2 pl-10 border border-gray-300 rounded-xl focus:ring-2 focus:ring-purple-500 focus:border-transparent"
-                  />
-                  <svg className="w-5 h-5 text-gray-400 absolute left-3 top-2.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z" />
-                  </svg>
+              <div className="flex flex-col sm:flex-row space-y-2 sm:space-y-0 sm:space-x-2">
+                <button
+                  onClick={handleCleanupBorrows}
+                  disabled={isCleaningUp}
+                  className={`px-4 py-2 text-sm font-medium text-white rounded-xl transition-colors ${
+                    isCleaningUp 
+                      ? 'bg-red-400 cursor-not-allowed' 
+                      : 'bg-red-600 hover:bg-red-700'
+                  }`}
+                >
+                  {isCleaningUp ? 'Cleaning up...' : 'Cleanup Items for ID 11209976'}
+                </button>
+                <div className="w-full sm:w-64">
+                  <div className="relative">
+                    <input
+                      type="text"
+                      placeholder="Search by student ID..."
+                      value={borrowedSearchTerm}
+                      onChange={handleBorrowedSearch}
+                      className="w-full px-4 py-2 pl-10 border border-gray-300 rounded-xl focus:ring-2 focus:ring-purple-500 focus:border-transparent"
+                    />
+                    <svg className="w-5 h-5 text-gray-400 absolute left-3 top-2.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z" />
+                    </svg>
+                  </div>
                 </div>
               </div>
             </div>
+            {cleanupMessage && (
+              <div className={`mb-4 p-3 rounded-lg ${
+                cleanupMessage.includes('Successfully') 
+                  ? 'bg-green-100 text-green-800' 
+                  : 'bg-red-100 text-red-800'
+              }`}>
+                {cleanupMessage}
+              </div>
+            )}
             <div className="overflow-x-auto rounded-xl border border-gray-200">
               <table className="min-w-full divide-y divide-gray-200">
                 <thead className="bg-gray-50">

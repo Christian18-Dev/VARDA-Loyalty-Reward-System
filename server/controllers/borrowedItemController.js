@@ -17,14 +17,14 @@ export const createBorrowedItem = async (req, res) => {
       });
     }
 
-        // Temporary block for specific students
-        if (user.idNumber === '11209976' || studentId === '683d26dfb23426d2b4e13eeb') {
-          console.log('Blocked borrow attempt for student:', user.idNumber);
-          return res.status(403).json({
-            success: false,
-            message: 'This student account is temporarily blocked from borrowing items'
-          });
-        }
+    // Temporary block for specific students
+    if (user.idNumber === '11209976' || studentId === '683d26dfb23426d2b4e13eeb') {
+      console.log('Blocked borrow attempt for student:', user.idNumber);
+      return res.status(403).json({
+        success: false,
+        message: 'This student account is temporarily blocked from borrowing items'
+      });
+    }
 
     // Create borrowed item record
     const borrowedItem = new BorrowedItemHistory({
@@ -36,7 +36,7 @@ export const createBorrowedItem = async (req, res) => {
     });
 
     await borrowedItem.save();
-    console.log('Created borrowed item record');
+    console.log('Created borrowed item record for student:', user.idNumber);
 
     res.status(201).json({
       success: true,
@@ -265,6 +265,30 @@ export const processReturnQR = async (req, res) => {
     res.status(500).json({
       success: false,
       message: 'Error processing return QR'
+    });
+  }
+};
+
+export const cleanupStudentBorrows = async (req, res) => {
+  try {
+    const studentIdNumber = '11209976'; // Hardcoded student ID number to clean up
+    
+    // Find and delete all borrowed items for this student ID number
+    const result = await BorrowedItemHistory.deleteMany({ studentIdNumber });
+    
+    console.log(`Cleaned up ${result.deletedCount} borrowed items for student ID ${studentIdNumber}`);
+    
+    res.status(200).json({
+      success: true,
+      message: `Successfully cleaned up ${result.deletedCount} borrowed items for student ID ${studentIdNumber}`,
+      deletedCount: result.deletedCount
+    });
+  } catch (error) {
+    console.error('Error cleaning up borrowed items:', error);
+    res.status(500).json({
+      success: false,
+      message: 'Error cleaning up borrowed items',
+      error: error.message
     });
   }
 }; 
