@@ -328,27 +328,61 @@ export default function ConciergePage() {
       const res = await axios.get(`${baseUrl}/api/concierge/borrowed-items?${queryParams}`, {
         headers: { Authorization: `Bearer ${token}` },
       });
-      const items = res.data.data;
-      const sortedBorrowed = items
-        .filter(item => item.status === 'borrowed')
+
+      // Get current items and new items
+      const currentItems = borrowedItems;
+      const newItems = res.data.data.filter(item => item.status === 'borrowed')
         .sort((a, b) => new Date(b.borrowTime) - new Date(a.borrowTime));
-      setBorrowedItems(sortedBorrowed);
+
+      // Create a Set of existing item identifiers for faster lookup
+      const existingItemIds = new Set(
+        currentItems.map(item => 
+          `${item.studentId}-${item.borrowTime.getTime()}-${JSON.stringify(item.items)}`
+        )
+      );
+
+      // Only add items that don't already exist in our current list
+      const uniqueNewItems = newItems.filter(item => {
+        const itemId = `${item.studentId}-${new Date(item.borrowTime).getTime()}-${JSON.stringify(item.items)}`;
+        return !existingItemIds.has(itemId);
+      });
+
+      // If we have new items, update the state
+      if (uniqueNewItems.length > 0) {
+        console.log('New borrowed items found:', uniqueNewItems.length);
+        setBorrowedItems(prevItems => [...uniqueNewItems, ...prevItems]);
+      }
     } catch (err) {
+      console.error('Error fetching borrowed items:', err);
       setError('Failed to fetch borrowed items');
     }
   };
 
-  // Polling for borrowed tab
+  // Polling for borrowed tab with cleanup
   useEffect(() => {
     let pollInterval;
-    if (activeTab === 'borrowed') {
-      fetchBorrowedItems();
-      pollInterval = setInterval(fetchBorrowedItems, 3000);
-    }
-    return () => {
-      if (pollInterval) clearInterval(pollInterval);
+    let isMounted = true;
+
+    const pollBorrowedItems = async () => {
+      if (isMounted && activeTab === 'borrowed') {
+        await fetchBorrowedItems();
+      }
     };
-  }, [activeTab, token]);
+
+    if (activeTab === 'borrowed') {
+      // Initial fetch
+      pollBorrowedItems();
+      // Poll every 5 seconds instead of 3
+      pollInterval = setInterval(pollBorrowedItems, 5000);
+    }
+
+    return () => {
+      isMounted = false;
+      if (pollInterval) {
+        clearInterval(pollInterval);
+      }
+    };
+  }, [activeTab, token, startDate, endDate]);
 
   // Filter and paginate
   const filteredBorrowedItems = borrowedItems.filter(item =>
