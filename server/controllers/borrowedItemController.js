@@ -16,13 +16,34 @@ export const createBorrowedItem = async (req, res) => {
         message: 'Student not found'
       });
     }
+    
+    // Check for recent borrows of the same items (within last 30 seconds)
+    const thirtySecondsAgo = new Date(Date.now() - 30000);
+    const recentBorrows = await BorrowedItemHistory.find({
+      studentId: user._id,
+      borrowTime: { $gte: thirtySecondsAgo },
+      status: 'borrowed'
+    }).sort({ borrowTime: -1 }); // Sort by most recent first
 
-    // Temporary block for specific students
-    if (user.idNumber === '11209976' || studentId === '683d26dfb23426d2b4e13eeb') {
-      console.log('Blocked borrow attempt for student:', user.idNumber);
-      return res.status(403).json({
+    // Check if any of the items being borrowed were recently borrowed
+    const duplicateItems = [];
+    for (const newItem of items) {
+      const isDuplicate = recentBorrows.some(recentBorrow => 
+        recentBorrow.items.some(recentItem => 
+          recentItem.name === newItem.name && 
+          recentItem.quantity === newItem.quantity
+        )
+      );
+      if (isDuplicate) {
+        duplicateItems.push(newItem.name);
+      }
+    }
+
+    if (duplicateItems.length > 0) {
+      console.log('Duplicate borrow attempt detected for student:', user.idNumber, 'Items:', duplicateItems);
+      return res.status(400).json({
         success: false,
-        message: 'This student account is temporarily blocked from borrowing items'
+        message: `Cannot borrow ${duplicateItems.join(', ')} - these items were recently borrowed. Please wait a moment before trying again.`
       });
     }
 

@@ -187,26 +187,56 @@ export default function ConciergePage() {
     };
   }, [scanning]);
 
+  // Add useEffect to persist scanned codes to localStorage
+  useEffect(() => {
+    localStorage.setItem('scannedCodes', JSON.stringify([...scannedCodes]));
+  }, [scannedCodes]);
+
   const handleScan = async (decodedText) => {
     try {
       setScanning(false);
-      if (isCooldown) {
+      
+      // Parse QR code data first
+      let orderData;
+      try {
+        orderData = JSON.parse(decodedText);
+      } catch (e) {
+        showStatusMessage('error', 'Invalid QR code format');
         return;
       }
-      const orderData = JSON.parse(decodedText);
+
+      if (!orderData.studentId || !orderData.items) {
+        showStatusMessage('error', 'Invalid QR code data');
+        return;
+      }
+
       const scanIdentifier = `${orderData.studentId}-${orderData.timestamp}`;
       
-      if (scannedCodes.has(scanIdentifier)) {
-        showStatusMessage('error', 'This QR code has already been scanned.');
+      // Check both local state and localStorage for scanned codes
+      const savedCodes = localStorage.getItem('scannedCodes');
+      const savedCodesSet = savedCodes ? new Set(JSON.parse(savedCodes)) : new Set();
+      
+      // Check for duplicates before making API call
+      if (scannedCodes.has(scanIdentifier) || savedCodesSet.has(scanIdentifier)) {
+        showStatusMessage('error', 'This QR code has already been scanned. Please wait a moment before trying again.');
+        setScanning(true); // Restart scanner
+        return;
+      }
+
+      if (isCooldown) {
+        showStatusMessage('error', 'Please wait a moment before scanning again.');
+        setScanning(true); // Restart scanner
         return;
       }
       
+      // Set cooldown and update scanned codes BEFORE making API call
       setIsCooldown(true);
-      setScannedCodes(prev => new Set([...prev, scanIdentifier]));
+      const newScannedCodes = new Set([...scannedCodes, scanIdentifier]);
+      setScannedCodes(newScannedCodes);
+      localStorage.setItem('scannedCodes', JSON.stringify([...newScannedCodes]));
       
       // Check if this is a return QR code
       if (orderData.type === 'return') {
-        // Make API call to process the return
         const response = await axios.post(
           `${baseUrl}/api/concierge/return-item`,
           orderData,
@@ -218,23 +248,44 @@ export default function ConciergePage() {
         showStatusMessage('success', 'Items returned successfully!');
       } else {
         // Handle regular borrow QR code
-        const response = await axios.post(
-          `${baseUrl}/api/concierge/scan`,
-          orderData,
-          {
-            headers: { Authorization: `Bearer ${token}` },
+        try {
+          const response = await axios.post(
+            `${baseUrl}/api/concierge/scan`,
+            orderData,
+            {
+              headers: { Authorization: `Bearer ${token}` },
+            }
+          );
+          
+          showStatusMessage('success', 'QR Code scanned successfully!');
+        } catch (error) {
+          // If server detects a duplicate, show the server's error message
+          if (error.response?.data?.message) {
+            showStatusMessage('error', error.response.data.message);
+          } else {
+            showStatusMessage('error', 'Failed to process QR code. Please try again.');
           }
-        );
-        
-        showStatusMessage('success', 'QR Code scanned successfully!');
+          // Remove the scan from our local tracking since it failed
+          const updatedCodes = new Set([...scannedCodes]);
+          updatedCodes.delete(scanIdentifier);
+          setScannedCodes(updatedCodes);
+          localStorage.setItem('scannedCodes', JSON.stringify([...updatedCodes]));
+        }
       }
       
+      // Set cooldown to 3 seconds
       setTimeout(() => {
         setIsCooldown(false);
-      }, 5000);
+        setScanning(true); // Restart scanner after cooldown
+      }, 3000);
     } catch (err) {
       console.error('Error scanning QR code:', err);
       showStatusMessage('error', err.response?.data?.message || 'Invalid QR Code or failed to save');
+      // Reset cooldown on error and restart scanner
+      setTimeout(() => {
+        setIsCooldown(false);
+        setScanning(true);
+      }, 3000);
     }
   };
 
