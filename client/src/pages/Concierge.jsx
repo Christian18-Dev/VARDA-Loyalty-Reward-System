@@ -187,56 +187,26 @@ export default function ConciergePage() {
     };
   }, [scanning]);
 
-  // Add useEffect to persist scanned codes to localStorage
-  useEffect(() => {
-    localStorage.setItem('scannedCodes', JSON.stringify([...scannedCodes]));
-  }, [scannedCodes]);
-
   const handleScan = async (decodedText) => {
     try {
       setScanning(false);
-      
-      // Parse QR code data first
-      let orderData;
-      try {
-        orderData = JSON.parse(decodedText);
-      } catch (e) {
-        showStatusMessage('error', 'Invalid QR code format');
+      if (isCooldown) {
         return;
       }
-
-      if (!orderData.studentId || !orderData.items) {
-        showStatusMessage('error', 'Invalid QR code data');
-        return;
-      }
-
+      const orderData = JSON.parse(decodedText);
       const scanIdentifier = `${orderData.studentId}-${orderData.timestamp}`;
       
-      // Check both local state and localStorage for scanned codes
-      const savedCodes = localStorage.getItem('scannedCodes');
-      const savedCodesSet = savedCodes ? new Set(JSON.parse(savedCodes)) : new Set();
-      
-      // Check for duplicates before making API call
-      if (scannedCodes.has(scanIdentifier) || savedCodesSet.has(scanIdentifier)) {
-        showStatusMessage('error', 'This QR code has already been scanned. Please wait a moment before trying again.');
-        setScanning(true); // Restart scanner
-        return;
-      }
-
-      if (isCooldown) {
-        showStatusMessage('error', 'Please wait a moment before scanning again.');
-        setScanning(true); // Restart scanner
+      if (scannedCodes.has(scanIdentifier)) {
+        showStatusMessage('error', 'This QR code has already been scanned.');
         return;
       }
       
-      // Set cooldown and update scanned codes BEFORE making API call
       setIsCooldown(true);
-      const newScannedCodes = new Set([...scannedCodes, scanIdentifier]);
-      setScannedCodes(newScannedCodes);
-      localStorage.setItem('scannedCodes', JSON.stringify([...newScannedCodes]));
+      setScannedCodes(prev => new Set([...prev, scanIdentifier]));
       
       // Check if this is a return QR code
       if (orderData.type === 'return') {
+        // Make API call to process the return
         const response = await axios.post(
           `${baseUrl}/api/concierge/return-item`,
           orderData,
@@ -248,44 +218,23 @@ export default function ConciergePage() {
         showStatusMessage('success', 'Items returned successfully!');
       } else {
         // Handle regular borrow QR code
-        try {
-          const response = await axios.post(
-            `${baseUrl}/api/concierge/scan`,
-            orderData,
-            {
-              headers: { Authorization: `Bearer ${token}` },
-            }
-          );
-          
-          showStatusMessage('success', 'QR Code scanned successfully!');
-        } catch (error) {
-          // If server detects a duplicate, show the server's error message
-          if (error.response?.data?.message) {
-            showStatusMessage('error', error.response.data.message);
-          } else {
-            showStatusMessage('error', 'Failed to process QR code. Please try again.');
+        const response = await axios.post(
+          `${baseUrl}/api/concierge/scan`,
+          orderData,
+          {
+            headers: { Authorization: `Bearer ${token}` },
           }
-          // Remove the scan from our local tracking since it failed
-          const updatedCodes = new Set([...scannedCodes]);
-          updatedCodes.delete(scanIdentifier);
-          setScannedCodes(updatedCodes);
-          localStorage.setItem('scannedCodes', JSON.stringify([...updatedCodes]));
-        }
+        );
+        
+        showStatusMessage('success', 'QR Code scanned successfully!');
       }
       
-      // Set cooldown to 3 seconds
       setTimeout(() => {
         setIsCooldown(false);
-        setScanning(true); // Restart scanner after cooldown
-      }, 3000);
+      }, 5000);
     } catch (err) {
       console.error('Error scanning QR code:', err);
       showStatusMessage('error', err.response?.data?.message || 'Invalid QR Code or failed to save');
-      // Reset cooldown on error and restart scanner
-      setTimeout(() => {
-        setIsCooldown(false);
-        setScanning(true);
-      }, 3000);
     }
   };
 
@@ -328,61 +277,27 @@ export default function ConciergePage() {
       const res = await axios.get(`${baseUrl}/api/concierge/borrowed-items?${queryParams}`, {
         headers: { Authorization: `Bearer ${token}` },
       });
-
-      // Get current items and new items
-      const currentItems = borrowedItems;
-      const newItems = res.data.data.filter(item => item.status === 'borrowed')
+      const items = res.data.data;
+      const sortedBorrowed = items
+        .filter(item => item.status === 'borrowed')
         .sort((a, b) => new Date(b.borrowTime) - new Date(a.borrowTime));
-
-      // Create a Set of existing item identifiers for faster lookup
-      const existingItemIds = new Set(
-        currentItems.map(item => 
-          `${item.studentId}-${item.borrowTime.getTime()}-${JSON.stringify(item.items)}`
-        )
-      );
-
-      // Only add items that don't already exist in our current list
-      const uniqueNewItems = newItems.filter(item => {
-        const itemId = `${item.studentId}-${new Date(item.borrowTime).getTime()}-${JSON.stringify(item.items)}`;
-        return !existingItemIds.has(itemId);
-      });
-
-      // If we have new items, update the state
-      if (uniqueNewItems.length > 0) {
-        console.log('New borrowed items found:', uniqueNewItems.length);
-        setBorrowedItems(prevItems => [...uniqueNewItems, ...prevItems]);
-      }
+      setBorrowedItems(sortedBorrowed);
     } catch (err) {
-      console.error('Error fetching borrowed items:', err);
       setError('Failed to fetch borrowed items');
     }
   };
 
-  // Polling for borrowed tab with cleanup
+  // Polling for borrowed tab
   useEffect(() => {
     let pollInterval;
-    let isMounted = true;
-
-    const pollBorrowedItems = async () => {
-      if (isMounted && activeTab === 'borrowed') {
-        await fetchBorrowedItems();
-      }
-    };
-
     if (activeTab === 'borrowed') {
-      // Initial fetch
-      pollBorrowedItems();
-      // Poll every 5 seconds instead of 3
-      pollInterval = setInterval(pollBorrowedItems, 5000);
+      fetchBorrowedItems();
+      pollInterval = setInterval(fetchBorrowedItems, 3000);
     }
-
     return () => {
-      isMounted = false;
-      if (pollInterval) {
-        clearInterval(pollInterval);
-      }
+      if (pollInterval) clearInterval(pollInterval);
     };
-  }, [activeTab, token, startDate, endDate]);
+  }, [activeTab, token]);
 
   // Filter and paginate
   const filteredBorrowedItems = borrowedItems.filter(item =>

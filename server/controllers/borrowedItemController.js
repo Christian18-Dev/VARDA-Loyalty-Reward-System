@@ -16,36 +16,6 @@ export const createBorrowedItem = async (req, res) => {
         message: 'Student not found'
       });
     }
-    
-    // Check for recent borrows of the same items (within last 30 seconds)
-    const thirtySecondsAgo = new Date(Date.now() - 30000);
-    const recentBorrows = await BorrowedItemHistory.find({
-      studentId: user._id,
-      borrowTime: { $gte: thirtySecondsAgo },
-      status: 'borrowed'
-    }).sort({ borrowTime: -1 }); // Sort by most recent first
-
-    // Check if any of the items being borrowed were recently borrowed
-    const duplicateItems = [];
-    for (const newItem of items) {
-      const isDuplicate = recentBorrows.some(recentBorrow => 
-        recentBorrow.items.some(recentItem => 
-          recentItem.name === newItem.name && 
-          recentItem.quantity === newItem.quantity
-        )
-      );
-      if (isDuplicate) {
-        duplicateItems.push(newItem.name);
-      }
-    }
-
-    if (duplicateItems.length > 0) {
-      console.log('Duplicate borrow attempt detected for student:', user.idNumber, 'Items:', duplicateItems);
-      return res.status(400).json({
-        success: false,
-        message: `Cannot borrow ${duplicateItems.join(', ')} - these items were recently borrowed. Please wait a moment before trying again.`
-      });
-    }
 
     // Create borrowed item record
     const borrowedItem = new BorrowedItemHistory({
@@ -57,7 +27,7 @@ export const createBorrowedItem = async (req, res) => {
     });
 
     await borrowedItem.save();
-    console.log('Created borrowed item record for student:', user.idNumber);
+    console.log('Created borrowed item record');
 
     res.status(201).json({
       success: true,
