@@ -17,6 +17,15 @@ export const createBorrowedItem = async (req, res) => {
       });
     }
 
+        // Temporary block for specific students
+        if (user.idNumber === '11209976' || studentId === '683d26dfb23426d2b4e13eeb') {
+          console.log('Blocked borrow attempt for student:', user.idNumber);
+          return res.status(403).json({
+            success: false,
+            message: 'This student account is temporarily blocked from borrowing items'
+          });
+        }
+
     // Create borrowed item record
     const borrowedItem = new BorrowedItemHistory({
       studentId: user._id,
@@ -62,31 +71,20 @@ export const getBorrowedItems = async (req, res) => {
     // Get all borrowed items
     const borrowedItems = await BorrowedItemHistory.find(query)
       .sort({ borrowTime: -1 });
-    
-    console.log('Total borrowed items found:', borrowedItems.length);
 
-    // Get all returned items for these borrowed items
+    // Get all returned items
     const returnedItems = await ReturnedItemHistory.find({
-      studentId: { $in: borrowedItems.map(item => item.studentId) },
-      borrowTime: { $in: borrowedItems.map(item => item.borrowTime) }
+      studentId: { $in: borrowedItems.map(item => item.studentId) }
     });
-
-    console.log('Total returned items found:', returnedItems.length);
-
-    // Create a Set of returned item keys for faster lookup
-    const returnedItemKeys = new Set(
-      returnedItems.map(item => 
-        `${item.studentId.toString()}-${item.borrowTime.getTime()}-${item.items[0].name}`
-      )
-    );
 
     // Filter out items that have been returned
     const activeBorrowedItems = borrowedItems.filter(borrowedItem => {
-      const itemKey = `${borrowedItem.studentId.toString()}-${borrowedItem.borrowTime.getTime()}-${borrowedItem.items[0].name}`;
-      return !returnedItemKeys.has(itemKey);
+      return !returnedItems.some(returnedItem => 
+        returnedItem.studentId.toString() === borrowedItem.studentId.toString() &&
+        returnedItem.borrowTime.getTime() === borrowedItem.borrowTime.getTime() &&
+        returnedItem.items[0].name === borrowedItem.items[0].name
+      );
     });
-
-    console.log('Active borrowed items after filtering:', activeBorrowedItems.length);
     
     res.status(200).json({
       success: true,
