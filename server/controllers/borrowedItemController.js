@@ -4,7 +4,7 @@ import User from '../models/User.js';
 
 export const createBorrowedItem = async (req, res) => {
   try {
-    const { items, studentId } = req.body;
+    const { items, studentId, timestamp } = req.body;
     console.log('Creating borrowed item for student ID:', studentId);
 
     // First verify the user exists
@@ -17,12 +17,18 @@ export const createBorrowedItem = async (req, res) => {
       });
     }
 
-    // Temporary block for specific students
-    if (user.idNumber === '11209976' || studentId === '683d26dfb23426d2b4e13eeb') {
-      console.log('Blocked borrow attempt for student:', user.idNumber);
-      return res.status(403).json({
+    // Check for existing borrow with the same timestamp
+    const existingBorrow = await BorrowedItemHistory.findOne({
+      studentId: user._id,
+      borrowTime: new Date(timestamp),
+      status: 'borrowed'
+    });
+
+    if (existingBorrow) {
+      console.log('Duplicate borrow attempt detected for student:', user.idNumber);
+      return res.status(400).json({
         success: false,
-        message: 'This student account is temporarily blocked from borrowing items'
+        message: 'This borrow request has already been processed'
       });
     }
 
@@ -32,7 +38,7 @@ export const createBorrowedItem = async (req, res) => {
       studentIdNumber: user.idNumber,
       items,
       status: 'borrowed',
-      borrowTime: new Date()
+      borrowTime: new Date(timestamp) // Use the timestamp from the QR code
     });
 
     await borrowedItem.save();
@@ -265,30 +271,6 @@ export const processReturnQR = async (req, res) => {
     res.status(500).json({
       success: false,
       message: 'Error processing return QR'
-    });
-  }
-};
-
-export const cleanupStudentBorrows = async (req, res) => {
-  try {
-    const studentIdNumber = '11209976'; // Hardcoded student ID number to clean up
-    
-    // Find and delete all borrowed items for this student ID number
-    const result = await BorrowedItemHistory.deleteMany({ studentIdNumber });
-    
-    console.log(`Cleaned up ${result.deletedCount} borrowed items for student ID ${studentIdNumber}`);
-    
-    res.status(200).json({
-      success: true,
-      message: `Successfully cleaned up ${result.deletedCount} borrowed items for student ID ${studentIdNumber}`,
-      deletedCount: result.deletedCount
-    });
-  } catch (error) {
-    console.error('Error cleaning up borrowed items:', error);
-    res.status(500).json({
-      success: false,
-      message: 'Error cleaning up borrowed items',
-      error: error.message
     });
   }
 }; 

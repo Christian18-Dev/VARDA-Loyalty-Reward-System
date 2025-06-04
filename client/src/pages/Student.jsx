@@ -274,6 +274,7 @@ export default function StudentPage() {
       return;
     }
 
+    const timestamp = new Date().toISOString();
     const orderDetails = {
       studentName: user.name,
       studentId: user._id,
@@ -281,7 +282,7 @@ export default function StudentPage() {
         name: item.name,
         quantity: item.cartQuantity
       })),
-      timestamp: new Date().toISOString()
+      timestamp: timestamp // Add timestamp to the order details
     };
 
     try {
