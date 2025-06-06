@@ -77,14 +77,28 @@ export const registerUser = async (req, res) => {
 };
 
 export const loginUser = async (req, res) => {
+  console.log('Login attempt with payload:', req.body);
   const { idNumber, password } = req.body;
+  
+  if (!idNumber || !password) {
+    console.log('Missing credentials:', { idNumber: !!idNumber, password: !!password });
+    return res.status(400).json({ message: 'ID number and password are required' });
+  }
+
   try {
     const user = await User.findOne({ idNumber });
-    if (!user) return res.status(400).json({ message: 'Invalid ID number or password' });
+    if (!user) {
+      console.log('User not found for ID:', idNumber);
+      return res.status(400).json({ message: 'Invalid ID number or password' });
+    }
 
     const isMatch = await bcrypt.compare(password, user.password);
-    if (!isMatch) return res.status(400).json({ message: 'Invalid ID number or password' });
+    if (!isMatch) {
+      console.log('Password mismatch for user:', idNumber);
+      return res.status(400).json({ message: 'Invalid ID number or password' });
+    }
 
+    console.log('Login successful for user:', idNumber);
     res.status(200).json({
       _id: user._id,
       firstName: user.firstName,
@@ -94,6 +108,7 @@ export const loginUser = async (req, res) => {
       token: generateToken(user),
     });
   } catch (error) {
+    console.error('Login error:', error);
     res.status(500).json({ message: error.message });
   }
 };
