@@ -11,7 +11,8 @@ import {
   ExclamationIcon,
   ArrowLeftIcon,
   ArrowRightIcon,
-  BellIcon
+  BellIcon,
+  CurrencyDollarIcon
 } from '@heroicons/react/outline';
 import { motion, AnimatePresence } from 'framer-motion';
 
@@ -95,6 +96,13 @@ export default function AdminPage() {
   // Add new state for cleanup
   const [isCleaningUp, setIsCleaningUp] = useState(false);
   const [cleanupMessage, setCleanupMessage] = useState('');
+
+  // Add new state for points usage
+  const [pointsUsage, setPointsUsage] = useState([]);
+  const [pointsUsagePage, setPointsUsagePage] = useState(1);
+  const [pointsUsageTotalPages, setPointsUsageTotalPages] = useState(1);
+  const [pointsUsageSearchTerm, setPointsUsageSearchTerm] = useState('');
+  const [isPointsUsageLoading, setIsPointsUsageLoading] = useState(false);
 
   const token = user.token;
   const baseUrl = import.meta.env.VITE_API_BASE_URL;
@@ -655,6 +663,43 @@ export default function AdminPage() {
     }
   };
 
+  // Add new function to fetch points usage
+  const fetchPointsUsage = async (page = 1, search = '') => {
+    try {
+      setIsPointsUsageLoading(true);
+      const response = await axios.get(
+        `${baseUrl}/api/admin/points-usage?page=${page}&limit=10&search=${search}`,
+        { headers: { Authorization: `Bearer ${token}` } }
+      );
+      setPointsUsage(response.data.pointsUsage);
+      setPointsUsagePage(response.data.currentPage);
+      setPointsUsageTotalPages(response.data.totalPages);
+    } catch (error) {
+      console.error('Error fetching points usage:', error);
+      setError('Failed to fetch points usage records');
+    } finally {
+      setIsPointsUsageLoading(false);
+    }
+  };
+
+  // Add effect for points usage tab
+  useEffect(() => {
+    if (activeTab === 'points-usage') {
+      fetchPointsUsage(pointsUsagePage, pointsUsageSearchTerm);
+    }
+  }, [activeTab, pointsUsagePage, pointsUsageSearchTerm]);
+
+  // Add points usage search handler
+  const handlePointsUsageSearch = (e) => {
+    setPointsUsageSearchTerm(e.target.value);
+    setPointsUsagePage(1);
+  };
+
+  // Add points usage page change handler
+  const handlePointsUsagePageChange = (newPage) => {
+    setPointsUsagePage(newPage);
+  };
+
   if (isLoading && !isOverviewPolling) {
     return (
       <div className="flex justify-center items-center h-screen">
@@ -1180,6 +1225,7 @@ export default function AdminPage() {
             { id: 'claims', icon: ClipboardListIcon, label: 'Claims' },
             { id: 'borrowed', icon: ArrowLeftIcon, label: 'Borrowed' },
             { id: 'returned', icon: ArrowRightIcon, label: 'Returned' },
+            { id: 'points-usage', icon: CurrencyDollarIcon, label: 'Points Usage' },
             { id: 'notifications', icon: BellIcon, label: 'Notifications' }
           ].map(({ id, icon: Icon, label }) => (
             <button
@@ -1326,6 +1372,13 @@ export default function AdminPage() {
                               <option value="ateneoStaff">Ateneo Staff</option>
                               <option value="cashier">Cashier</option>
                               <option value="concierge">Concierge</option>
+                              <option value="catering">Catering</option>
+                              <option value="varda">Varda</option>
+                              <option value="blueCafe">Blue Cafe</option>
+                              <option value="colonelsCurry">Colonel's Curry</option>
+                              <option value="chillers">Chillers</option>
+                              <option value="luckyShawarma">Lucky Shawarma</option>
+                              <option value="yumdimdum">Yumdimdum</option>
                               <option value="admin">Admin</option>
                             </select>
                           </td>
@@ -1867,6 +1920,158 @@ export default function AdminPage() {
                 </button>
               </div>
             )}
+          </motion.div>
+        )}
+
+        {/* Points Usage Tab */}
+        {activeTab === 'points-usage' && (
+          <motion.div
+            initial={{ opacity: 0, y: 20 }}
+            animate={{ opacity: 1, y: 0 }}
+            className="bg-white rounded-2xl shadow-lg p-4 sm:p-6"
+          >
+            <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center mb-6 space-y-4 sm:space-y-0">
+              <div className="flex items-center space-x-3">
+                <div className="p-2 bg-purple-100 rounded-lg">
+                  <CurrencyDollarIcon className="w-6 h-6 text-purple-600" />
+                </div>
+                <div>
+                  <h2 className="text-2xl font-bold text-gray-800">Points Usage History</h2>
+                  <p className="text-gray-600 mt-1">View all points usage records</p>
+                </div>
+              </div>
+              <div className="w-full sm:w-64">
+                <div className="relative">
+                  <input
+                    type="text"
+                    placeholder="Search records..."
+                    value={pointsUsageSearchTerm}
+                    onChange={handlePointsUsageSearch}
+                    className="w-full px-4 py-2 pl-10 border border-gray-300 rounded-xl focus:ring-2 focus:ring-purple-500 focus:border-transparent"
+                  />
+                  <svg className="w-5 h-5 text-gray-400 absolute left-3 top-2.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z" />
+                  </svg>
+                </div>
+              </div>
+            </div>
+
+            <div className="overflow-x-auto">
+              {isPointsUsageLoading ? (
+                <div className="flex justify-center items-center py-8">
+                  <div className="animate-spin rounded-full h-8 w-8 border-t-2 border-b-2 border-purple-500"></div>
+                </div>
+              ) : (
+                <>
+                  <table className="min-w-full divide-y divide-gray-200">
+                    <thead className="bg-gray-50">
+                      <tr>
+                        <th scope="col" className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                          Date
+                        </th>
+                        <th scope="col" className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                          ID Number
+                        </th>
+                        <th scope="col" className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                          Name
+                        </th>
+                        <th scope="col" className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                          Meal Type
+                        </th>
+                        <th scope="col" className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                          Store
+                        </th>
+                        <th scope="col" className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                          Points Used
+                        </th>
+                        <th scope="col" className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                          Items
+                        </th>
+                      </tr>
+                    </thead>
+                    <tbody className="bg-white divide-y divide-gray-200">
+                      {pointsUsage.map((record) => (
+                        <tr key={record._id} className="hover:bg-gray-50">
+                          <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500">
+                            {new Date(record.dateUsed).toLocaleString()}
+                          </td>
+                          <td className="px-6 py-4 whitespace-nowrap text-sm font-medium text-gray-900">
+                            {record.idNumber}
+                          </td>
+                          <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500">
+                            {record.firstName} {record.lastName}
+                          </td>
+                          <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500">
+                            <span className="px-2 inline-flex text-xs leading-5 font-semibold rounded-full bg-purple-100 text-purple-800">
+                              {record.mealType}
+                            </span>
+                          </td>
+                          <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500">
+                            {record.storeName}
+                          </td>
+                          <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500">
+                            <span className="px-2 inline-flex text-xs leading-5 font-semibold rounded-full bg-green-100 text-green-800">
+                              {record.pointsUsed}
+                            </span>
+                          </td>
+                          <td className="px-6 py-4 text-sm text-gray-500">
+                            <div className="max-w-xs">
+                              {record.items.map((item, index) => (
+                                <div key={index} className="mb-1">
+                                  {item.name}
+                                </div>
+                              ))}
+                            </div>
+                          </td>
+                        </tr>
+                      ))}
+                      {pointsUsage.length === 0 && (
+                        <tr>
+                          <td colSpan="7" className="px-6 py-4 text-center text-sm text-gray-500">
+                            No points usage records found
+                          </td>
+                        </tr>
+                      )}
+                    </tbody>
+                  </table>
+
+                  {/* Pagination */}
+                  {pointsUsageTotalPages > 1 && (
+                    <div className="flex justify-center items-center mt-6 space-x-4">
+                      <button
+                        onClick={() => handlePointsUsagePageChange(Math.max(1, pointsUsagePage - 1))}
+                        disabled={pointsUsagePage === 1 || isPointsUsageLoading}
+                        className={`p-2 rounded-lg transition-colors ${
+                          pointsUsagePage === 1 || isPointsUsageLoading
+                            ? 'text-gray-400 cursor-not-allowed'
+                            : 'text-gray-700 hover:bg-gray-100'
+                        }`}
+                      >
+                        <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M15 19l-7-7 7-7" />
+                        </svg>
+                      </button>
+                      <span className="text-gray-700 font-medium">
+                        Page {pointsUsagePage} of {pointsUsageTotalPages}
+                      </span>
+                      <button
+                        onClick={() => handlePointsUsagePageChange(Math.min(pointsUsageTotalPages, pointsUsagePage + 1))}
+                        disabled={pointsUsagePage === pointsUsageTotalPages || isPointsUsageLoading}
+                        className={`p-2 rounded-lg transition-colors ${
+                          pointsUsagePage === pointsUsageTotalPages || isPointsUsageLoading
+                            ? 'text-gray-400 cursor-not-allowed'
+                            : 'text-gray-700 hover:bg-gray-100'
+                        }`}
+                      >
+                        <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M9 5l7 7-7 7" />
+                        </svg>
+                      </button>
+                    </div>
+                  )}
+                </>
+              )}
+            </div>
           </motion.div>
         )}
 

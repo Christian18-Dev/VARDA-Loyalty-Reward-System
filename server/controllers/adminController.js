@@ -2,6 +2,7 @@ import User from '../models/User.js';
 import Reward from '../models/Reward.js';
 import ClaimedReward from '../models/ClaimedReward.js';
 import bcrypt from 'bcryptjs';
+import PointsUsage from '../models/PointsUsage.js';
 
 export const getStats = async (req, res) => {
   try {
@@ -87,7 +88,20 @@ export const updateUserRole = async (req, res) => {
     const { role } = req.body;
 
     // Validate role
-    const validRoles = ['student', 'teacher', 'ateneoStaff', 'cashier', 'concierge'];
+    const validRoles = [
+      'student', 
+      'teacher', 
+      'ateneoStaff', 
+      'cashier', 
+      'concierge', 
+      'catering',
+      'varda',
+      'blueCafe',
+      'colonelsCurry',
+      'chillers',
+      'luckyShawarma',
+      'yumdimdum'
+    ];
     if (!validRoles.includes(role)) {
       return res.status(400).json({ message: 'Invalid role' });
     }
@@ -143,5 +157,44 @@ export const updateUserPassword = async (req, res) => {
   } catch (error) {
     console.error('Error updating password:', error);
     res.status(500).json({ message: 'Error updating password' });
+  }
+};
+
+// Get all points usage records
+export const getAllPointsUsage = async (req, res) => {
+  try {
+    const page = parseInt(req.query.page) || 1;
+    const limit = parseInt(req.query.limit) || 10;
+    const search = req.query.search || '';
+
+    // Create search query
+    const searchQuery = search ? {
+      $or: [
+        { idNumber: { $regex: search, $options: 'i' } },
+        { firstName: { $regex: search, $options: 'i' } },
+        { lastName: { $regex: search, $options: 'i' } },
+        { storeName: { $regex: search, $options: 'i' } },
+        { mealType: { $regex: search, $options: 'i' } }
+      ]
+    } : {};
+
+    // Get total count for pagination
+    const total = await PointsUsage.countDocuments(searchQuery);
+
+    // Get paginated points usage records
+    const pointsUsage = await PointsUsage.find(searchQuery)
+      .sort({ dateUsed: -1 })
+      .skip((page - 1) * limit)
+      .limit(limit);
+
+    res.json({
+      pointsUsage,
+      currentPage: page,
+      totalPages: Math.ceil(total / limit),
+      totalRecords: total
+    });
+  } catch (error) {
+    console.error('Error fetching points usage records:', error);
+    res.status(500).json({ message: 'Error fetching points usage records' });
   }
 };

@@ -33,7 +33,19 @@ export default function Login() {
       });
 
       login(data);
-      if (data.role === 'cashier') {
+      
+      // Check for store roles
+      const storeRoles = [
+        'cashier',
+        'varda',
+        'blueCafe',
+        'colonelsCurry',
+        'chillers',
+        'luckyShawarma',
+        'yumdimdum'
+      ];
+      
+      if (storeRoles.includes(data.role)) {
         navigate('/cashier');
       } else if (data.role === 'admin') {
         navigate('/admin');

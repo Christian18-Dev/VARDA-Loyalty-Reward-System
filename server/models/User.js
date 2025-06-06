@@ -7,11 +7,40 @@ const userSchema = new mongoose.Schema({
   idNumber: { type: String, required: true, unique: true },
   role: {
     type: String,
-    enum: ['student', 'teacher', 'ateneoStaff', 'cashier', 'admin', 'concierge'],
+    enum: [
+      'student', 
+      'teacher', 
+      'ateneoStaff', 
+      'cashier', 
+      'admin', 
+      'concierge', 
+      'catering',
+      'varda',
+      'blueCafe',
+      'colonelsCurry',
+      'chillers',
+      'luckyShawarma',
+      'yumdimdum'
+    ],
     default: 'student'
   },
-  points: { type: Number, default: 0 },   // Current available points
-  pointsUsed: { type: Number, default: 0 }, // Total points spent by user
+  points: { type: Number, default: 0 },   // Loyalty points
+  pointsUsed: { type: Number, default: 0 }, // Total loyalty points spent
+  cateringPoints: {
+    type: {
+      breakfast: { type: Number, default: 250 },
+      lunch: { type: Number, default: 250 },
+      dinner: { type: Number, default: 250 },
+      lastReset: { type: Date, default: Date.now }
+    },
+    default: () => ({
+      breakfast: 250,
+      lunch: 250,
+      dinner: 250,
+      lastReset: new Date()
+    })
+  },
+  cateringPointsUsed: { type: Number, default: 0 }, // Total catering points spent
   termsAccepted: { type: Boolean, default: false },
   termsAcceptedAt: { type: Date }
 }, {

@@ -63,7 +63,7 @@ export const getBorrowedItems = async (req, res) => {
     let query = {};
 
     // Filter by user's ID for student, teacher, and ateneo staff roles
-    if (req.user && ['student', 'teacher', 'ateneostaff'].includes(req.user.role.toLowerCase())) {
+    if (req.user && ['student', 'teacher', 'ateneostaff', 'catering'].includes(req.user.role.toLowerCase())) {
       query.studentId = req.user._id;
     }
 

@@ -3,6 +3,7 @@ import { claimCode, submitFeedback, getPoints, claimReward, updateProfile } from
 import { protect } from '../middleware/authMiddleware.js';
 import { getRewards } from '../controllers/rewardController.js';
 import { createBorrowedItem, getBorrowedItems } from '../controllers/borrowedItemController.js';
+import { recordPointsUsage, getPointsUsageHistory, getPointsUsageStats } from '../controllers/pointsUsageController.js';
 
 const router = express.Router();
 
@@ -28,5 +29,10 @@ router.post('/claim-reward/:id', protect, claimReward);
 router.put('/profile', protect, updateProfile);
 
 router.get('/rewards', protect, getRewards);
+
+// Routes for points usage tracking
+router.post('/points-usage', protect, recordPointsUsage);
+router.get('/points-usage/history', protect, getPointsUsageHistory);
+router.get('/points-usage/stats', protect, getPointsUsageStats);
 
 export default router;

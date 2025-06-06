@@ -13,16 +13,19 @@ export const protect = async (req, res, next) => {
       const decoded = jwt.verify(token, process.env.JWT_SECRET);
 
       // Get user from the token
-      req.user = await User.findById(decoded.id).select('-password');
+      const user = await User.findById(decoded.id).select('-password');
+      
+      if (!user) {
+        return res.status(401).json({ message: 'User not found' });
+      }
 
+      req.user = user;
       next();
     } catch (error) {
       console.error(error);
       res.status(401).json({ message: 'Not authorized, token failed' });
     }
-  }
-
-  if (!token) {
+  } else {
     res.status(401).json({ message: 'Not authorized, no token' });
   }
 };
@@ -31,7 +34,7 @@ export const admin = (req, res, next) => {
   if (req.user && req.user.role === 'admin') {
     next();
   } else {
-    res.status(403).json({ message: 'Not authorized as an admin' });
+    res.status(401).json({ message: 'Not authorized as admin' });
   }
 };
 
@@ -43,10 +46,21 @@ export const adminOnly = (req, res, next) => {
 };
 
 export const cashierOnly = (req, res, next) => {
-  if (req.user?.role !== 'cashier') {
-    return res.status(403).json({ message: 'Cashier access only' });
+  const allowedRoles = [
+    'cashier',
+    'varda',
+    'blueCafe',
+    'colonelsCurry',
+    'chillers',
+    'luckyShawarma',
+    'yumdimdum'
+  ];
+  
+  if (req.user && allowedRoles.includes(req.user.role)) {
+    next();
+  } else {
+    res.status(401).json({ message: 'Not authorized as cashier' });
   }
-  next();
 };
 
 export const conciergeOnly = (req, res, next) => {

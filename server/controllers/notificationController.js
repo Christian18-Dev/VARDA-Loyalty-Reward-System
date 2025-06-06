@@ -41,6 +41,13 @@ export const createNotification = async (req, res) => {
 // Get notifications for a specific user
 export const getUserNotifications = async (req, res) => {
   try {
+    if (!req.user || !req.user._id) {
+      return res.status(401).json({
+        success: false,
+        message: 'User not authenticated'
+      });
+    }
+
     const notifications = await Notification.find({ studentId: req.user._id })
       .sort({ createdAt: -1 });
 
