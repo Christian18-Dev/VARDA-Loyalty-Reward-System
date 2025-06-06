@@ -5,7 +5,6 @@ import { useNavigate } from 'react-router-dom';
 import { HomeIcon, TicketIcon, GiftIcon, LogoutIcon, ShoppingBagIcon, XIcon, TrashIcon } from '@heroicons/react/outline';
 import { motion, AnimatePresence } from 'framer-motion';
 import confetti from 'canvas-confetti';
-import { QRCodeSVG } from 'qrcode.react';
 import completeSetImage from '../assets/completeset.png';
 import spoonImage from '../assets/spoon.png';
 import forkImage from '../assets/fork.png';
@@ -84,12 +83,8 @@ export default function StudentPage() {
       cartQuantity: 0
     },
   ]);
-  const [showQRModal, setShowQRModal] = useState(false);
-  const [qrData, setQrData] = useState(null);
   const [showCart, setShowCart] = useState(false);
   const [showSuccessModal, setShowSuccessModal] = useState(false);
-  const [showReturnQRModal, setShowReturnQRModal] = useState(false);
-  const [returnQRData, setReturnQRData] = useState(null);
   const [notifications, setNotifications] = useState([]);
   const [showNotification, setShowNotification] = useState(false);
   const [currentNotification, setCurrentNotification] = useState(null);
@@ -115,6 +110,10 @@ export default function StudentPage() {
   const [selectedLunchStore, setSelectedLunchStore] = useState(null);
   const [selectedDinnerStore, setSelectedDinnerStore] = useState(null);
   const [error, setError] = useState('');
+  const [currentReturnItem, setCurrentReturnItem] = useState(null);
+  const [modalType, setModalType] = useState('');
+  const [modalItems, setModalItems] = useState([]);
+  const [modalTime, setModalTime] = useState('');
 
   const baseUrl = import.meta.env.VITE_API_BASE_URL;
   const token = user.token;
@@ -508,6 +507,25 @@ export default function StudentPage() {
     setSelectedDinnerStore(null);
   };
 
+  // Add retry utility function
+  const retryOperation = async (operation, maxRetries = 3) => {
+    let lastError;
+    for (let i = 0; i < maxRetries; i++) {
+      try {
+        return await operation();
+      } catch (error) {
+        lastError = error;
+        if (error.code === 'ECONNRESET' || error.message.includes('network')) {
+          // Wait before retrying (exponential backoff)
+          await new Promise(resolve => setTimeout(resolve, Math.pow(2, i) * 1000));
+          continue;
+        }
+        throw error;
+      }
+    }
+    throw lastError;
+  };
+
   // Update handlePlaceBreakfastOrder
   const handlePlaceBreakfastOrder = async () => {
     try {
@@ -691,19 +709,122 @@ export default function StudentPage() {
     }
   };
 
+  // Update handleConfirmOrder function
+  const handleConfirmOrder = async () => {
+    const itemsToBorrow = availableItems.filter(item => item.cartQuantity > 0);
+    
+    if (itemsToBorrow.length === 0) {
+      setErrorMessage('Your cart is empty. Please add items before confirming your borrow.');
+      return;
+    }
+
+    const timestamp = new Date().toISOString();
+    const orderDetails = {
+      studentId: user._id,
+      studentIdNumber: user.idNumber,
+      items: itemsToBorrow.map(item => ({
+        name: item.name,
+        quantity: item.cartQuantity
+      })),
+      timestamp: timestamp
+    };
+
+    try {
+      // Use retry logic for the API call
+      const response = await retryOperation(async () => {
+        return await axios.post(
+          `${baseUrl}/api/student/borrow-items`,
+          orderDetails,
+          {
+            headers: { Authorization: `Bearer ${token}` },
+            timeout: 10000 // 10 second timeout
+          }
+        );
+      });
+
+      // Store items and time for modal display
+      setModalItems(itemsToBorrow);
+      setModalTime(new Date().toLocaleString());
+      setModalType('borrow');
+      setSuccessMessage('Borrow Complete!');
+      setShowSuccessModal(true);
+
+      // Reset cart quantities
+      setAvailableItems(prevItems => 
+        prevItems.map(item => ({ ...item, cartQuantity: 0 }))
+      );
+
+      // Fetch updated borrowed items with retry
+      await retryOperation(fetchBorrowedItems);
+    } catch (error) {
+      console.error('Error creating borrow record:', error);
+      if (error.code === 'ECONNRESET') {
+        setErrorMessage('Network connection was lost. Please try again.');
+      } else {
+        setErrorMessage('Failed to create borrow record. Please try again.');
+      }
+    }
+  };
+
+  // Update handleReturn function
+  const handleReturn = async (item) => {
+    try {
+      const returnData = {
+        studentId: user._id,
+        studentIdNumber: user.idNumber,
+        items: item.items,
+        timestamp: item.borrowTime
+      };
+
+      // Use retry logic for the API call
+      const response = await retryOperation(async () => {
+        return await axios.post(
+          `${baseUrl}/api/student/return-items`,
+          returnData,
+          {
+            headers: { Authorization: `Bearer ${token}` },
+            timeout: 10000 // 10 second timeout
+          }
+        );
+      });
+
+      // Store items and time for modal display
+      setModalItems(item.items);
+      setModalTime(new Date().toLocaleString());
+      setModalType('return');
+      setSuccessMessage('Return Complete!');
+      setShowSuccessModal(true);
+
+      // Fetch updated borrowed items with retry
+      await retryOperation(fetchBorrowedItems);
+    } catch (error) {
+      console.error('Error returning items:', error);
+      if (error.code === 'ECONNRESET') {
+        setErrorMessage('Network connection was lost. Please try again.');
+      } else {
+        setErrorMessage('Failed to return items. Please try again.');
+      }
+    }
+  };
+
+  // Update fetchBorrowedItems function
   const fetchBorrowedItems = async () => {
     try {
-      const res = await axios.get(`${baseUrl}/api/student/borrowed-items`, {
-        headers: { Authorization: `Bearer ${token}` },
-      });
-      const items = res.data.data;
-      const sortedBorrowed = items
-        .filter(item => item.status === 'borrowed')
-        .sort((a, b) => new Date(b.borrowTime) - new Date(a.borrowTime));
-      setBorrowedItems(sortedBorrowed);
-    } catch (err) {
-      console.error('Error fetching borrowed items:', err);
-      setErrorMessage('Failed to fetch borrowed items');
+      const response = await axios.get(
+        `${baseUrl}/api/student/borrowed-items`,
+        {
+          headers: { Authorization: `Bearer ${token}` },
+          timeout: 10000 // 10 second timeout
+        }
+      );
+      setBorrowedItems(response.data.data);
+    } catch (error) {
+      console.error('Error fetching borrowed items:', error);
+      if (error.code === 'ECONNRESET') {
+        setErrorMessage('Network connection was lost while fetching items. Please refresh the page.');
+      } else {
+        setErrorMessage('Failed to fetch borrowed items. Please refresh the page.');
+      }
     }
   };
 
@@ -832,76 +953,6 @@ export default function StudentPage() {
         return item;
       })
     );
-  };
-
-  const handleConfirmOrder = async () => {
-    const itemsToBorrow = availableItems.filter(item => item.cartQuantity > 0);
-    
-    // Check if there are any items to borrow
-    if (itemsToBorrow.length === 0) {
-      setErrorMessage('Your cart is empty. Please add items before confirming your borrow.');
-      return;
-    }
-
-    const timestamp = new Date().toISOString();
-    const orderDetails = {
-      studentId: user._id,
-      studentIdNumber: user.idNumber,
-      items: itemsToBorrow.map(item => ({
-        name: item.name,
-        quantity: item.cartQuantity
-      })),
-      timestamp: timestamp
-    };
-
-    try {
-      // Generate QR code data
-      setQrData(JSON.stringify(orderDetails));
-      setShowQRModal(true);
-      setShowSuccessModal(true);
-
-      // Reset cart quantities
-      setAvailableItems(prevItems => 
-        prevItems.map(item => ({ ...item, cartQuantity: 0 }))
-      );
-
-      // Fetch updated borrowed items
-      await fetchBorrowedItems();
-    } catch (error) {
-      console.error('Error creating order:', error);
-      setErrorMessage('Failed to create order. Please try again.');
-    }
-  };
-
-  const handleBorrow = (itemId) => {
-    setAvailableItems(prevItems => 
-      prevItems.map(item => {
-        if (item.id === itemId && item.quantity > item.borrowed) {
-          return { ...item, borrowed: item.borrowed + 1 };
-        }
-        return item;
-      })
-    );
-    setBorrowedItems(prev => [...prev, { ...availableItems.find(item => item.id === itemId), borrowTime: new Date() }]);
-    setSuccessMessage('Item borrowed successfully!');
-    setTimeout(() => setSuccessMessage(''), 3000);
-  };
-
-  const handleReturn = (item) => {
-    const returnData = {
-      type: 'return',
-      studentId: user._id,
-      studentIdNumber: user.idNumber,
-      items: item.items,
-      timestamp: item.borrowTime,
-      summary: {
-        totalItems: item.items.reduce((sum, i) => sum + i.quantity, 0),
-        itemDetails: item.items.map(i => `${i.name} (x${i.quantity})`).join(', '),
-        borrowDate: new Date(item.borrowTime).toLocaleString()
-      }
-    };
-    setReturnQRData(JSON.stringify(returnData));
-    setShowReturnQRModal(true);
   };
 
   // Animation variants
@@ -2225,49 +2276,6 @@ export default function StudentPage() {
         </div>
       )}
 
-      {/* QR Code Modal */}
-      {showQRModal && qrData && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 backdrop-blur-sm">
-          <motion.div 
-            initial={{ scale: 0.9, opacity: 0 }}
-            animate={{ scale: 1, opacity: 1 }}
-            className="bg-[#1e293b] rounded-2xl p-6 max-w-sm w-full shadow-xl border-2 border-gray-700/50"
-          >
-            <div className="text-center space-y-4">
-              <h3 className="text-xl font-bold text-blue-400">Scan Me!</h3>
-              
-              <div className="bg-gray-800/50 p-4 rounded-xl border-2 border-dashed border-gray-700/50">
-                <QRCodeSVG 
-                  value={qrData}
-                  size={200}
-                  level="H"
-                  includeMargin={true}
-                  className="mx-auto"
-                />
-              </div>
-
-              <div className="text-left bg-gray-800/50 p-4 rounded-xl">
-                <h4 className="font-semibold text-gray-200 mb-2">Order Details:</h4>
-                <ul className="space-y-1 text-sm text-gray-400">
-                  {JSON.parse(qrData).items.map((item, index) => (
-                    <li key={index}>
-                      • {item.name} (x{item.quantity})
-                    </li>
-                  ))}
-                </ul>
-              </div>
-
-              <button 
-                onClick={() => setShowQRModal(false)}
-                className="w-full bg-blue-600 text-white px-4 py-2 rounded-xl hover:bg-blue-700 transition"
-              >
-                Close
-              </button>
-            </div>
-          </motion.div>
-        </div>
-      )}
-
       {/* Success Modal */}
       {showSuccessModal && (
         <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 backdrop-blur-sm">
@@ -2282,59 +2290,48 @@ export default function StudentPage() {
                   <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M5 13l4 4L19 7" />
                 </svg>
               </div>
-              <h3 className="text-xl font-bold text-gray-200">Borrow Created!</h3>
-              <p className="text-gray-400">Show the QR code to the Concierge</p>
+              <h3 className="text-xl font-bold text-gray-200">
+                {modalType === 'borrow' ? 'Borrow Complete!' : 'Return Complete!'}
+              </h3>
+              <div className="bg-gray-800/50 p-4 rounded-xl">
+                <p className="text-gray-300 mb-2">
+                  <span className="font-bold text-gray-200">ID Number:</span> {user.idNumber}
+                </p>
+                <p className="text-gray-300 mb-2">
+                  <span className="font-bold text-gray-200">
+                    {modalType === 'borrow' ? 'Borrow Time:' : 'Return Time:'}
+                  </span> {modalTime}
+                </p>
+                <p className="text-gray-300">
+                  <span className="font-bold text-gray-200">
+                    {modalType === 'borrow' ? 'Borrowed Items:' : 'Returned Items:'}
+                  </span>
+                </p>
+                <ul className="text-gray-300 mt-2 space-y-1">
+                  {modalItems.map((item, index) => (
+                    <li key={index}>• {item.name} (x{item.quantity || item.cartQuantity})</li>
+                  ))}
+                </ul>
+                <div className="mt-4 p-3 bg-blue-900/30 rounded-lg border border-blue-700/50">
+                  <p className="text-blue-300 font-medium">
+                    Please show this to the Concierge as Proof.
+                  </p>
+                </div>
+              </div>
               <button 
                 onClick={() => {
                   setShowSuccessModal(false);
-                  setShowCart(false);
+                  if (modalType === 'borrow') {
+                    setShowCart(false);
+                  }
+                  setModalItems([]); // Clear modal items
+                  setModalTime(''); // Clear modal time
                 }}
                 className="w-full py-3 bg-blue-600 text-white rounded-xl font-bold hover:bg-blue-700 transition-all"
               >
                 OK
               </button>
             </div>
-          </motion.div>
-        </div>
-      )}
-
-      {/* Return QR Code Modal */}
-      {showReturnQRModal && (
-        <div className="fixed inset-0 bg-black/50 backdrop-blur-sm z-50 flex items-center justify-center">
-          <motion.div
-            initial={{ opacity: 0, scale: 0.95 }}
-            animate={{ opacity: 1, scale: 1 }}
-            className="bg-[#1e293b] rounded-2xl p-6 max-w-sm w-full shadow-xl border-2 border-gray-700/50"
-          >
-            <h3 className="text-xl font-semibold text-gray-200 mb-4">Return QR Code</h3>
-            <p className="text-gray-400 mb-4">Show this QR code to the concierge to return your items.</p>
-            
-            {/* Summary Information */}
-            <div className="bg-gray-800/50 p-4 rounded-xl mb-4">
-              <h4 className="font-bold text-xl text-gray-200 mb-3">Return Summary:</h4>
-              <div className="space-y-3 text-lg">
-                <p className="text-gray-300">
-                  <span className="font-bold text-gray-200">Total Items:</span> {JSON.parse(returnQRData).summary.totalItems}
-                </p>
-                <p className="text-gray-300">
-                  <span className="font-bold text-gray-200">Items:</span> {JSON.parse(returnQRData).summary.itemDetails}
-                </p>
-                <p className="text-gray-300">
-                  <span className="font-bold text-gray-200">Borrowed on:</span> {JSON.parse(returnQRData).summary.borrowDate}
-                </p>
-              </div>
-            </div>
-
-            <div className="bg-white p-4 rounded-xl mb-4 flex justify-center">
-              <QRCodeSVG value={returnQRData} size={200} />
-            </div>
-
-            <button
-              onClick={() => setShowReturnQRModal(false)}
-              className="w-full px-4 py-2 bg-gray-700 text-white rounded-lg hover:bg-gray-600 transition-colors"
-            >
-              Close
-            </button>
           </motion.div>
         </div>
       )}

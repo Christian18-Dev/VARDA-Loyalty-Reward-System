@@ -3,14 +3,12 @@ import axios from 'axios';
 import { useAuth } from '../context/AuthContext';
 import { useNavigate } from 'react-router-dom';
 import { 
-  CameraIcon, 
   ArrowLeftIcon, 
   ArrowRightIcon,
   ExclamationIcon,
   LogoutIcon,
   DocumentReportIcon
 } from '@heroicons/react/outline';
-import { Html5Qrcode, Html5QrcodeSupportedFormats } from 'html5-qrcode';
 import { motion, AnimatePresence } from 'framer-motion';
 import ExcelJS from 'exceljs';
 import { PDFDownloadLink, Document, Page, Text, View, StyleSheet, Image } from '@react-pdf/renderer';
@@ -52,20 +50,9 @@ if (typeof window !== 'undefined' && !window.Buffer) {
 export default function ConciergePage() {
   const { user, logout } = useAuth();
   const navigate = useNavigate();
-  const [activeTab, setActiveTab] = useState('scanner');
-  const [scanning, setScanning] = useState(false);
+  const [activeTab, setActiveTab] = useState('borrowed');
   const [error, setError] = useState('');
   const [success, setSuccess] = useState('');
-  const [html5QrCode, setHtml5QrCode] = useState(null);
-  const [isCooldown, setIsCooldown] = useState(false);
-  const [scannedCodes, setScannedCodes] = useState(() => {
-    const savedCodes = localStorage.getItem('scannedCodes');
-    return savedCodes ? new Set(JSON.parse(savedCodes)) : new Set();
-  });
-  const [scannedReturnCodes, setScannedReturnCodes] = useState(() => {
-    const savedCodes = localStorage.getItem('scannedReturnCodes');
-    return savedCodes ? new Set(JSON.parse(savedCodes)) : new Set();
-  });
   const [showLogoutModal, setShowLogoutModal] = useState(false);
   const [borrowedItems, setBorrowedItems] = useState([]);
   const [borrowedSearchTerm, setBorrowedSearchTerm] = useState('');
@@ -126,188 +113,6 @@ export default function ConciergePage() {
     return true;
   };
 
-  // Scanner logic
-  const startScanner = async () => {
-    try {
-      const qrCode = new Html5Qrcode("reader");
-      setHtml5QrCode(qrCode);
-      await qrCode.start(
-        { facingMode: "environment" },
-        {
-          fps: 10,
-          qrbox: { width: 300, height: 300 },
-          aspectRatio: 1.0,
-          disableFlip: false,
-          delayBetweenScanAttempts: 500,
-          formatsToSupport: [ Html5QrcodeSupportedFormats.QR_CODE ],
-          experimentalFeatures: {
-            useBarCodeDetectorIfSupported: true
-          }
-        },
-        (decodedText) => {
-          handleScan(decodedText);
-          stopScanner();
-        },
-        (errorMessage) => {
-          // Ignore errors during scanning
-        }
-      );
-      const readerElement = document.getElementById('reader');
-      if (readerElement) {
-        readerElement.style.border = '2px solid #4F46E5';
-        readerElement.style.borderRadius = '1rem';
-        readerElement.style.boxShadow = '0 0 0 4px rgba(79, 70, 229, 0.1)';
-      }
-    } catch (err) {
-      console.error('Error starting scanner:', err);
-      showStatusMessage('error', 'Failed to start camera');
-      setScanning(false);
-    }
-  };
-
-  const stopScanner = async () => {
-    if (html5QrCode) {
-      try {
-        await html5QrCode.stop();
-        setHtml5QrCode(null);
-      } catch (err) {
-        console.error('Error stopping scanner:', err);
-      }
-    }
-  };
-
-  useEffect(() => {
-    if (scanning) {
-      startScanner();
-    } else {
-      stopScanner();
-    }
-    
-    // Cleanup function
-    return () => {
-      if (html5QrCode) {
-        stopScanner();
-      }
-    };
-  }, [scanning]);
-
-  const handleScan = async (decodedText) => {
-    try {
-      // Stop scanning immediately to prevent multiple scans
-      await stopScanner();
-      setScanning(false);
-
-      if (isCooldown) {
-        showStatusMessage('error', 'Please wait a moment before scanning again.');
-        return;
-      }
-
-      const orderData = JSON.parse(decodedText);
-      const scanIdentifier = `${orderData.studentId}-${orderData.timestamp}`;
-      
-      // Check if this is a return QR code
-      if (orderData.type === 'return') {
-        if (scannedReturnCodes.has(scanIdentifier)) {
-          showStatusMessage('error', 'This return QR code has already been scanned.');
-          return;
-        }
-        
-        setIsCooldown(true);
-        setScannedReturnCodes(prev => {
-          const newSet = new Set([...prev, scanIdentifier]);
-          localStorage.setItem('scannedReturnCodes', JSON.stringify([...newSet]));
-          return newSet;
-        });
-        
-        // Make API call to process the return
-        const response = await axios.post(
-          `${baseUrl}/api/concierge/return-item`,
-          orderData,
-          {
-            headers: { Authorization: `Bearer ${token}` },
-          }
-        );
-        
-        // Create a summary of returned items with better formatting
-        const itemsSummary = orderData.items.map(item => `${item.name} (x${item.quantity})`).join('\n• ');
-        showStatusMessage('success', `✅ Items Returned Successfully!\n\n📚 ID Number: ${orderData.studentIdNumber}\n\n📦 Returned Items:\n• ${itemsSummary}`);
-      } else {
-        // Handle regular borrow QR code
-        if (scannedCodes.has(scanIdentifier)) {
-          showStatusMessage('error', 'This borrow QR code has already been scanned.');
-          return;
-        }
-        
-        setIsCooldown(true);
-        setScannedCodes(prev => {
-          const newSet = new Set([...prev, scanIdentifier]);
-          localStorage.setItem('scannedCodes', JSON.stringify([...newSet]));
-          return newSet;
-        });
-        
-        const response = await axios.post(
-          `${baseUrl}/api/concierge/scan`,
-          orderData,
-          {
-            headers: { Authorization: `Bearer ${token}` },
-          }
-        );
-        
-        // Create a summary of borrowed items with better formatting
-        const itemsSummary = orderData.items.map(item => `${item.name} (x${item.quantity})`).join('\n• ');
-        showStatusMessage('success', `✅ QR Code Scanned Successfully!\n\n📚 ID Number: ${orderData.studentIdNumber}\n\n📦 Borrowed Items:\n• ${itemsSummary}`);
-      }
-      
-      // Set a longer cooldown period (10 seconds) to prevent rapid scanning
-      setTimeout(() => {
-        setIsCooldown(false);
-      }, 3000);
-    } catch (err) {
-      console.error('Error scanning QR code:', err);
-      showStatusMessage('error', err.response?.data?.message || 'Invalid QR Code or failed to save');
-    }
-  };
-
-  // Modify the scanning button click handler
-  const handleScanningToggle = async () => {
-    if (isCooldown) {
-      showStatusMessage('error', 'Please wait a moment before scanning again.');
-      return;
-    }
-    setScanning(!scanning);
-  };
-
-  const handleLogoutClick = () => {
-    setShowLogoutModal(true);
-  };
-  const handleConfirmLogout = () => {
-    // Clear all local storage items
-    localStorage.removeItem('cafeteria-user');
-    localStorage.removeItem('scannedCodes');
-    localStorage.removeItem('scannedReturnCodes');
-    
-    // Stop scanner if active
-    if (html5QrCode) {
-      stopScanner();
-    }
-    
-    // Clear all state
-    setScannedCodes(new Set());
-    setScannedReturnCodes(new Set());
-    setBorrowedItems([]);
-    setReturnedItems([]);
-    setError('');
-    setSuccess('');
-    
-    // Logout and navigate
-    logout();
-    setShowLogoutModal(false);
-    navigate('/login');
-  };
-  const handleCancelLogout = () => {
-    setShowLogoutModal(false);
-  };
-
   // Fetch borrowed items with date filter
   const fetchBorrowedItems = async () => {
     try {
@@ -328,19 +133,14 @@ export default function ConciergePage() {
     }
   };
 
-  // Polling for borrowed tab
+  // Polling for borrowed items
   useEffect(() => {
-    let pollInterval;
-    if (activeTab === 'borrowed') {
-      fetchBorrowedItems();
-      pollInterval = setInterval(fetchBorrowedItems, 3000);
-    }
-    return () => {
-      if (pollInterval) clearInterval(pollInterval);
-    };
-  }, [activeTab, token]);
+    fetchBorrowedItems();
+    const pollInterval = setInterval(fetchBorrowedItems, 3000);
+    return () => clearInterval(pollInterval);
+  }, [token, startDate, endDate]);
 
-  // Filter and paginate
+  // Filter and paginate borrowed items
   const filteredBorrowedItems = borrowedItems.filter(item =>
     item?.studentIdNumber?.toLowerCase().includes(borrowedSearchTerm.toLowerCase())
   );
@@ -349,11 +149,6 @@ export default function ConciergePage() {
     (currentBorrowedPage - 1) * itemsPerPage,
     currentBorrowedPage * itemsPerPage
   );
-  const handleBorrowedPageChange = (page) => setCurrentBorrowedPage(page);
-  const handleBorrowedSearch = (e) => {
-    setBorrowedSearchTerm(e.target.value);
-    setCurrentBorrowedPage(1);
-  };
 
   // Fetch returned items with date filter
   const fetchReturnedItems = async () => {
@@ -821,6 +616,36 @@ export default function ConciergePage() {
     setError('');
   };
 
+  // Add function to manually process returns
+  const handleManualReturn = async (item) => {
+    try {
+      const returnData = {
+        studentId: item.studentId,
+        studentIdNumber: item.studentIdNumber,
+        items: item.items,
+        timestamp: item.borrowTime
+      };
+
+      // Make API call to process return
+      const response = await axios.post(
+        `${baseUrl}/api/concierge/manual-return`,
+        returnData,
+        {
+          headers: { Authorization: `Bearer ${token}` },
+        }
+      );
+
+      // Show success message
+      setSuccess('Item returned successfully!');
+      
+      // Fetch updated borrowed items
+      await fetchBorrowedItems();
+    } catch (error) {
+      console.error('Error returning item:', error);
+      setError('Failed to return item. Please try again.');
+    }
+  };
+
   return (
     <div className="min-h-screen bg-gradient-to-br from-indigo-50 via-purple-50 to-pink-50">
       {/* Header with Welcome Message and Logout */}
@@ -837,7 +662,7 @@ export default function ConciergePage() {
               </div>
             </div>
             <button
-              onClick={handleLogoutClick}
+              onClick={() => setShowLogoutModal(true)}
               className="flex items-center space-x-2 px-4 py-2 bg-red-500 text-white rounded-lg hover:bg-red-600 transition-colors shadow-sm"
             >
               <LogoutIcon className="w-5 h-5" />
@@ -857,7 +682,7 @@ export default function ConciergePage() {
                 exit={{ opacity: 0 }}
                 className="fixed inset-0 backdrop-blur-sm bg-white/30 transition-opacity"
                 aria-hidden="true"
-                onClick={handleCancelLogout}
+                onClick={() => setShowLogoutModal(false)}
               />
               <span className="hidden sm:inline-block sm:align-middle sm:h-screen" aria-hidden="true">&#8203;</span>
               <motion.div
@@ -889,14 +714,18 @@ export default function ConciergePage() {
                 <div className="bg-gray-50 px-4 py-3 sm:px-6 sm:flex sm:flex-row-reverse">
                   <button
                     type="button"
-                    onClick={handleConfirmLogout}
+                    onClick={() => {
+                      localStorage.removeItem('cafeteria-user');
+                      logout();
+                      navigate('/login');
+                    }}
                     className="w-full inline-flex justify-center rounded-md border border-transparent shadow-sm px-4 py-2 bg-red-600 text-base font-medium text-white hover:bg-red-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-red-500 sm:ml-3 sm:w-auto sm:text-sm"
                   >
                     Logout
                   </button>
                   <button
                     type="button"
-                    onClick={handleCancelLogout}
+                    onClick={() => setShowLogoutModal(false)}
                     className="mt-3 w-full inline-flex justify-center rounded-md border border-gray-300 shadow-sm px-4 py-2 bg-white text-base font-medium text-gray-700 hover:bg-gray-50 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-indigo-500 sm:mt-0 sm:ml-3 sm:w-auto sm:text-sm"
                   >
                     Cancel
@@ -922,7 +751,6 @@ export default function ConciergePage() {
       <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-4 bg-white fixed top-[72px] left-0 right-0 z-[90] shadow-sm">
         <div className="flex space-x-2 overflow-x-auto pb-2 scrollbar-hide">
           {[
-            { id: 'scanner', icon: CameraIcon, label: 'Scanner' },
             { id: 'borrowed', icon: ArrowLeftIcon, label: 'Borrowed' },
             { id: 'returned', icon: ArrowRightIcon, label: 'Returned' },
             { id: 'reports', icon: DocumentReportIcon, label: 'Reports' }
@@ -942,42 +770,8 @@ export default function ConciergePage() {
           ))}
         </div>
       </div>
-      {/* Main Content - Scanner Tab only for now */}
+      {/* Main Content */}
       <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-6 mt-[144px] min-h-[calc(100vh-144px)] flex flex-col">
-        {activeTab === 'scanner' && (
-          <motion.div
-            initial={{ opacity: 0, y: 20 }}
-            animate={{ opacity: 1, y: 0 }}
-            className="bg-white rounded-2xl shadow-lg p-4 sm:p-6 flex-1 flex flex-col"
-          >
-            <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center mb-6 space-y-4 sm:space-y-0">
-              <div>
-                <h2 className="text-2xl font-bold text-gray-800">QR Scanner</h2>
-                <p className="text-gray-600 mt-1">Scan student QR codes to process requests</p>
-              </div>
-              <button
-                onClick={handleScanningToggle}
-                className={`w-full sm:w-auto px-6 py-3 rounded-xl transition-all flex items-center justify-center space-x-2 ${
-                  scanning
-                    ? 'bg-red-500 hover:bg-red-600 text-white'
-                    : 'bg-purple-600 hover:bg-purple-700 text-white'
-                }`}
-              >
-                <CameraIcon className="w-5 h-5" />
-                <span>{scanning ? 'Stop Scanning' : 'Start Scanning'}</span>
-              </button>
-            </div>
-            {scanning && (
-              <div className="relative flex-1 flex items-center justify-center">
-                <div id="reader" className="w-full max-w-md rounded-xl overflow-hidden shadow-lg"></div>
-                <div className="absolute inset-0 pointer-events-none border-4 border-indigo-500 rounded-xl animate-pulse"></div>
-                <div className="absolute top-4 left-1/2 transform -translate-x-1/2 bg-indigo-600 text-white px-4 py-2 rounded-lg text-sm">
-                  Position QR code within the frame
-                </div>
-              </div>
-            )}
-          </motion.div>
-        )}
         {activeTab === 'borrowed' && (
           <motion.div
             initial={{ opacity: 0, y: 20 }}
@@ -995,7 +789,7 @@ export default function ConciergePage() {
                     type="text"
                     placeholder="Search by student ID..."
                     value={borrowedSearchTerm}
-                    onChange={handleBorrowedSearch}
+                    onChange={(e) => setBorrowedSearchTerm(e.target.value)}
                     className="w-full px-4 py-2 pl-10 border border-gray-300 rounded-xl focus:ring-2 focus:ring-purple-500 focus:border-transparent"
                   />
                   <svg className="w-5 h-5 text-gray-400 absolute left-3 top-2.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
@@ -1018,7 +812,7 @@ export default function ConciergePage() {
                       Borrow Time
                     </th>
                     <th className="px-4 sm:px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
-                      Status
+                      Actions
                     </th>
                   </tr>
                 </thead>
@@ -1039,9 +833,12 @@ export default function ConciergePage() {
                         {new Date(item.borrowTime).toLocaleString()}
                       </td>
                       <td className="px-4 sm:px-6 py-4 whitespace-nowrap text-sm text-gray-500">
-                        <span className={`px-2 inline-flex text-xs leading-5 font-semibold rounded-full bg-yellow-100 text-yellow-800`}>
-                          {item.status}
-                        </span>
+                        <button
+                          onClick={() => handleManualReturn(item)}
+                          className="px-4 py-2 bg-green-600 text-white rounded-lg hover:bg-green-700 transition-colors"
+                        >
+                          Process Return
+                        </button>
                       </td>
                     </tr>
                   ))}
@@ -1057,7 +854,7 @@ export default function ConciergePage() {
             {totalBorrowedPages > 1 && (
               <div className="flex justify-center items-center mt-6 space-x-4">
                 <button
-                  onClick={() => handleBorrowedPageChange(Math.max(1, currentBorrowedPage - 1))}
+                  onClick={() => setCurrentBorrowedPage(Math.max(1, currentBorrowedPage - 1))}
                   disabled={currentBorrowedPage === 1}
                   className={`p-2 rounded-lg transition-colors ${
                     currentBorrowedPage === 1
@@ -1071,7 +868,7 @@ export default function ConciergePage() {
                   Page {currentBorrowedPage} of {totalBorrowedPages}
                 </span>
                 <button
-                  onClick={() => handleBorrowedPageChange(Math.min(totalBorrowedPages, currentBorrowedPage + 1))}
+                  onClick={() => setCurrentBorrowedPage(Math.min(totalBorrowedPages, currentBorrowedPage + 1))}
                   disabled={currentBorrowedPage === totalBorrowedPages}
                   className={`p-2 rounded-lg transition-colors ${
                     currentBorrowedPage === totalBorrowedPages
@@ -1198,7 +995,6 @@ export default function ConciergePage() {
             )}
           </motion.div>
         )}
-        {/* Reports Tab */}
         {activeTab === 'reports' && (
           <motion.div
             initial={{ opacity: 0, y: 20 }}

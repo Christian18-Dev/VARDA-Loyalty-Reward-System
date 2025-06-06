@@ -1,11 +1,14 @@
 import express from 'express';
 import { claimCode, submitFeedback, getPoints, claimReward, updateProfile } from '../controllers/studentController.js';
-import { protect } from '../middleware/authMiddleware.js';
+import { protect, borrowAccess } from '../middleware/authMiddleware.js';
 import { getRewards } from '../controllers/rewardController.js';
-import { createBorrowedItem, getBorrowedItems } from '../controllers/borrowedItemController.js';
+import { createBorrowedItem, getBorrowedItems, processReturnQR } from '../controllers/borrowedItemController.js';
 import { recordPointsUsage, getPointsUsageHistory, getPointsUsageStats } from '../controllers/pointsUsageController.js';
 
 const router = express.Router();
+
+// Protect all routes with authentication
+router.use(protect);
 
 // Route for claiming a generated code
 router.post('/claim-code', protect, claimCode);
@@ -17,7 +20,7 @@ router.post('/submit-feedback', protect, submitFeedback);
 router.get('/points', protect, getPoints);
 
 // Route for creating borrowed items
-router.post('/borrow-items', protect, createBorrowedItem);
+router.post('/borrow-items', borrowAccess, createBorrowedItem);
 
 // Route for getting student's borrowed items
 router.get('/borrowed-items', protect, getBorrowedItems);
@@ -34,5 +37,8 @@ router.get('/rewards', protect, getRewards);
 router.post('/points-usage', protect, recordPointsUsage);
 router.get('/points-usage/history', protect, getPointsUsageHistory);
 router.get('/points-usage/stats', protect, getPointsUsageStats);
+
+// Add return items route with borrowAccess middleware
+router.post('/return-items', borrowAccess, processReturnQR);
 
 export default router;

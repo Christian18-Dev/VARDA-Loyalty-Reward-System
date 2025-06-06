@@ -69,3 +69,15 @@ export const conciergeOnly = (req, res, next) => {
   }
   next();
 };
+
+export const borrowAccess = (req, res, next) => {
+  const allowedRoles = ['student', 'teacher', 'ateneostaff'];
+  if (req.user && allowedRoles.includes(req.user.role.toLowerCase())) {
+    next();
+  } else {
+    res.status(403).json({
+      success: false,
+      message: 'Access denied. Only students, teachers, and Ateneo staff can borrow items.'
+    });
+  }
+};
