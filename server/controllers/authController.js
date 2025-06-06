@@ -77,7 +77,7 @@ export const registerUser = async (req, res) => {
 };
 
 export const loginUser = async (req, res) => {
-  console.log('Login attempt with payload:', req.body);
+  console.log('Login attempt for ID:', req.body.idNumber);
   const { idNumber, password } = req.body;
   
   if (!idNumber || !password) {
