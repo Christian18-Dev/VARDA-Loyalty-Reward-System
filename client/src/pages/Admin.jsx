@@ -2018,7 +2018,7 @@ export default function AdminPage() {
                             <div className="max-w-xs">
                               {record.items.map((item, index) => (
                                 <div key={index} className="mb-1">
-                                  {item.name}
+                                  {item.name} {item.quantity > 1 ? `(x${item.quantity})` : ''}
                                 </div>
                               ))}
                             </div>
