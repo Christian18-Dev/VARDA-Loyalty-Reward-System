@@ -6,6 +6,7 @@ import {
   getReturnedItemHistory,
   processReturnQR
 } from '../controllers/borrowedItemController.js';
+import { exportBorrowedItems, exportReturnedItems } from '../controllers/exportController.js';
 import { protect, conciergeOnly } from '../middleware/authMiddleware.js';
 
 const router = express.Router();
@@ -23,5 +24,9 @@ router.post('/manual-return', processReturnQR);
 // Get history
 router.get('/borrowed-history', getBorrowedItemHistory);
 router.get('/returned-history', getReturnedItemHistory);
+
+// Export routes
+router.get('/export/borrowed-items', exportBorrowedItems);
+router.get('/export/returned-items', exportReturnedItems);
 
 export default router; 

@@ -2,6 +2,7 @@ import express from 'express';
 import { protect, admin } from '../middleware/authMiddleware.js';
 import { getStats, createReward, getUsers, getClaimedRewards, updateUserRole, updateUserPassword, getAllPointsUsage } from '../controllers/adminController.js';
 import { getBorrowedItems, getBorrowedItemHistory, getReturnedItemHistory, deleteReturnedItem } from '../controllers/borrowedItemController.js';
+import { exportBorrowedItems, exportReturnedItems } from '../controllers/exportController.js';
 
 const router = express.Router();
 
@@ -17,6 +18,10 @@ router.get('/borrowed-items', protect, admin, getBorrowedItems);
 router.get('/borrowed-history', protect, admin, getBorrowedItemHistory);
 router.get('/returned-history', protect, admin, getReturnedItemHistory);
 router.delete('/returned-history/:id', protect, admin, deleteReturnedItem);
+
+// Export routes
+router.get('/export/borrowed-items', protect, admin, exportBorrowedItems);
+router.get('/export/returned-items', protect, admin, exportReturnedItems);
 
 // Points usage route
 router.get('/points-usage', getAllPointsUsage);

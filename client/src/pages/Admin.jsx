@@ -1,4 +1,4 @@
-import { useEffect, useState } from 'react';
+import { useEffect, useState, useRef } from 'react';
 import axios from 'axios';
 import { useAuth } from '../context/AuthContext';
 import { useNavigate } from 'react-router-dom';
@@ -12,9 +12,46 @@ import {
   ArrowLeftIcon,
   ArrowRightIcon,
   BellIcon,
-  CurrencyDollarIcon
+  CurrencyDollarIcon,
+  DocumentReportIcon
 } from '@heroicons/react/outline';
 import { motion, AnimatePresence } from 'framer-motion';
+import ExcelJS from 'exceljs';
+import { PDFDownloadLink, Document, Page, Text, View, StyleSheet, Image } from '@react-pdf/renderer';
+import { pdf } from '@react-pdf/renderer';
+import logo from '../assets/2gonzlogo.png';
+
+// More robust Buffer polyfill
+if (typeof window !== 'undefined' && !window.Buffer) {
+  window.Buffer = class Buffer extends Uint8Array {
+    constructor(input, encodingOrOffset, length) {
+      if (typeof input === 'string') {
+        const encoder = new TextEncoder();
+        const bytes = encoder.encode(input);
+        super(bytes);
+      } else if (input instanceof ArrayBuffer || ArrayBuffer.isView(input)) {
+        super(input);
+      } else if (Array.isArray(input)) {
+        super(input);
+      } else {
+        super(input || 0);
+      }
+    }
+
+    static from(input, encodingOrOffset, length) {
+      return new Buffer(input, encodingOrOffset, length);
+    }
+
+    static isBuffer(obj) {
+      return obj instanceof Buffer;
+    }
+
+    toString(encoding = 'utf8') {
+      const decoder = new TextDecoder(encoding);
+      return decoder.decode(this);
+    }
+  };
+}
 
 export default function AdminPage() {
   const { user, logout } = useAuth();
@@ -104,8 +141,85 @@ export default function AdminPage() {
   const [pointsUsageSearchTerm, setPointsUsageSearchTerm] = useState('');
   const [isPointsUsageLoading, setIsPointsUsageLoading] = useState(false);
 
+  // Add new state for status modal
+  const [showStatusModal, setShowStatusModal] = useState(false);
+  const [statusModalData, setStatusModalData] = useState({ type: '', message: '' });
+
+  const [logoDataUrl, setLogoDataUrl] = useState('');
+  const [logoError, setLogoError] = useState(null);
+
   const token = user.token;
   const baseUrl = import.meta.env.VITE_API_BASE_URL;
+
+  // Add StatusModal component
+  const StatusModal = ({ isOpen, onClose, type, message }) => {
+    if (!isOpen) return null;
+
+    return (
+      <div className="fixed inset-0 z-[100] overflow-y-auto">
+        <div className="flex items-center justify-center min-h-screen px-4 pt-4 pb-20 text-center sm:block sm:p-0">
+          <div
+            className="fixed inset-0 backdrop-blur-sm bg-white/30"
+            aria-hidden="true"
+            onClick={onClose}
+          />
+          <span className="hidden sm:inline-block sm:align-middle sm:h-screen" aria-hidden="true">&#8203;</span>
+          <div
+            className="relative inline-block align-bottom bg-white rounded-2xl text-left overflow-hidden shadow-xl transform sm:my-8 sm:align-middle sm:max-w-lg sm:w-full"
+            role="dialog"
+            aria-modal="true"
+            aria-labelledby="modal-headline"
+          >
+            <div className="bg-white px-6 pt-6 pb-4 sm:p-8">
+              <div className="sm:flex sm:items-start">
+                <div 
+                  className={`mx-auto flex-shrink-0 flex items-center justify-center h-16 w-16 rounded-full sm:mx-0 sm:h-14 sm:w-14 ${
+                    type === 'success' ? 'bg-green-100' : 'bg-red-100'
+                  }`}
+                >
+                  {type === 'success' ? (
+                    <svg className="h-8 w-8 text-green-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M5 13l4 4L19 7" />
+                    </svg>
+                  ) : (
+                    <ExclamationIcon className="h-8 w-8 text-red-600" aria-hidden="true" />
+                  )}
+                </div>
+                <div className="mt-4 text-center sm:mt-0 sm:ml-6 sm:text-left flex-1">
+                  <h3 className={`text-2xl font-bold ${type === 'success' ? 'text-green-700' : 'text-red-700'}`} id="modal-headline">
+                    {type === 'success' ? 'Success!' : 'Error'}
+                  </h3>
+                  <div className="mt-4">
+                    <p className="text-lg text-gray-700 whitespace-pre-line font-medium leading-relaxed">
+                      {message}
+                    </p>
+                  </div>
+                </div>
+              </div>
+            </div>
+            <div className="bg-gray-50 px-6 py-4 sm:px-8 sm:flex sm:flex-row-reverse">
+              <button
+                onClick={onClose}
+                className={`w-full inline-flex justify-center rounded-xl border border-transparent shadow-sm px-6 py-3 text-lg font-semibold text-white focus:outline-none focus:ring-2 focus:ring-offset-2 transition-colors sm:ml-3 sm:w-auto ${
+                  type === 'success' 
+                    ? 'bg-green-600 hover:bg-green-700 focus:ring-green-500' 
+                    : 'bg-red-600 hover:bg-red-700 focus:ring-red-500'
+                }`}
+              >
+                Close
+              </button>
+            </div>
+          </div>
+        </div>
+      </div>
+    );
+  };
+
+  // Add showStatusMessage function
+  const showStatusMessage = (type, message) => {
+    setStatusModalData({ type, message });
+    setShowStatusModal(true);
+  };
 
   // Update fetchData to handle pagination and search
   const fetchData = async (page = 1, search = '') => {
@@ -700,6 +814,357 @@ export default function AdminPage() {
     setPointsUsagePage(newPage);
   };
 
+  // PDF styles and component
+  const styles = StyleSheet.create({
+    page: { padding: 10 },
+    header: { 
+      marginTop: 5,
+      fontSize: 20, 
+      marginBottom: 5, 
+      textAlign: 'center',
+      display: 'flex',
+      flexDirection: 'column',
+      alignItems: 'center',
+      gap: 2
+    },
+    logo: {
+      width: 150,
+      height: 150,
+      marginBottom: 0,
+      objectFit: 'contain'
+    },
+    table: { display: 'table', width: 'auto', borderStyle: 'solid', borderWidth: 1, borderColor: '#bfbfbf', marginTop: 5 },
+    tableRow: { flexDirection: 'row' },
+    tableCol: { borderStyle: 'solid', borderWidth: 1, borderColor: '#bfbfbf' },
+    tableCell: { padding: 5, fontSize: 10, fontFamily: 'Helvetica' },
+    headerCell: { padding: 5, fontSize: 12, fontWeight: 'bold', backgroundColor: '#f0f0f0', fontFamily: 'Helvetica-Bold' },
+    title: {
+      fontSize: 18,
+      fontFamily: 'Helvetica-Bold',
+      color: '#1a1a1a',
+      marginTop: 2
+    },
+    subtitle: {
+      fontSize: 12,
+      fontFamily: 'Helvetica',
+      color: '#666666',
+      marginTop: 1
+    }
+  });
+
+  const PDFDocument = ({ data, type }) => {
+    if (!data || data.length === 0) {
+      return (
+        <Document>
+          <Page size="A4" style={styles.page}>
+            <Text style={styles.header}>No data available</Text>
+          </Page>
+        </Document>
+      );
+    }
+
+    // Format date for display
+    const formatDate = (dateString) => {
+      const date = new Date(dateString);
+      return date.toLocaleDateString('en-US', { 
+        year: 'numeric', 
+        month: 'long', 
+        day: 'numeric' 
+      });
+    };
+
+    // Calculate column widths based on type
+    const columnWidths = type === 'borrowed' 
+      ? { studentId: '25%', items: '35%', borrowTime: '25%', status: '15%' }
+      : { studentId: '20%', items: '30%', borrowTime: '20%', returnTime: '20%', status: '10%' };
+
+    return (
+      <Document>
+        <Page size="A4" style={styles.page}>
+          <View style={styles.header}>
+            {logoDataUrl && !logoError && (
+              <Image 
+                src={logoDataUrl}
+                style={styles.logo}
+              />
+            )}
+            <Text style={styles.title}>{type === 'borrowed' ? 'Borrowed Items Report' : 'Returned Items Report'}</Text>
+            <Text style={styles.subtitle}>
+              {`From ${formatDate(startDate)} to ${formatDate(endDate)}`}
+            </Text>
+          </View>
+          <View style={styles.table}>
+            <View style={styles.tableRow}>
+              <View style={[styles.tableCol, { width: columnWidths.studentId }]}>
+                <Text style={styles.headerCell}>Student ID</Text>
+              </View>
+              <View style={[styles.tableCol, { width: columnWidths.items }]}>
+                <Text style={styles.headerCell}>Items</Text>
+              </View>
+              <View style={[styles.tableCol, { width: columnWidths.borrowTime }]}>
+                <Text style={styles.headerCell}>Borrow Time</Text>
+              </View>
+              {type === 'returned' && (
+                <View style={[styles.tableCol, { width: columnWidths.returnTime }]}>
+                  <Text style={styles.headerCell}>Return Time</Text>
+                </View>
+              )}
+              <View style={[styles.tableCol, { width: columnWidths.status }]}>
+                <Text style={styles.headerCell}>Status</Text>
+              </View>
+            </View>
+            {data.map((item, index) => (
+              <View key={index} style={styles.tableRow}>
+                <View style={[styles.tableCol, { width: columnWidths.studentId }]}>
+                  <Text style={styles.tableCell}>{item.studentIdNumber}</Text>
+                </View>
+                <View style={[styles.tableCol, { width: columnWidths.items }]}>
+                  <Text style={styles.tableCell}>{item.items.map(i => `${i.name} (x${i.quantity})`).join('; ')}</Text>
+                </View>
+                <View style={[styles.tableCol, { width: columnWidths.borrowTime }]}>
+                  <Text style={styles.tableCell}>{new Date(item.borrowTime).toLocaleString()}</Text>
+                </View>
+                {type === 'returned' && (
+                  <View style={[styles.tableCol, { width: columnWidths.returnTime }]}>
+                    <Text style={styles.tableCell}>{new Date(item.returnTime).toLocaleString()}</Text>
+                  </View>
+                )}
+                <View style={[styles.tableCol, { width: columnWidths.status }]}>
+                  <Text style={styles.tableCell}>{type === 'borrowed' ? 'borrowed' : 'returned'}</Text>
+                </View>
+              </View>
+            ))}
+          </View>
+        </Page>
+      </Document>
+    );
+  };
+
+  // Export logic with enhanced error handling
+  const handleExport = async (type, format) => {
+    if (!validateDates()) {
+      showStatusMessage('error', 'Please select both start and end dates');
+      return;
+    }
+
+    try {
+      const queryParams = new URLSearchParams();
+      if (startDate) queryParams.append('startDate', startDate);
+      if (endDate) queryParams.append('endDate', endDate);
+      const endpoint = type === 'borrowed' ? 'export/borrowed-items' : 'export/returned-items';
+      
+      // Add timeout to the request
+      const res = await axios.get(`${baseUrl}/api/admin/${endpoint}?${queryParams}`, {
+        headers: { Authorization: `Bearer ${token}` },
+        timeout: 30000 // 30 second timeout
+      });
+      
+      const data = res.data.data;
+
+      if (!data || data.length === 0) {
+        showStatusMessage('error', 'No data found for the selected date range');
+        return;
+      }
+
+      if (format === 'excel') {
+        try {
+          const workbook = new ExcelJS.Workbook();
+          const worksheet = workbook.addWorksheet('Items Report');
+          
+          // Define columns based on type with exact PDF widths
+          const columns = type === 'borrowed' 
+            ? [
+                { header: 'Student ID', key: 'studentId', width: 25 },
+                { header: 'Items', key: 'items', width: 35 },
+                { header: 'Borrow Time', key: 'borrowTime', width: 25 },
+                { header: 'Status', key: 'status', width: 15 }
+              ]
+            : [
+                { header: 'Student ID', key: 'studentId', width: 20 },
+                { header: 'Items', key: 'items', width: 30 },
+                { header: 'Borrow Time', key: 'borrowTime', width: 20 },
+                { header: 'Return Time', key: 'returnTime', width: 20 },
+                { header: 'Status', key: 'status', width: 10 }
+              ];
+          
+          worksheet.columns = columns;
+
+          // Style the header row
+          const headerRow = worksheet.getRow(1);
+          headerRow.height = 25;
+          headerRow.eachCell((cell) => {
+            cell.font = { 
+              bold: true,
+              size: 12,
+              color: { argb: '1a1a1a' },
+              name: 'Helvetica-Bold'
+            };
+            cell.fill = {
+              type: 'pattern',
+              pattern: 'solid',
+              fgColor: { argb: 'f0f0f0' }
+            };
+            cell.alignment = {
+              vertical: 'middle',
+              horizontal: 'center'
+            };
+            cell.border = {
+              top: { style: 'thin', color: { argb: 'bfbfbf' } },
+              left: { style: 'thin', color: { argb: 'bfbfbf' } },
+              bottom: { style: 'thin', color: { argb: 'bfbfbf' } },
+              right: { style: 'thin', color: { argb: 'bfbfbf' } }
+            };
+          });
+
+          // Add data rows
+          data.forEach(item => {
+            worksheet.addRow({
+              studentId: item.studentIdNumber,
+              items: item.items.map(i => `${i.name} (x${i.quantity})`).join('; '),
+              borrowTime: new Date(item.borrowTime).toLocaleString(),
+              returnTime: type === 'returned' ? new Date(item.returnTime).toLocaleString() : undefined,
+              status: type === 'borrowed' ? 'borrowed' : 'returned'
+            });
+          });
+
+          // Generate Excel file
+          const excelBuffer = await workbook.xlsx.writeBuffer();
+          const excelBlob = new Blob([excelBuffer], { type: 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet' });
+          const url = URL.createObjectURL(excelBlob);
+          const link = document.createElement('a');
+          link.href = url;
+          link.download = `${type}_items_${new Date().toISOString().split('T')[0]}.xlsx`;
+          document.body.appendChild(link);
+          link.click();
+          document.body.removeChild(link);
+          URL.revokeObjectURL(url);
+          
+          showStatusMessage('success', `Successfully exported ${type} items report to Excel`);
+        } catch (excelError) {
+          console.error('Excel generation error:', excelError);
+          showStatusMessage('error', 'Failed to generate Excel file. Please try again.');
+          return;
+        }
+      } else if (format === 'pdf') {
+        try {
+          if (logoError) {
+            console.warn('Logo error:', logoError);
+          }
+
+          const tempPDFDocument = (
+            <PDFDocument data={data} type={type} />
+          );
+          
+          const pdfBlob = await pdf(tempPDFDocument).toBlob();
+          const url = URL.createObjectURL(pdfBlob);
+          const link = document.createElement('a');
+          link.href = url;
+          link.download = `${type}_items_${new Date().toISOString().split('T')[0]}.pdf`;
+          document.body.appendChild(link);
+          link.click();
+          document.body.removeChild(link);
+          URL.revokeObjectURL(url);
+          
+          showStatusMessage('success', `Successfully exported ${type} items report to PDF`);
+        } catch (pdfError) {
+          console.error('PDF generation error:', pdfError);
+          showStatusMessage('error', 'Failed to generate PDF. Please try again.');
+          return;
+        }
+      }
+    } catch (err) {
+      console.error('Export error:', err);
+      if (err.code === 'ECONNABORTED') {
+        showStatusMessage('error', 'Request timed out. Please try again.');
+      } else if (err.response?.status === 401) {
+        showStatusMessage('error', 'Session expired. Please login again.');
+        logout();
+        navigate('/login');
+      } else {
+        showStatusMessage('error', 'Failed to export items. Please try again.');
+      }
+    }
+  };
+
+  // Update the PDFExportButton to show loading state
+  const PDFExportButton = ({ type }) => {
+    const [isLoading, setIsLoading] = useState(false);
+
+    const handleClick = async () => {
+      setIsLoading(true);
+      try {
+        await handleExport(type, 'pdf');
+      } finally {
+        setIsLoading(false);
+      }
+    };
+
+    return (
+      <button
+        onClick={handleClick}
+        disabled={isLoading}
+        className={`w-full px-4 py-3 bg-red-600 text-white rounded-xl hover:bg-red-700 flex items-center justify-center space-x-2 transition-all transform hover:scale-105 ${
+          isLoading ? 'opacity-50 cursor-not-allowed' : ''
+        }`}
+      >
+        <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M7 21h10a2 2 0 002-2V9.414a1 1 0 00-.293-.707l-5.414-5.414A1 1 0 0012.586 3H7a2 2 0 00-2 2v14a2 2 0 002 2z" />
+        </svg>
+        <span>{isLoading ? 'Generating...' : 'PDF'}</span>
+      </button>
+    );
+  };
+
+  // Add function to validate dates
+  const validateDates = () => {
+    if (!startDate || !endDate) {
+      return false;
+    }
+    const start = new Date(startDate);
+    const end = new Date(endDate);
+    return start <= end;
+  };
+
+  // Add date input handlers
+  const handleStartDateChange = (e) => {
+    setStartDate(e.target.value);
+    setError('');
+  };
+
+  const handleEndDateChange = (e) => {
+    setEndDate(e.target.value);
+    setError('');
+  };
+
+  // Convert logo to data URL
+  const convertLogoToDataUrl = async () => {
+    try {
+      // Convert the imported logo to a data URL
+      const response = await fetch(logo);
+      const blob = await response.blob();
+      const reader = new FileReader();
+      
+      reader.onloadend = () => {
+        setLogoDataUrl(reader.result);
+        setLogoError(null);
+      };
+      
+      reader.onerror = () => {
+        setLogoError('Failed to convert logo to data URL');
+      };
+      
+      reader.readAsDataURL(blob);
+    } catch (error) {
+      console.error('Error loading logo:', error);
+      setLogoError(error.message);
+    }
+  };
+
+  // Load logo on component mount
+  useEffect(() => {
+    convertLogoToDataUrl();
+  }, []);
+
   if (isLoading && !isOverviewPolling) {
     return (
       <div className="flex justify-center items-center h-screen">
@@ -1226,7 +1691,8 @@ export default function AdminPage() {
             { id: 'borrowed', icon: ArrowLeftIcon, label: 'Borrowed' },
             { id: 'returned', icon: ArrowRightIcon, label: 'Returned' },
             { id: 'points-usage', icon: CurrencyDollarIcon, label: 'Points Usage' },
-            { id: 'notifications', icon: BellIcon, label: 'Notifications' }
+            { id: 'notifications', icon: BellIcon, label: 'Notifications' },
+            { id: 'reports', icon: DocumentReportIcon, label: 'Reports' }
           ].map(({ id, icon: Icon, label }) => (
             <button
               key={id}
@@ -2222,6 +2688,106 @@ export default function AdminPage() {
             </div>
           </motion.div>
         )}
+
+        {/* Reports Tab */}
+        {activeTab === 'reports' && (
+          <motion.div
+            initial={{ opacity: 0, y: 20 }}
+            animate={{ opacity: 1, y: 0 }}
+            className="bg-white rounded-2xl shadow-lg p-4 sm:p-6"
+          >
+            <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center mb-6 space-y-4 sm:space-y-0">
+              <div className="flex items-center space-x-3">
+                <div className="p-2 bg-purple-100 rounded-lg">
+                  <DocumentReportIcon className="w-6 h-6 text-purple-600" />
+                </div>
+                <div>
+                  <h2 className="text-2xl font-bold text-gray-800">History Reports</h2>
+                  <p className="text-gray-600 mt-1">Generate and export reports for borrowed and returned items.</p>
+                </div>
+              </div>
+            </div>
+
+            <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
+              {/* Date Range Selection */}
+              <div className="bg-gradient-to-br from-purple-50 to-indigo-50 p-6 rounded-xl border border-purple-100">
+                <div className="flex items-center space-x-2 mb-4">
+                  <svg className="w-5 h-5 text-purple-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M8 7V3m8 4V3m-9 8h10M5 21h14a2 2 0 002-2V7a2 2 0 00-2-2H5a2 2 0 00-2 2v12a2 2 0 002 2z" />
+                  </svg>
+                  <h3 className="text-lg font-semibold text-gray-800">Select Date Range</h3>
+                </div>
+                <div className="space-y-4">
+                  <div>
+                    <label className="block text-sm font-medium text-gray-700 mb-1">Start Date</label>
+                    <input
+                      type="date"
+                      value={startDate}
+                      onChange={handleStartDateChange}
+                      className="w-full px-4 py-2 border border-gray-300 rounded-xl focus:ring-2 focus:ring-purple-500 focus:border-transparent bg-white"
+                    />
+                  </div>
+                  <div>
+                    <label className="block text-sm font-medium text-gray-700 mb-1">End Date</label>
+                    <input
+                      type="date"
+                      value={endDate}
+                      onChange={handleEndDateChange}
+                      className="w-full px-4 py-2 border border-gray-300 rounded-xl focus:ring-2 focus:ring-purple-500 focus:border-transparent bg-white"
+                    />
+                  </div>
+                </div>
+              </div>
+
+              {/* Export Options */}
+              <div className="space-y-6">
+                {/* Borrowed Items Export */}
+                <div className="bg-gradient-to-br from-green-50 to-emerald-50 p-6 rounded-xl border border-green-100">
+                  <div className="flex items-center space-x-2 mb-4">
+                    <svg className="w-5 h-5 text-green-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M9 5H7a2 2 0 00-2 2v12a2 2 0 002 2h10a2 2 0 002-2V7a2 2 0 00-2-2h-2M9 5a2 2 0 002 2h2a2 2 0 002-2M9 5a2 2 0 012-2h2a2 2 0 012 2" />
+                    </svg>
+                    <h3 className="text-lg font-semibold text-gray-800">Borrowed Items History</h3>
+                  </div>
+                  <div className="grid grid-cols-2 gap-4">
+                    <button
+                      onClick={() => handleExport('borrowed', 'excel')}
+                      className="w-full px-4 py-3 bg-green-600 text-white rounded-xl hover:bg-green-700 flex items-center justify-center space-x-2 transition-all transform hover:scale-105"
+                    >
+                      <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M9 17v-2m3 2v-4m3 4v-6m2 10H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z" />
+                      </svg>
+                      <span>Excel</span>
+                    </button>
+                    <PDFExportButton type="borrowed" />
+                  </div>
+                </div>
+
+                {/* Returned Items Export */}
+                <div className="bg-gradient-to-br from-blue-50 to-indigo-50 p-6 rounded-xl border border-blue-100">
+                  <div className="flex items-center space-x-2 mb-4">
+                    <svg className="w-5 h-5 text-blue-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M9 5H7a2 2 0 00-2 2v12a2 2 0 002 2h10a2 2 0 002-2V7a2 2 0 00-2-2h-2M9 5a2 2 0 002 2h2a2 2 0 002-2M9 5a2 2 0 012-2h2a2 2 0 012 2" />
+                    </svg>
+                    <h3 className="text-lg font-semibold text-gray-800">Returned Items History</h3>
+                  </div>
+                  <div className="grid grid-cols-2 gap-4">
+                    <button
+                      onClick={() => handleExport('returned', 'excel')}
+                      className="w-full px-4 py-3 bg-blue-600 text-white rounded-xl hover:bg-blue-700 flex items-center justify-center space-x-2 transition-all transform hover:scale-105"
+                    >
+                      <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M9 17v-2m3 2v-4m3 4v-6m2 10H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z" />
+                      </svg>
+                      <span>Excel</span>
+                    </button>
+                    <PDFExportButton type="returned" />
+                  </div>
+                </div>
+              </div>
+            </div>
+          </motion.div>
+        )}
       </div>
 
       {/* Notification Modal */}
@@ -2315,6 +2881,18 @@ export default function AdminPage() {
               <span>{notificationError}</span>
             </div>
           </motion.div>
+        )}
+      </AnimatePresence>
+
+      {/* Add Status Modal */}
+      <AnimatePresence>
+        {showStatusModal && (
+          <StatusModal
+            isOpen={showStatusModal}
+            onClose={() => setShowStatusModal(false)}
+            type={statusModalData.type}
+            message={statusModalData.message}
+          />
         )}
       </AnimatePresence>
     </div>
