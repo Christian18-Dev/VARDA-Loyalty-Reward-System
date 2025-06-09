@@ -13,6 +13,7 @@ import bowlImage from '../assets/bowl.png';
 import glassImage from '../assets/glassofwater.png'; 
 import saucerImage from '../assets/saucer.png';
 import twoGonzLogo from '../assets/2gonzlogo.png';
+import FeedbackForm from '../components/FeedbackForm';
 
 export default function StudentPage() {
   const { user, logout } = useAuth();
@@ -114,6 +115,7 @@ export default function StudentPage() {
   const [modalType, setModalType] = useState('');
   const [modalItems, setModalItems] = useState([]);
   const [modalTime, setModalTime] = useState('');
+  const [showFeedbackForm, setShowFeedbackForm] = useState(false);
 
   const baseUrl = import.meta.env.VITE_API_BASE_URL;
   const token = user.token;
@@ -1165,6 +1167,28 @@ export default function StudentPage() {
   // Add getTotalDinnerPoints function
   const getTotalDinnerPoints = () => {
     return dinnerCart.reduce((total, item) => total + (item.price * item.quantity), 0);
+  };
+
+  const handleFeedbackSubmit = async (feedbackData) => {
+    try {
+      const response = await axios.post(
+        `${baseUrl}/api/student/feedback`,
+        feedbackData,
+        {
+          headers: { Authorization: `Bearer ${token}` },
+          timeout: 10000 // 10 second timeout
+        }
+      );
+
+      if (response.data.success) {
+        // Don't close the form here, let the FeedbackForm component handle it
+        return true; // Return true to indicate success
+      }
+    } catch (error) {
+      console.error('Error submitting feedback:', error);
+      setErrorMessage('Failed to submit feedback. Please try again.');
+      return false; // Return false to indicate failure
+    }
   };
 
   return (
@@ -2321,8 +2345,8 @@ export default function StudentPage() {
               <button 
                 onClick={() => {
                   setShowSuccessModal(false);
-                  if (modalType === 'borrow') {
-                    setShowCart(false);
+                  if (modalType === 'return') {
+                    setShowFeedbackForm(true);
                   }
                   setModalItems([]); // Clear modal items
                   setModalTime(''); // Clear modal time
@@ -2482,6 +2506,13 @@ export default function StudentPage() {
             </div>
           </div>
         </motion.div>
+      )}
+
+      {showFeedbackForm && (
+        <FeedbackForm
+          onSubmit={handleFeedbackSubmit}
+          onClose={() => setShowFeedbackForm(false)}
+        />
       )}
     </div>
   );

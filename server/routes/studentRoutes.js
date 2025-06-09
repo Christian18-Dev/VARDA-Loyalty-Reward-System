@@ -4,6 +4,7 @@ import { protect, borrowAccess } from '../middleware/authMiddleware.js';
 import { getRewards } from '../controllers/rewardController.js';
 import { createBorrowedItem, getBorrowedItems, processReturnQR } from '../controllers/borrowedItemController.js';
 import { recordPointsUsage, getPointsUsageHistory, getPointsUsageStats } from '../controllers/pointsUsageController.js';
+import { submitFeedback as feedbackSubmit } from '../controllers/feedbackController.js';
 
 const router = express.Router();
 
@@ -40,5 +41,8 @@ router.get('/points-usage/stats', protect, getPointsUsageStats);
 
 // Add return items route with borrowAccess middleware
 router.post('/return-items', borrowAccess, processReturnQR);
+
+// Add feedback route
+router.post('/feedback', protect, feedbackSubmit);
 
 export default router;
