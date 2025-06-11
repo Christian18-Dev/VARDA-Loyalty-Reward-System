@@ -8,11 +8,8 @@ import rewardRoutes from './routes/rewardRoutes.js';
 import cashierRoutes from './routes/cashierRoutes.js';
 import codeRoutes from './routes/codeRoutes.js';
 import conciergeRoutes from './routes/conciergeRoutes.js';
-import notificationRoutes from './routes/notificationRoutes.js';
 import mongoose from 'mongoose';
 import { MongoClient } from 'mongodb'; // Corrected import
-import { createOverdueNotifications } from './controllers/notificationController.js';
-import cron from 'node-cron';
 import User from './models/User.js';
 
 dotenv.config();
@@ -77,8 +74,7 @@ app.use('/api/student', studentRoutes);
 app.use('/api/rewards', rewardRoutes);
 app.use('/api/cashier', cashierRoutes);
 app.use('/api/code', codeRoutes);
-app.use('/api/concierge', conciergeRoutes);
-app.use('/api/notifications', notificationRoutes);
+app.use('/apicge', conciergeRoutes);
 
 // Routes
 app.get('/', (req, res) => res.send('API is running...'));
@@ -88,40 +84,5 @@ function startServer() {
     console.log(`✅ Server running on port ${PORT}`);
   });
 }
-
-// Set up automatic overdue notifications check
-setInterval(createOverdueNotifications, 60 * 60 * 1000); // Check every hour
-
-// Add daily points reset cron job
-// Using Philippine timezone (UTC+8)
-// Reset at 5:00 AM Philippine time (before breakfast service)
-cron.schedule('0 5 * * *', async () => {
-  try {
-    const now = new Date(new Date().toLocaleString('en-US', { timeZone: 'Asia/Manila' }));
-    console.log('\n=== Daily Points Reset (5:00 AM) ===');
-    console.log(`Reset Time: ${now.toLocaleString('en-US', { timeZone: 'Asia/Manila' })}`);
-    console.log('Starting daily points reset for all users...');
-    
-    // Use bulk update for better performance
-    const result = await User.updateMany(
-      { 'cateringPoints': { $exists: true } },
-      {
-        $set: {
-          'cateringPoints.breakfast': 250,
-          'cateringPoints.lunch': 250,
-          'cateringPoints.dinner': 250,
-          'cateringPoints.lastReset': now
-        }
-      }
-    );
-    
-    console.log(`\nReset Summary:`);
-    console.log(`Total users reset: ${result.modifiedCount}`);
-    console.log(`Total users matched: ${result.matchedCount}`);
-    console.log('=== End of Daily Reset ===\n');
-  } catch (error) {
-    console.error('Error in daily points reset:', error);
-  }
-});
 
 connectDB();

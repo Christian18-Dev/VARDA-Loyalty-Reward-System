@@ -77,7 +77,12 @@ export default function Register() {
       return;
     }
 
+    if (isLoading) {
+      return; // Prevent multiple submissions
+    }
+
     try {
+      setIsLoading(true);
       const userData = {
         firstName,
         lastName,
@@ -112,6 +117,8 @@ export default function Register() {
     } catch (err) {
       console.error('Registration error:', err.response?.data);
       setErrorMessage(err.response?.data?.message || 'Registration failed');
+    } finally {
+      setIsLoading(false);
     }
   };
 

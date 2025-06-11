@@ -15,6 +15,8 @@ const FeedbackForm = ({ onSubmit, onClose }) => {
   });
   const [overallComment, setOverallComment] = useState('');
   const [showThankYou, setShowThankYou] = useState(false);
+  const [isSubmitting, setIsSubmitting] = useState(false);
+  const [error, setError] = useState('');
 
   const categories = [
     { key: 'taste', label: 'Taste/Flavor' },
@@ -28,21 +30,46 @@ const FeedbackForm = ({ onSubmit, onClose }) => {
   ];
 
   const handleRatingChange = (category, value) => {
+    if (isSubmitting) return; // Prevent changes while submitting
     setRatings(prev => ({
       ...prev,
       [category]: value
     }));
+    setError(''); // Clear error when user makes changes
   };
 
   const handleSubmit = async (e) => {
     e.preventDefault();
-    const success = await onSubmit({
-      ratings,
-      overallComment
-    });
-    
-    if (success) {
-      setShowThankYou(true);
+    if (isSubmitting) return; // Prevent multiple submissions
+    setError(''); // Clear any previous errors
+
+    // Validate that all ratings are provided
+    const allRatingsProvided = Object.values(ratings).every(rating => rating > 0);
+    if (!allRatingsProvided) {
+      setError('Please provide ratings for all categories');
+      return;
+    }
+
+    if (!overallComment.trim()) {
+      setError('Please provide an overall comment');
+      return;
+    }
+
+    try {
+      setIsSubmitting(true);
+      const success = await onSubmit({
+        ratings,
+        overallComment
+      });
+      
+      if (success) {
+        setShowThankYou(true);
+      }
+    } catch (error) {
+      console.error('Error submitting feedback:', error);
+      setError(error.message || 'Failed to submit feedback. Please try again.');
+    } finally {
+      setIsSubmitting(false);
     }
   };
 
@@ -91,6 +118,12 @@ const FeedbackForm = ({ onSubmit, onClose }) => {
           <p className="text-gray-400 mt-2 text-sm">Please rate your experience with our service.</p>
         </div>
 
+        {error && (
+          <div className="mb-4 p-3 bg-red-900/30 border border-red-700/50 rounded-lg">
+            <p className="text-red-400 text-sm">{error}</p>
+          </div>
+        )}
+
         <form onSubmit={handleSubmit} className="space-y-4 sm:space-y-6">
           {categories.map(({ key, label }) => (
             <div key={key} className="space-y-2">
@@ -101,11 +134,12 @@ const FeedbackForm = ({ onSubmit, onClose }) => {
                     key={star}
                     type="button"
                     onClick={() => handleRatingChange(key, star)}
+                    disabled={isSubmitting}
                     className={`p-2 rounded-full transition-all transform hover:scale-110 ${
                       ratings[key] >= star
                         ? 'bg-yellow-400/20 text-yellow-400 hover:bg-yellow-400/30'
                         : 'bg-gray-700/50 text-gray-400 hover:bg-gray-600/50'
-                    }`}
+                    } ${isSubmitting ? 'opacity-50 cursor-not-allowed' : ''}`}
                   >
                     <svg
                       className="w-7 h-7 sm:w-8 sm:h-8"
@@ -127,8 +161,11 @@ const FeedbackForm = ({ onSubmit, onClose }) => {
             <textarea
               value={overallComment}
               onChange={(e) => setOverallComment(e.target.value)}
+              disabled={isSubmitting}
               required
-              className="w-full px-3 py-2 bg-gray-800 text-gray-200 rounded-xl border border-gray-700 focus:ring-2 focus:ring-blue-500 focus:border-transparent text-sm"
+              className={`w-full px-3 py-2 bg-gray-800 text-gray-200 rounded-xl border border-gray-700 focus:ring-2 focus:ring-blue-500 focus:border-transparent text-sm ${
+                isSubmitting ? 'opacity-50 cursor-not-allowed' : ''
+              }`}
               rows="3"
               placeholder="Please share your overall experience..."
             />
@@ -139,15 +176,21 @@ const FeedbackForm = ({ onSubmit, onClose }) => {
               <button
                 type="button"
                 onClick={onClose}
-                className="w-full px-4 py-2 sm:px-6 sm:py-3 bg-gray-600 text-white rounded-xl font-bold hover:bg-gray-700 transition-all text-sm sm:text-base"
+                disabled={isSubmitting}
+                className={`w-full px-4 py-2 sm:px-6 sm:py-3 bg-gray-600 text-white rounded-xl font-bold hover:bg-gray-700 transition-all text-sm sm:text-base ${
+                  isSubmitting ? 'opacity-50 cursor-not-allowed' : ''
+                }`}
               >
                 Skip
               </button>
               <button
                 type="submit"
-                className="w-full px-4 py-2 sm:px-6 sm:py-3 bg-blue-600 text-white rounded-xl font-bold hover:bg-blue-700 transition-all text-sm sm:text-base"
+                disabled={isSubmitting}
+                className={`w-full px-4 py-2 sm:px-6 sm:py-3 bg-blue-600 text-white rounded-xl font-bold hover:bg-blue-700 transition-all text-sm sm:text-base ${
+                  isSubmitting ? 'opacity-50 cursor-not-allowed' : ''
+                }`}
               >
-                Submit Feedback
+                {isSubmitting ? 'Submitting...' : 'Submit Feedback'}
               </button>
             </div>
           </div>

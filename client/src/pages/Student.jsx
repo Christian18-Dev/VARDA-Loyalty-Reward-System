@@ -86,9 +86,6 @@ export default function StudentPage() {
   ]);
   const [showCart, setShowCart] = useState(false);
   const [showSuccessModal, setShowSuccessModal] = useState(false);
-  const [notifications, setNotifications] = useState([]);
-  const [showNotification, setShowNotification] = useState(false);
-  const [currentNotification, setCurrentNotification] = useState(null);
   const [currentTime, setCurrentTime] = useState(new Date());
   const [mealStatus, setMealStatus] = useState({
     breakfast: false,
@@ -116,6 +113,8 @@ export default function StudentPage() {
   const [modalItems, setModalItems] = useState([]);
   const [modalTime, setModalTime] = useState('');
   const [showFeedbackForm, setShowFeedbackForm] = useState(false);
+  const [isSubmitting, setIsSubmitting] = useState(false);
+  const [isReturning, setIsReturning] = useState(false);
 
   const baseUrl = import.meta.env.VITE_API_BASE_URL;
   const token = user.token;
@@ -713,6 +712,8 @@ export default function StudentPage() {
 
   // Update handleConfirmOrder function
   const handleConfirmOrder = async () => {
+    if (isSubmitting) return; // Prevent multiple submissions
+    
     const itemsToBorrow = availableItems.filter(item => item.cartQuantity > 0);
     
     if (itemsToBorrow.length === 0) {
@@ -732,6 +733,7 @@ export default function StudentPage() {
     };
 
     try {
+      setIsSubmitting(true);
       // Use retry logic for the API call
       const response = await retryOperation(async () => {
         return await axios.post(
@@ -750,6 +752,7 @@ export default function StudentPage() {
       setModalType('borrow');
       setSuccessMessage('Borrow Complete!');
       setShowSuccessModal(true);
+      setShowCart(false); // Close cart only after successful borrow
 
       // Reset cart quantities
       setAvailableItems(prevItems => 
@@ -765,12 +768,17 @@ export default function StudentPage() {
       } else {
         setErrorMessage('Failed to create borrow record. Please try again.');
       }
+    } finally {
+      setIsSubmitting(false);
     }
   };
 
   // Update handleReturn function
   const handleReturn = async (item) => {
+    if (isReturning) return; // Prevent multiple submissions
+    
     try {
+      setIsReturning(true);
       const returnData = {
         studentId: user._id,
         studentIdNumber: user.idNumber,
@@ -806,6 +814,8 @@ export default function StudentPage() {
       } else {
         setErrorMessage('Failed to return items. Please try again.');
       }
+    } finally {
+      setIsReturning(false);
     }
   };
 
@@ -839,6 +849,8 @@ export default function StudentPage() {
   }, [currentPage, token]);
 
   const handleCodeSubmit = async () => {
+    if (isLoading) return; // Prevent multiple submissions
+    
     if (!code.trim()) {
       setErrorMessage('Please enter a code');
       return;
@@ -967,58 +979,6 @@ export default function StudentPage() {
     hidden: { y: 20, opacity: 0 },
     visible: { y: 0, opacity: 1 },
   };
-
-  // Fetch notifications
-  const fetchNotifications = async () => {
-    try {
-      const res = await axios.get(`${baseUrl}/api/notifications/user`, {
-        headers: { Authorization: `Bearer ${token}` }
-      });
-      const newNotifications = res.data.data;
-      
-      // Check for unread notifications
-      const unreadNotifications = newNotifications.filter(n => !n.isRead);
-      if (unreadNotifications.length > 0) {
-        // Show the most recent unread notification
-        setCurrentNotification(unreadNotifications[0]);
-        setShowNotification(true);
-        // Mark it as read
-        handleMarkAsRead(unreadNotifications[0]._id);
-      }
-      
-      setNotifications(newNotifications);
-    } catch (error) {
-      console.error('Error fetching notifications:', error);
-    }
-  };
-
-  // Mark notification as read
-  const handleMarkAsRead = async (notificationId) => {
-    try {
-      await axios.put(
-        `${baseUrl}/api/notifications/${notificationId}/read`,
-        {},
-        {
-          headers: { Authorization: `Bearer ${token}` }
-        }
-      );
-      fetchNotifications();
-    } catch (error) {
-      console.error('Error marking notification as read:', error);
-    }
-  };
-
-  // Close notification
-  const handleCloseNotification = () => {
-    setShowNotification(false);
-    setCurrentNotification(null);
-  };
-
-  useEffect(() => {
-    fetchNotifications();
-    const interval = setInterval(fetchNotifications, 5000); // Poll every 5 seconds
-    return () => clearInterval(interval);
-  }, [token]);
 
   // Function to check if current time is within meal hours
   const checkMealHours = () => {
@@ -1181,14 +1141,32 @@ export default function StudentPage() {
       );
 
       if (response.data.success) {
-        // Don't close the form here, let the FeedbackForm component handle it
+        setSuccessMessage('Feedback submitted successfully!');
         return true; // Return true to indicate success
       }
+      return false;
     } catch (error) {
       console.error('Error submitting feedback:', error);
-      setErrorMessage('Failed to submit feedback. Please try again.');
+      if (error.response?.data?.message) {
+        setErrorMessage(error.response.data.message);
+      } else {
+        setErrorMessage('Failed to submit feedback. Please try again.');
+      }
       return false; // Return false to indicate failure
     }
+  };
+
+  // Add debounce function
+  const debounce = (func, wait) => {
+    let timeout;
+    return function executedFunction(...args) {
+      const later = () => {
+        clearTimeout(timeout);
+        func(...args);
+      };
+      clearTimeout(timeout);
+      timeout = setTimeout(later, wait);
+    };
   };
 
   return (
@@ -1342,9 +1320,12 @@ export default function StudentPage() {
                       </div>
                       <button
                         onClick={() => handleReturn(item)}
-                        className="px-4 py-2 bg-green-600 text-white rounded-lg hover:bg-green-700 transition-colors"
+                        disabled={isReturning}
+                        className={`px-4 py-2 bg-green-600 text-white rounded-lg hover:bg-green-700 transition-colors ${
+                          isReturning ? 'opacity-50 cursor-not-allowed' : ''
+                        }`}
                       >
-                        Return
+                        {isReturning ? 'Processing...' : 'Return'}
                       </button>
                     </motion.div>
                   ))}
@@ -1389,15 +1370,11 @@ export default function StudentPage() {
                 <button
                   onClick={handleCodeSubmit}
                   disabled={isLoading}
-                  className="w-full bg-gradient-to-r from-blue-600 to-blue-700 hover:from-blue-700 hover:to-blue-800 text-white px-4 py-4 rounded-xl font-bold text-lg shadow-lg transition-all disabled:opacity-70"
+                  className={`w-full py-3 bg-blue-600 text-white rounded-xl font-bold hover:bg-blue-700 transition-all ${
+                    isLoading ? 'opacity-50 cursor-not-allowed' : ''
+                  }`}
                 >
-                  {isLoading ? (
-                    <span className="flex items-center justify-center">
-                      <span className="animate-pulse">🔍 Checking Code...</span>
-                    </span>
-                  ) : (
-                    '🎁 Redeem Now!'
-                  )}
+                  {isLoading ? 'Processing...' : 'Submit Code'}
                 </button>
               </div>
             </motion.div>
@@ -1697,20 +1674,22 @@ export default function StudentPage() {
                       )}
                       
                       <button
-                        onClick={() => {
-                          handleConfirmOrder();
-                          setShowCart(false);
-                        }}
-                        disabled={!availableItems.some(item => item.cartQuantity > 0)}
+                        onClick={handleConfirmOrder}
+                        disabled={!availableItems.some(item => item.cartQuantity > 0) || isSubmitting}
                         className={`w-full py-4 rounded-xl font-bold transition-all ${
-                          availableItems.some(item => item.cartQuantity > 0)
+                          availableItems.some(item => item.cartQuantity > 0) && !isSubmitting
                             ? 'bg-blue-600 text-white hover:bg-blue-700'
                             : 'bg-gray-800 text-gray-600 cursor-not-allowed'
                         }`}
                       >
-                        {availableItems.some(item => item.cartQuantity > 0)
-                          ? 'Confirm Borrow'
-                          : 'Add Items to Cart'}
+                        {isSubmitting ? (
+                          <div className="flex items-center justify-center">
+                            <div className="w-5 h-5 border-2 border-white border-t-transparent rounded-full animate-spin mr-2"></div>
+                            Processing...
+                          </div>
+                        ) : (
+                          'Confirm Borrow'
+                        )}
                       </button>
                     </div>
                   </div>

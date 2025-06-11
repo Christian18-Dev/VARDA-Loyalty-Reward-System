@@ -17,10 +17,14 @@ export const createBorrowedItem = async (req, res) => {
       });
     }
 
-    // Check for existing borrow with the same timestamp
+    // Check for existing borrow with the same timestamp and items
     const existingBorrow = await BorrowedItemHistory.findOne({
       studentId: user._id,
       borrowTime: new Date(timestamp),
+      'items': { $all: items.map(item => ({ 
+        name: item.name,
+        quantity: item.quantity 
+      }))},
       status: 'borrowed'
     });
 
@@ -38,7 +42,7 @@ export const createBorrowedItem = async (req, res) => {
       studentIdNumber: user.idNumber,
       items,
       status: 'borrowed',
-      borrowTime: new Date(timestamp) // Use the timestamp from the QR code
+      borrowTime: new Date(timestamp)
     });
 
     await borrowedItem.save();
@@ -235,10 +239,14 @@ export const processReturnQR = async (req, res) => {
       });
     }
 
-    // Check if item is already in ReturnedItemHistory
+    // Check if item is already in ReturnedItemHistory with the same items
     const existingReturn = await ReturnedItemHistory.findOne({
       studentId: borrowedItem.studentId,
       borrowTime: borrowedItem.borrowTime,
+      'items': { $all: items.map(item => ({ 
+        name: item.name,
+        quantity: item.quantity 
+      }))},
       status: 'returned'
     });
 

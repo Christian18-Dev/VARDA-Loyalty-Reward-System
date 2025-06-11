@@ -6,6 +6,20 @@ export const submitFeedback = async (req, res) => {
     const studentId = req.user._id;
     const studentIdNumber = req.user.idNumber;
 
+    // Check for existing feedback from the same student within the last 5 minutes
+    const fiveMinutesAgo = new Date(Date.now() - 5 * 60 * 1000);
+    const existingFeedback = await Feedback.findOne({
+      studentId,
+      createdAt: { $gte: fiveMinutesAgo }
+    });
+
+    if (existingFeedback) {
+      return res.status(400).json({
+        success: false,
+        message: 'You have already submitted feedback recently. Please wait a few minutes before submitting again.'
+      });
+    }
+
     const feedback = new Feedback({
       studentId,
       studentIdNumber,
