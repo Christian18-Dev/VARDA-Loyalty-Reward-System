@@ -135,12 +135,21 @@ const FeedbackForm = ({ onSubmit, onClose }) => {
           </div>
 
           <div className="pt-4">
-            <button
-              type="submit"
-              className="w-full px-4 py-2 sm:px-6 sm:py-3 bg-blue-600 text-white rounded-xl font-bold hover:bg-blue-700 transition-all text-sm sm:text-base"
-            >
-              Submit Feedback
-            </button>
+            <div className="flex gap-4">
+              <button
+                type="button"
+                onClick={onClose}
+                className="w-full px-4 py-2 sm:px-6 sm:py-3 bg-gray-600 text-white rounded-xl font-bold hover:bg-gray-700 transition-all text-sm sm:text-base"
+              >
+                Skip
+              </button>
+              <button
+                type="submit"
+                className="w-full px-4 py-2 sm:px-6 sm:py-3 bg-blue-600 text-white rounded-xl font-bold hover:bg-blue-700 transition-all text-sm sm:text-base"
+              >
+                Submit Feedback
+              </button>
+            </div>
           </div>
         </form>
       </motion.div>

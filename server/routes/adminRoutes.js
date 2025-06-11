@@ -3,6 +3,7 @@ import { protect, admin } from '../middleware/authMiddleware.js';
 import { getStats, createReward, getUsers, getClaimedRewards, updateUserRole, updateUserPassword, getAllPointsUsage } from '../controllers/adminController.js';
 import { getBorrowedItems, getBorrowedItemHistory, getReturnedItemHistory, deleteReturnedItem } from '../controllers/borrowedItemController.js';
 import { exportBorrowedItems, exportReturnedItems } from '../controllers/exportController.js';
+import { getFeedbackStats } from '../controllers/feedbackController.js';
 
 const router = express.Router();
 
@@ -25,5 +26,8 @@ router.get('/export/returned-items', protect, admin, exportReturnedItems);
 
 // Points usage route
 router.get('/points-usage', getAllPointsUsage);
+
+// Get feedback statistics
+router.get('/feedback-stats', protect, admin, getFeedbackStats);
 
 export default router;

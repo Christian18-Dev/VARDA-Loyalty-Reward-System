@@ -46,4 +46,38 @@ export const getFeedback = async (req, res) => {
       message: 'Error fetching feedback'
     });
   }
+};
+
+export const getFeedbackStats = async (req, res) => {
+  try {
+    const feedback = await Feedback.find();
+    
+    // Initialize stats object
+    const stats = {
+      taste: 0,
+      variety: 0,
+      value: 0,
+      dietary: 0,
+      portion: 0,
+      speed: 0,
+      cleanliness: 0,
+      service: 0,
+      totalFeedbacks: feedback.length
+    };
+
+    // Calculate total ratings for each category
+    feedback.forEach(item => {
+      Object.keys(item.ratings).forEach(category => {
+        stats[category] += item.ratings[category];
+      });
+    });
+
+    res.status(200).json(stats);
+  } catch (error) {
+    console.error('Error fetching feedback stats:', error);
+    res.status(500).json({
+      success: false,
+      message: 'Error fetching feedback statistics'
+    });
+  }
 }; 

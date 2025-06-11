@@ -6,20 +6,44 @@ import {
   ChartBarIcon, 
   UserGroupIcon, 
   GiftIcon, 
-  ClipboardListIcon,
   LogoutIcon,
   ExclamationIcon,
   ArrowLeftIcon,
   ArrowRightIcon,
   BellIcon,
   CurrencyDollarIcon,
-  DocumentReportIcon
+  DocumentReportIcon,
+  ChatAltIcon
 } from '@heroicons/react/outline';
 import { motion, AnimatePresence } from 'framer-motion';
 import ExcelJS from 'exceljs';
 import { PDFDownloadLink, Document, Page, Text, View, StyleSheet, Image } from '@react-pdf/renderer';
 import { pdf } from '@react-pdf/renderer';
 import logo from '../assets/2gonzlogo.png';
+import { Line } from 'react-chartjs-2';
+import {
+  Chart as ChartJS,
+  CategoryScale,
+  LinearScale,
+  PointElement,
+  LineElement,
+  Title,
+  Tooltip,
+  Legend,
+  Filler
+} from 'chart.js';
+
+// Register ChartJS components
+ChartJS.register(
+  CategoryScale,
+  LinearScale,
+  PointElement,
+  LineElement,
+  Title,
+  Tooltip,
+  Legend,
+  Filler
+);
 
 // More robust Buffer polyfill
 if (typeof window !== 'undefined' && !window.Buffer) {
@@ -73,6 +97,7 @@ export default function AdminPage() {
   const [showSuccessModal, setShowSuccessModal] = useState(false);
   const [showErrorModal, setShowErrorModal] = useState(false);
   const [modalMessage, setModalMessage] = useState('');
+  const [totalBorrowedItems, setTotalBorrowedItems] = useState(0);
   
   // Add new state for pagination and search
   const [currentPage, setCurrentPage] = useState(1);
@@ -102,7 +127,7 @@ export default function AdminPage() {
   const [currentReturnedPage, setCurrentReturnedPage] = useState(1);
   const [startDate, setStartDate] = useState('');
   const [endDate, setEndDate] = useState('');
-  const itemsPerPage = 5;
+  const itemsPerPage = 10;
 
   const [showNotificationModal, setShowNotificationModal] = useState(false);
   const [notificationMessage, setNotificationMessage] = useState('');
@@ -147,6 +172,24 @@ export default function AdminPage() {
 
   const [logoDataUrl, setLogoDataUrl] = useState('');
   const [logoError, setLogoError] = useState(null);
+
+  const [feedbackStats, setFeedbackStats] = useState({
+    taste: 0,
+    variety: 0,
+    value: 0,
+    dietary: 0,
+    portion: 0,
+    speed: 0,
+    cleanliness: 0,
+    service: 0,
+    totalFeedbacks: 0
+  });
+
+  const [borrowedItemsData, setBorrowedItemsData] = useState([]);
+  const [timeRange, setTimeRange] = useState('day'); // 'day' or 'month'
+
+  const [analyticsStartDate, setAnalyticsStartDate] = useState('');
+  const [analyticsEndDate, setAnalyticsEndDate] = useState('');
 
   const token = user.token;
   const baseUrl = import.meta.env.VITE_API_BASE_URL;
@@ -231,7 +274,7 @@ export default function AdminPage() {
         setIsPageLoading(true);
       }
 
-      const [statsRes, usersRes, claimedRes, rewardsRes] = await Promise.all([
+      const [statsRes, usersRes, claimedRes, rewardsRes, borrowedRes] = await Promise.all([
         axios.get(`${baseUrl}/api/admin/stats`, {
           headers: { Authorization: `Bearer ${token}` },
         }),
@@ -243,6 +286,9 @@ export default function AdminPage() {
         }),
         axios.get(`${baseUrl}/api/rewards`, {
           headers: { Authorization: `Bearer ${token}` },
+        }),
+        axios.get(`${baseUrl}/api/admin/borrowed-items`, {
+          headers: { Authorization: `Bearer ${token}` },
         })
       ]);
 
@@ -253,6 +299,7 @@ export default function AdminPage() {
       setTotalUsers(usersRes.data.totalUsers);
       setClaimedRewards(claimedRes.data);
       setAvailableRewards(rewardsRes.data);
+      setTotalBorrowedItems(borrowedRes.data.data.length);
       // Calculate total pages for rewards
       setRewardsTotalPages(Math.ceil(rewardsRes.data.length / rewardsPerPage));
     } catch (error) {
@@ -1023,27 +1070,54 @@ export default function AdminPage() {
               items: item.items.map(i => `${i.name} (x${i.quantity})`).join('; '),
               borrowTime: new Date(item.borrowTime).toLocaleString(),
               returnTime: type === 'returned' ? new Date(item.returnTime).toLocaleString() : undefined,
-              status: type === 'borrowed' ? 'borrowed' : 'returned'
+              status: item.status
             });
           });
 
-          // Generate Excel file
-          const excelBuffer = await workbook.xlsx.writeBuffer();
-          const excelBlob = new Blob([excelBuffer], { type: 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet' });
-          const url = URL.createObjectURL(excelBlob);
-          const link = document.createElement('a');
-          link.href = url;
-          link.download = `${type}_items_${new Date().toISOString().split('T')[0]}.xlsx`;
-          document.body.appendChild(link);
-          link.click();
-          document.body.removeChild(link);
-          URL.revokeObjectURL(url);
-          
-          showStatusMessage('success', `Successfully exported ${type} items report to Excel`);
-        } catch (excelError) {
-          console.error('Excel generation error:', excelError);
-          showStatusMessage('error', 'Failed to generate Excel file. Please try again.');
-          return;
+          // Style data rows
+          worksheet.eachRow((row, rowNumber) => {
+            if (rowNumber > 1) {
+              row.eachCell((cell) => {
+                cell.font = { 
+                  size: 11,
+                  name: 'Helvetica'
+                };
+                cell.alignment = {
+                  vertical: 'middle',
+                  horizontal: 'left'
+                };
+                cell.border = {
+                  top: { style: 'thin', color: { argb: 'bfbfbf' } },
+                  left: { style: 'thin', color: { argb: 'bfbfbf' } },
+                  bottom: { style: 'thin', color: { argb: 'bfbfbf' } },
+                  right: { style: 'thin', color: { argb: 'bfbfbf' } }
+                };
+              });
+            }
+          });
+
+          // Auto-fit columns
+          worksheet.columns.forEach(column => {
+            const maxLength = column.values.reduce((max, value) => {
+              return Math.max(max, value ? value.toString().length : 0);
+            }, 0);
+            column.width = Math.min(maxLength + 2, 50);
+          });
+
+          // Generate and download the Excel file
+          const buffer = await workbook.xlsx.writeBuffer();
+          const blob = new Blob([buffer], { type: 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet' });
+          const url = window.URL.createObjectURL(blob);
+          const a = document.createElement('a');
+          a.href = url;
+          a.download = `${type}-items-report.xlsx`;
+          document.body.appendChild(a);
+          a.click();
+          window.URL.revokeObjectURL(url);
+          document.body.removeChild(a);
+        } catch (error) {
+          console.error('Error generating Excel file:', error);
+          showStatusMessage('error', 'Error generating Excel file');
         }
       } else if (format === 'pdf') {
         try {
@@ -1051,38 +1125,257 @@ export default function AdminPage() {
             console.warn('Logo error:', logoError);
           }
 
-          const tempPDFDocument = (
-            <PDFDocument data={data} type={type} />
+          const doc = (
+            <Document>
+              <Page size="A4" style={styles.page}>
+                <View style={styles.header}>
+                  {logoDataUrl && !logoError && (
+                    <Image 
+                      src={logoDataUrl}
+                      style={styles.logo}
+                    />
+                  )}
+                  <Text style={styles.title}>{type === 'borrowed' ? 'Borrowed Items Report' : 'Returned Items Report'}</Text>
+                  <Text style={styles.subtitle}>
+                    {`From ${new Date(startDate).toLocaleDateString()} to ${new Date(endDate).toLocaleDateString()}`}
+                  </Text>
+                </View>
+                <View style={styles.table}>
+                  <View style={styles.tableRow}>
+                    <View style={[styles.tableCol, { width: '25%' }]}>
+                      <Text style={styles.headerCell}>Student ID</Text>
+                    </View>
+                    <View style={[styles.tableCol, { width: '35%' }]}>
+                      <Text style={styles.headerCell}>Items</Text>
+                    </View>
+                    <View style={[styles.tableCol, { width: '25%' }]}>
+                      <Text style={styles.headerCell}>Borrow Time</Text>
+                    </View>
+                    {type === 'returned' && (
+                      <View style={[styles.tableCol, { width: '25%' }]}>
+                        <Text style={styles.headerCell}>Return Time</Text>
+                      </View>
+                    )}
+                    <View style={[styles.tableCol, { width: '15%' }]}>
+                      <Text style={styles.headerCell}>Status</Text>
+                    </View>
+                  </View>
+                  {data.map((item, index) => (
+                    <View key={index} style={styles.tableRow}>
+                      <View style={[styles.tableCol, { width: '25%' }]}>
+                        <Text style={styles.tableCell}>{item.studentIdNumber}</Text>
+                      </View>
+                      <View style={[styles.tableCol, { width: '35%' }]}>
+                        <Text style={styles.tableCell}>
+                          {item.items.map(i => `${i.name} (x${i.quantity})`).join('; ')}
+                        </Text>
+                      </View>
+                      <View style={[styles.tableCol, { width: '25%' }]}>
+                        <Text style={styles.tableCell}>
+                          {new Date(item.borrowTime).toLocaleString()}
+                        </Text>
+                      </View>
+                      {type === 'returned' && (
+                        <View style={[styles.tableCol, { width: '25%' }]}>
+                          <Text style={styles.tableCell}>
+                            {new Date(item.returnTime).toLocaleString()}
+                          </Text>
+                        </View>
+                      )}
+                      <View style={[styles.tableCol, { width: '15%' }]}>
+                        <Text style={styles.tableCell}>{item.status}</Text>
+                      </View>
+                    </View>
+                  ))}
+                </View>
+              </Page>
+            </Document>
           );
-          
-          const pdfBlob = await pdf(tempPDFDocument).toBlob();
-          const url = URL.createObjectURL(pdfBlob);
-          const link = document.createElement('a');
-          link.href = url;
-          link.download = `${type}_items_${new Date().toISOString().split('T')[0]}.pdf`;
-          document.body.appendChild(link);
-          link.click();
-          document.body.removeChild(link);
-          URL.revokeObjectURL(url);
-          
-          showStatusMessage('success', `Successfully exported ${type} items report to PDF`);
-        } catch (pdfError) {
-          console.error('PDF generation error:', pdfError);
-          showStatusMessage('error', 'Failed to generate PDF. Please try again.');
-          return;
+
+          const blob = await pdf(doc).toBlob();
+          const url = window.URL.createObjectURL(blob);
+          const a = document.createElement('a');
+          a.href = url;
+          a.download = `${type}-items-report.pdf`;
+          document.body.appendChild(a);
+          a.click();
+          window.URL.revokeObjectURL(url);
+          document.body.removeChild(a);
+        } catch (error) {
+          console.error('Error generating PDF:', error);
+          showStatusMessage('error', 'Error generating PDF file');
         }
       }
-    } catch (err) {
-      console.error('Export error:', err);
-      if (err.code === 'ECONNABORTED') {
-        showStatusMessage('error', 'Request timed out. Please try again.');
-      } else if (err.response?.status === 401) {
-        showStatusMessage('error', 'Session expired. Please login again.');
-        logout();
-        navigate('/login');
-      } else {
-        showStatusMessage('error', 'Failed to export items. Please try again.');
+    } catch (error) {
+      console.error('Error exporting data:', error);
+      showStatusMessage('error', 'Error exporting data');
+    }
+  };
+
+  // Add handleExportAnalytics function
+  const handleExportAnalytics = async (format) => {
+    try {
+      if (!validateDates(true)) {
+        showStatusMessage('error', 'Please select both start and end dates');
+        return;
       }
+
+      if (!borrowedItemsData || Object.keys(borrowedItemsData).length === 0) {
+        showStatusMessage('error', 'No analytics data available to export');
+        return;
+      }
+
+      // Filter data based on date range
+      const filteredData = {};
+      const start = new Date(analyticsStartDate);
+      start.setHours(0, 0, 0, 0); // Set to start of day
+      const end = new Date(analyticsEndDate);
+      end.setHours(23, 59, 59, 999); // Set to end of day
+
+      Object.entries(borrowedItemsData).forEach(([date, count]) => {
+        const currentDate = new Date(date);
+        currentDate.setHours(0, 0, 0, 0); // Normalize the current date to start of day
+        if (currentDate >= start && currentDate <= end) {
+          filteredData[date] = count;
+        }
+      });
+
+      if (Object.keys(filteredData).length === 0) {
+        showStatusMessage('error', 'No data found for the selected date range');
+        return;
+      }
+
+      if (format === 'excel') {
+        const workbook = new ExcelJS.Workbook();
+        const worksheet = workbook.addWorksheet('Borrowed Items Analytics');
+        
+        // Add headers
+        worksheet.columns = [
+          { header: 'Date', key: 'date', width: 20 },
+          { header: 'Borrowed Items Count', key: 'count', width: 20 }
+        ];
+
+        // Style the header row
+        const headerRow = worksheet.getRow(1);
+        headerRow.height = 25;
+        headerRow.eachCell((cell) => {
+          cell.font = { 
+            bold: true,
+            size: 12,
+            color: { argb: '1a1a1a' },
+            name: 'Helvetica-Bold'
+          };
+          cell.fill = {
+            type: 'pattern',
+            pattern: 'solid',
+            fgColor: { argb: 'f0f0f0' }
+          };
+          cell.alignment = {
+            vertical: 'middle',
+            horizontal: 'center'
+          };
+          cell.border = {
+            top: { style: 'thin', color: { argb: 'bfbfbf' } },
+            left: { style: 'thin', color: { argb: 'bfbfbf' } },
+            bottom: { style: 'thin', color: { argb: 'bfbfbf' } },
+            right: { style: 'thin', color: { argb: 'bfbfbf' } }
+          };
+        });
+
+        // Add data rows
+        Object.entries(filteredData).forEach(([date, count]) => {
+          worksheet.addRow({
+            date: date,
+            count: count
+          });
+        });
+
+        // Style data rows
+        worksheet.eachRow((row, rowNumber) => {
+          if (rowNumber > 1) {
+            row.eachCell((cell) => {
+              cell.font = { 
+                size: 11,
+                name: 'Helvetica'
+              };
+              cell.alignment = {
+                vertical: 'middle',
+                horizontal: 'left'
+              };
+              cell.border = {
+                top: { style: 'thin', color: { argb: 'bfbfbf' } },
+                left: { style: 'thin', color: { argb: 'bfbfbf' } },
+                bottom: { style: 'thin', color: { argb: 'bfbfbf' } },
+                right: { style: 'thin', color: { argb: 'bfbfbf' } }
+              };
+            });
+          }
+        });
+
+        // Generate and download the Excel file
+        const buffer = await workbook.xlsx.writeBuffer();
+        const blob = new Blob([buffer], { type: 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet' });
+        const url = window.URL.createObjectURL(blob);
+        const a = document.createElement('a');
+        a.href = url;
+        a.download = 'borrowed-items-analytics.xlsx';
+        document.body.appendChild(a);
+        a.click();
+        window.URL.revokeObjectURL(url);
+        document.body.removeChild(a);
+      } else if (format === 'pdf') {
+        const doc = (
+          <Document>
+            <Page size="A4" style={styles.page}>
+              <View style={styles.header}>
+                {logoDataUrl && !logoError && (
+                  <Image 
+                    src={logoDataUrl}
+                    style={styles.logo}
+                  />
+                )}
+                <Text style={styles.title}>Borrowed Items Analytics</Text>
+                <Text style={styles.subtitle}>
+                  {`From ${new Date(analyticsStartDate).toLocaleDateString()} to ${new Date(analyticsEndDate).toLocaleDateString()}`}
+                </Text>
+              </View>
+              <View style={styles.table}>
+                <View style={styles.tableRow}>
+                  <View style={[styles.tableCol, { width: '50%' }]}>
+                    <Text style={styles.headerCell}>Date</Text>
+                  </View>
+                  <View style={[styles.tableCol, { width: '50%' }]}>
+                    <Text style={styles.headerCell}>Borrowed Items Count</Text>
+                  </View>
+                </View>
+                {Object.entries(filteredData).map(([date, count], index) => (
+                  <View key={index} style={styles.tableRow}>
+                    <View style={[styles.tableCol, { width: '50%' }]}>
+                      <Text style={styles.tableCell}>{date}</Text>
+                    </View>
+                    <View style={[styles.tableCol, { width: '50%' }]}>
+                      <Text style={styles.tableCell}>{count}</Text>
+                    </View>
+                  </View>
+                ))}
+              </View>
+            </Page>
+          </Document>
+        );
+
+        const blob = await pdf(doc).toBlob();
+        const url = window.URL.createObjectURL(blob);
+        const a = document.createElement('a');
+        a.href = url;
+        a.download = 'borrowed-items-analytics.pdf';
+        document.body.appendChild(a);
+        a.click();
+        window.URL.revokeObjectURL(url);
+        document.body.removeChild(a);
+      }
+    } catch (error) {
+      console.error('Error exporting analytics:', error);
+      showStatusMessage('error', 'Error exporting analytics data');
     }
   };
 
@@ -1116,13 +1409,16 @@ export default function AdminPage() {
   };
 
   // Add function to validate dates
-  const validateDates = () => {
-    if (!startDate || !endDate) {
+  const validateDates = (isAnalytics = false) => {
+    const start = isAnalytics ? analyticsStartDate : startDate;
+    const end = isAnalytics ? analyticsEndDate : endDate;
+    
+    if (!start || !end) {
       return false;
     }
-    const start = new Date(startDate);
-    const end = new Date(endDate);
-    return start <= end;
+    const startDateObj = new Date(start);
+    const endDateObj = new Date(end);
+    return startDateObj <= endDateObj;
   };
 
   // Add date input handlers
@@ -1164,6 +1460,127 @@ export default function AdminPage() {
   useEffect(() => {
     convertLogoToDataUrl();
   }, []);
+
+  // Add fetchFeedbackStats function
+  const fetchFeedbackStats = async () => {
+    try {
+      const response = await axios.get(`${baseUrl}/api/admin/feedback-stats`, {
+        headers: { Authorization: `Bearer ${token}` }
+      });
+      setFeedbackStats(response.data);
+    } catch (error) {
+      console.error('Error fetching feedback stats:', error);
+      setError('Failed to fetch feedback statistics');
+    }
+  };
+
+  // Add useEffect for feedback stats
+  useEffect(() => {
+    if (activeTab === 'feedback') {
+      fetchFeedbackStats();
+    }
+  }, [activeTab]);
+
+  // Process borrowed items data for graph
+  const processBorrowedItemsData = (items) => {
+    const now = new Date();
+    const data = {};
+    
+    items.forEach(item => {
+      const borrowDate = new Date(item.borrowTime);
+      let key;
+      
+      if (timeRange === 'hour') {
+        // Group by hour, showing only time in 12-hour format
+        key = borrowDate.toLocaleString('en-US', {
+          hour: 'numeric',
+          hour12: true
+        });
+      } else if (timeRange === 'day') {
+        // Group by day
+        key = borrowDate.toLocaleDateString();
+      } else {
+        // Group by month
+        key = `${borrowDate.getFullYear()}-${borrowDate.getMonth() + 1}`;
+      }
+      
+      if (!data[key]) {
+        data[key] = 0;
+      }
+      data[key]++;
+    });
+    
+    // Sort the data chronologically
+    const sortedData = {};
+    Object.keys(data)
+      .sort((a, b) => {
+        if (timeRange === 'hour') {
+          // Convert 12-hour format to 24-hour for sorting
+          const getHour = (timeStr) => {
+            const [time, period] = timeStr.split(' ');
+            const hour = parseInt(time);
+            return period === 'PM' && hour !== 12 ? hour + 12 : 
+                   period === 'AM' && hour === 12 ? 0 : hour;
+          };
+          // Sort in ascending order (earlier hours on left)
+          return getHour(a) - getHour(b);
+        } else if (timeRange === 'day') {
+          return new Date(a) - new Date(b);
+        } else {
+          const [yearA, monthA] = a.split('-').map(Number);
+          const [yearB, monthB] = b.split('-').map(Number);
+          return yearA === yearB ? monthA - monthB : yearA - yearB;
+        }
+      })
+      .forEach(key => {
+        sortedData[key] = data[key];
+      });
+    
+    return sortedData;
+  };
+
+  // Add function to fetch borrowed items for the graph
+  const fetchBorrowedItemsForGraph = async () => {
+    try {
+      const queryParams = new URLSearchParams();
+      
+      // For hourly view, only fetch today's data
+      if (timeRange === 'hour') {
+        const today = new Date();
+        const startOfDay = new Date(today.getFullYear(), today.getMonth(), today.getDate());
+        const endOfDay = new Date(today.getFullYear(), today.getMonth(), today.getDate(), 23, 59, 59);
+        queryParams.append('startDate', startOfDay.toISOString());
+        queryParams.append('endDate', endOfDay.toISOString());
+      }
+      
+      const res = await axios.get(`${baseUrl}/api/admin/borrowed-history?${queryParams}`, {
+        headers: { Authorization: `Bearer ${token}` },
+      });
+      const items = res.data.data;
+      const processedData = processBorrowedItemsData(items);
+      setBorrowedItemsData(processedData);
+    } catch (err) {
+      console.error('Error fetching borrowed items for graph:', err);
+    }
+  };
+
+  // Add useEffect for fetching borrowed items data
+  useEffect(() => {
+    if (activeTab === 'overview') {
+      fetchBorrowedItemsForGraph();
+      const interval = setInterval(fetchBorrowedItemsForGraph, 30000); // Update every 30 seconds
+      return () => clearInterval(interval);
+    }
+  }, [activeTab, timeRange]);
+
+  // Add new handlers for analytics date changes
+  const handleAnalyticsStartDateChange = (e) => {
+    setAnalyticsStartDate(e.target.value);
+  };
+
+  const handleAnalyticsEndDateChange = (e) => {
+    setAnalyticsEndDate(e.target.value);
+  };
 
   if (isLoading && !isOverviewPolling) {
     return (
@@ -1687,12 +2104,12 @@ export default function AdminPage() {
             { id: 'overview', icon: ChartBarIcon, label: 'Overview' },
             { id: 'users', icon: UserGroupIcon, label: 'Users' },
             { id: 'rewards', icon: GiftIcon, label: 'Rewards' },
-            { id: 'claims', icon: ClipboardListIcon, label: 'Claims' },
             { id: 'borrowed', icon: ArrowLeftIcon, label: 'Borrowed' },
             { id: 'returned', icon: ArrowRightIcon, label: 'Returned' },
             { id: 'points-usage', icon: CurrencyDollarIcon, label: 'Points Usage' },
             { id: 'notifications', icon: BellIcon, label: 'Notifications' },
-            { id: 'reports', icon: DocumentReportIcon, label: 'Reports' }
+            { id: 'reports', icon: DocumentReportIcon, label: 'Reports' },
+            { id: 'feedback', icon: ChatAltIcon, label: 'Feedback' }
           ].map(({ id, icon: Icon, label }) => (
             <button
               key={id}
@@ -1724,12 +2141,12 @@ export default function AdminPage() {
                 <ChartBarIcon className="w-6 h-6 text-purple-600" />
               </div>
               <div>
-                <h2 className="text-2xl font-bold text-gray-800">System Overview</h2>
-                <p className="text-gray-600 mt-1">View system statistics and metrics</p>
+                <h2 className="text-2xl font-bold text-gray-800">Overview</h2>
+                <p className="text-gray-600 mt-1">View statistics and metrics</p>
               </div>
             </div>
-            
-            <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
+
+            <div className="grid grid-cols-1 md:grid-cols-4 gap-6 mb-6">
               <div className="bg-gradient-to-br from-blue-50 to-indigo-50 p-6 rounded-xl border border-blue-100">
                 <h3 className="text-sm font-medium text-blue-800">Total Users</h3>
                 <p className="text-3xl font-bold text-blue-600">{stats.totalUsers || 0}</p>
@@ -1741,6 +2158,83 @@ export default function AdminPage() {
               <div className="bg-gradient-to-br from-purple-50 to-pink-50 p-6 rounded-xl border border-purple-100">
                 <h3 className="text-sm font-medium text-purple-800">Used Points</h3>
                 <p className="text-3xl font-bold text-purple-600">{stats.totalPointsUsed || 0}</p>
+              </div>
+              <div className="bg-gradient-to-br from-yellow-50 to-orange-50 p-6 rounded-xl border border-yellow-100">
+                <h3 className="text-sm font-medium text-yellow-800">Current Borrowed Items</h3>
+                <p className="text-3xl font-bold text-yellow-600">{totalBorrowedItems}</p>
+              </div>
+            </div>
+
+            {/* Borrowed Items Graph */}
+            <div className="bg-white rounded-xl border border-gray-200 p-6">
+              <div className="flex justify-between items-center mb-6">
+                <h3 className="text-lg font-semibold text-gray-800">Borrow Graph</h3>
+                <div className="flex space-x-2">
+                  <button
+                    onClick={() => setTimeRange('hour')}
+                    className={`px-3 py-1 rounded-lg text-sm font-medium ${
+                      timeRange === 'hour'
+                        ? 'bg-purple-600 text-white'
+                        : 'bg-gray-100 text-gray-600 hover:bg-gray-200'
+                    }`}
+                  >
+                    Hourly
+                  </button>
+                  <button
+                    onClick={() => setTimeRange('day')}
+                    className={`px-3 py-1 rounded-lg text-sm font-medium ${
+                      timeRange === 'day'
+                        ? 'bg-purple-600 text-white'
+                        : 'bg-gray-100 text-gray-600 hover:bg-gray-200'
+                    }`}
+                  >
+                    Daily
+                  </button>
+                  <button
+                    onClick={() => setTimeRange('month')}
+                    className={`px-3 py-1 rounded-lg text-sm font-medium ${
+                      timeRange === 'month'
+                        ? 'bg-purple-600 text-white'
+                        : 'bg-gray-100 text-gray-600 hover:bg-gray-200'
+                    }`}
+                  >
+                    Monthly
+                  </button>
+                </div>
+              </div>
+              <div className="h-[300px]">
+                <Line
+                  data={{
+                    labels: Object.keys(borrowedItemsData),
+                    datasets: [
+                      {
+                        label: 'Borrowed Items',
+                        data: Object.values(borrowedItemsData),
+                        borderColor: 'rgb(147, 51, 234)',
+                        backgroundColor: 'rgba(147, 51, 234, 0.1)',
+                        tension: 0.4,
+                        fill: true,
+                      },
+                    ],
+                  }}
+                  options={{
+                    responsive: true,
+                    maintainAspectRatio: false,
+                    plugins: {
+                      legend: {
+                        display: false,
+                      },
+                    },
+                    scales: {
+                      y: {
+                        beginAtZero: true,
+                        ticks: {
+                          stepSize: 1,
+                        },
+                      },
+                    },
+                  }}
+                />
               </div>
             </div>
           </motion.div>
@@ -1929,219 +2423,197 @@ export default function AdminPage() {
               </div>
               <div>
                 <h2 className="text-2xl font-bold text-gray-800">Rewards Management</h2>
-                <p className="text-gray-600 mt-1">Create and manage rewards</p>
+                <p className="text-gray-600 mt-1">Create and manage rewards, view claims</p>
               </div>
             </div>
 
-            <div className="bg-gradient-to-br from-purple-50 to-indigo-50 p-6 rounded-xl border border-purple-100 mb-8">
-              <h3 className="text-lg font-medium mb-4 text-gray-800">Create New Reward</h3>
-              <div className="flex flex-col gap-4">
-                <div className="flex flex-col sm:flex-row gap-4">
-                  <div className="flex-grow">
-                    <label htmlFor="reward-name" className="block text-sm font-medium text-gray-700 mb-1">
-                      Reward Name
-                    </label>
-                    <input
-                      id="reward-name"
-                      className="w-full px-4 py-2 border border-gray-300 rounded-xl focus:ring-2 focus:ring-purple-500 focus:border-transparent"
-                      placeholder="e.g. Free Coffee"
-                      value={rewards.name}
-                      onChange={(e) => setRewards({ ...rewards, name: e.target.value })}
-                    />
-                  </div>
-                  <div>
-                    <label htmlFor="reward-cost" className="block text-sm font-medium text-gray-700 mb-1">
-                      Point Cost
-                    </label>
-                    <input
-                      id="reward-cost"
-                      type="number"
-                      className="w-full px-4 py-2 border border-gray-300 rounded-xl focus:ring-2 focus:ring-purple-500 focus:border-transparent"
-                      placeholder="e.g. 100"
-                      value={rewards.cost}
-                      onChange={(e) => setRewards({ ...rewards, cost: e.target.value })}
-                    />
-                  </div>
-                </div>
+            {/* Create Reward Form */}
+            <div className="bg-gradient-to-br from-purple-50 to-indigo-50 p-6 rounded-xl border border-purple-100 mb-6">
+              <h3 className="text-lg font-semibold text-gray-800 mb-4">Create New Reward</h3>
+              <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
                 <div>
-                  <label htmlFor="reward-description" className="block text-sm font-medium text-gray-700 mb-1">
-                    Description
-                  </label>
-                  <textarea
-                    id="reward-description"
+                  <label className="block text-sm font-medium text-gray-700 mb-1">Reward Name</label>
+                  <input
+                    type="text"
+                    value={rewards.name}
+                    onChange={(e) => setRewards({ ...rewards, name: e.target.value })}
                     className="w-full px-4 py-2 border border-gray-300 rounded-xl focus:ring-2 focus:ring-purple-500 focus:border-transparent"
-                    placeholder="Enter a description for the reward..."
-                    rows="3"
-                    value={rewards.description}
-                    onChange={(e) => setRewards({ ...rewards, description: e.target.value })}
+                    placeholder="Enter reward name"
                   />
                 </div>
-                <div className="self-end">
-                  <button
-                    onClick={handleCreateReward}
-                    className="px-6 py-2 bg-gradient-to-r from-purple-600 to-indigo-600 hover:from-purple-700 hover:to-indigo-700 text-white font-medium rounded-xl transition-all shadow-md hover:shadow-lg"
-                  >
-                    Create Reward
-                  </button>
+                <div>
+                  <label className="block text-sm font-medium text-gray-700 mb-1">Point Cost</label>
+                  <input
+                    type="number"
+                    value={rewards.cost}
+                    onChange={(e) => setRewards({ ...rewards, cost: e.target.value })}
+                    className="w-full px-4 py-2 border border-gray-300 rounded-xl focus:ring-2 focus:ring-purple-500 focus:border-transparent"
+                    placeholder="Enter point cost"
+                  />
                 </div>
+                <div>
+                  <label className="block text-sm font-medium text-gray-700 mb-1">Description</label>
+                  <input
+                    type="text"
+                    value={rewards.description}
+                    onChange={(e) => setRewards({ ...rewards, description: e.target.value })}
+                    className="w-full px-4 py-2 border border-gray-300 rounded-xl focus:ring-2 focus:ring-purple-500 focus:border-transparent"
+                    placeholder="Enter reward description"
+                  />
+                </div>
+              </div>
+              <div className="mt-4">
+                <button
+                  onClick={handleCreateReward}
+                  className="px-4 py-2 bg-purple-600 text-white rounded-xl hover:bg-purple-700 transition-colors"
+                >
+                  Create Reward
+                </button>
               </div>
             </div>
 
-            {/* Rewards Table */}
-            <div className="overflow-x-auto">
-              <table className="min-w-full divide-y divide-gray-200">
-                <thead className="bg-gray-50">
-                  <tr>
-                    <th scope="col" className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
-                      Reward Name
-                    </th>
-                    <th scope="col" className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
-                      Point Cost
-                    </th>
-                    <th scope="col" className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
-                      Status
-                    </th>
-                    <th scope="col" className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
-                      Actions
-                    </th>
-                  </tr>
-                </thead>
-                <tbody className="bg-white divide-y divide-gray-200">
-                  {getCurrentRewards().map((reward) => (
-                    <tr key={reward._id} className="hover:bg-gray-50">
-                      <td className="px-6 py-4 whitespace-nowrap text-sm font-medium text-gray-900">
-                        {reward.name}
-                      </td>
-                      <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500">
-                        <span className="px-2 inline-flex text-xs leading-5 font-semibold rounded-full bg-purple-100 text-purple-800">
-                          {reward.cost} points
-                        </span>
-                      </td>
-                      <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500">
-                        <span className="px-2 inline-flex text-xs leading-5 font-semibold rounded-full bg-green-100 text-green-800">
-                          Active
-                        </span>
-                      </td>
-                      <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500">
-                        <button
-                          onClick={() => handleDeleteClick(reward)}
-                          className="px-2 inline-flex text-xs leading-5 font-semibold rounded-full bg-red-100 text-red-800 hover:bg-red-200 transition-colors cursor-pointer"
-                        >
-                          Delete
-                        </button>
-                      </td>
-                    </tr>
-                  ))}
-                  {availableRewards.length === 0 && (
+            {/* Available Rewards */}
+            <div className="mb-8">
+              <h3 className="text-lg font-semibold text-gray-800 mb-4">Available Rewards</h3>
+              <div className="overflow-x-auto">
+                <table className="min-w-full divide-y divide-gray-200">
+                  <thead className="bg-gray-50">
                     <tr>
-                      <td colSpan="4" className="px-6 py-4 text-center text-sm text-gray-500">
-                        No rewards available
-                      </td>
+                      <th scope="col" className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                        Reward Name
+                      </th>
+                      <th scope="col" className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                        Point Cost
+                      </th>
+                      <th scope="col" className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                        Description
+                      </th>
+                      <th scope="col" className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                        Actions
+                      </th>
                     </tr>
-                  )}
-                </tbody>
-              </table>
+                  </thead>
+                  <tbody className="bg-white divide-y divide-gray-200">
+                    {getCurrentRewards().map((reward) => (
+                      <tr key={reward._id} className="hover:bg-gray-50">
+                        <td className="px-6 py-4 whitespace-nowrap text-sm font-medium text-gray-900">
+                          {reward.name}
+                        </td>
+                        <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500">
+                          <span className="px-2 inline-flex text-xs leading-5 font-semibold rounded-full bg-purple-100 text-purple-800">
+                            {reward.cost} points
+                          </span>
+                        </td>
+                        <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500">
+                          {reward.description}
+                        </td>
+                        <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500">
+                          <button
+                            onClick={() => handleDeleteClick(reward)}
+                            className="px-2 inline-flex text-xs leading-5 font-semibold rounded-full bg-red-100 text-red-800 hover:bg-red-200 transition-colors cursor-pointer"
+                          >
+                            Delete
+                          </button>
+                        </td>
+                      </tr>
+                    ))}
+                    {availableRewards.length === 0 && (
+                      <tr>
+                        <td colSpan="4" className="px-6 py-4 text-center text-sm text-gray-500">
+                          No rewards available
+                        </td>
+                      </tr>
+                    )}
+                  </tbody>
+                </table>
 
-              {/* Rewards Pagination */}
-              {rewardsTotalPages > 1 && (
-                <div className="flex justify-center items-center mt-6 space-x-4">
-                  <button
-                    onClick={() => handleRewardsPageChange(Math.max(1, rewardsCurrentPage - 1))}
-                    disabled={rewardsCurrentPage === 1}
-                    className={`p-2 rounded-lg transition-colors ${
-                      rewardsCurrentPage === 1
-                        ? 'text-gray-400 cursor-not-allowed'
-                        : 'text-gray-700 hover:bg-gray-100'
-                    }`}
-                  >
-                    <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M15 19l-7-7 7-7" />
-                    </svg>
-                  </button>
-                  <span className="text-gray-700 font-medium">
-                    Page {rewardsCurrentPage} of {rewardsTotalPages}
-                  </span>
-                  <button
-                    onClick={() => handleRewardsPageChange(Math.min(rewardsTotalPages, rewardsCurrentPage + 1))}
-                    disabled={rewardsCurrentPage === rewardsTotalPages}
-                    className={`p-2 rounded-lg transition-colors ${
-                      rewardsCurrentPage === rewardsTotalPages
-                        ? 'text-gray-400 cursor-not-allowed'
-                        : 'text-gray-700 hover:bg-gray-100'
-                    }`}
-                  >
-                    <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M9 5l7 7-7 7" />
-                    </svg>
-                  </button>
-                </div>
-              )}
-            </div>
-          </motion.div>
-        )}
-
-        {/* Claims Tab */}
-        {activeTab === 'claims' && (
-          <motion.div
-            initial={{ opacity: 0, y: 20 }}
-            animate={{ opacity: 1, y: 0 }}
-            className="bg-white rounded-2xl shadow-lg p-4 sm:p-6"
-          >
-            <div className="flex items-center space-x-3 mb-6">
-              <div className="p-2 bg-green-100 rounded-lg">
-                <ClipboardListIcon className="w-6 h-6 text-green-600" />
+                {/* Rewards Pagination */}
+                {rewardsTotalPages > 1 && (
+                  <div className="flex justify-center items-center mt-6 space-x-4">
+                    <button
+                      onClick={() => handleRewardsPageChange(Math.max(1, rewardsCurrentPage - 1))}
+                      disabled={rewardsCurrentPage === 1}
+                      className={`p-2 rounded-lg transition-colors ${
+                        rewardsCurrentPage === 1
+                          ? 'text-gray-400 cursor-not-allowed'
+                          : 'text-gray-700 hover:bg-gray-100'
+                      }`}
+                    >
+                      <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M15 19l-7-7 7-7" />
+                      </svg>
+                    </button>
+                    <span className="text-gray-700 font-medium">
+                      Page {rewardsCurrentPage} of {rewardsTotalPages}
+                    </span>
+                    <button
+                      onClick={() => handleRewardsPageChange(Math.min(rewardsTotalPages, rewardsCurrentPage + 1))}
+                      disabled={rewardsCurrentPage === rewardsTotalPages}
+                      className={`p-2 rounded-lg transition-colors ${
+                        rewardsCurrentPage === rewardsTotalPages
+                          ? 'text-gray-400 cursor-not-allowed'
+                          : 'text-gray-700 hover:bg-gray-100'
+                      }`}
+                    >
+                      <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M9 5l7 7-7 7" />
+                      </svg>
+                    </button>
+                  </div>
+                )}
               </div>
-              <div>
-                <h2 className="text-2xl font-bold text-gray-800">Claimed Rewards</h2>
-                <p className="text-gray-600 mt-1">View all claimed rewards by users</p>
-              </div>
             </div>
 
-            <div className="overflow-x-auto">
-              <table className="min-w-full divide-y divide-gray-200">
-                <thead className="bg-gray-50">
-                  <tr>
-                    <th scope="col" className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
-                      ID Number
-                    </th>
-                    <th scope="col" className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
-                      Reward
-                    </th>
-                    <th scope="col" className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
-                      Points
-                    </th>
-                    <th scope="col" className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
-                      Date Claimed
-                    </th>
-                  </tr>
-                </thead>
-                <tbody className="bg-white divide-y divide-gray-200">
-                  {claimedRewards.map((claim) => (
-                    <tr key={claim._id} className="hover:bg-gray-50">
-                      <td className="px-6 py-4 whitespace-nowrap text-sm font-medium text-gray-900">
-                        {claim.idNumber}
-                      </td>
-                      <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500">
-                        {claim.reward}
-                      </td>
-                      <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500">
-                        <span className="px-2 inline-flex text-xs leading-5 font-semibold rounded-full bg-purple-100 text-purple-800">
-                          {claim.pointsUsed}
-                        </span>
-                      </td>
-                      <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500">
-                        {new Date(claim.dateClaimed).toLocaleDateString('en-US', {
-                          year: 'numeric',
-                          month: 'short',
-                          day: 'numeric',
-                          hour: '2-digit',
-                          minute: '2-digit'
-                        })}
-                      </td>
+            {/* Claimed Rewards */}
+            <div>
+              <h3 className="text-lg font-semibold text-gray-800 mb-4">Claimed Rewards</h3>
+              <div className="overflow-x-auto">
+                <table className="min-w-full divide-y divide-gray-200">
+                  <thead className="bg-gray-50">
+                    <tr>
+                      <th scope="col" className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                        Student ID
+                      </th>
+                      <th scope="col" className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                        Reward Name
+                      </th>
+                      <th scope="col" className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                        Points Used
+                      </th>
+                      <th scope="col" className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                        Claimed Date
+                      </th>
                     </tr>
-                  ))}
-                </tbody>
-              </table>
+                  </thead>
+                  <tbody className="bg-white divide-y divide-gray-200">
+                    {claimedRewards.map((claim) => (
+                      <tr key={claim._id} className="hover:bg-gray-50">
+                        <td className="px-6 py-4 whitespace-nowrap text-sm font-medium text-gray-900">
+                          {claim.studentIdNumber}
+                        </td>
+                        <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500">
+                          {claim.rewardName}
+                        </td>
+                        <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500">
+                          <span className="px-2 inline-flex text-xs leading-5 font-semibold rounded-full bg-purple-100 text-purple-800">
+                            {claim.pointsUsed} points
+                          </span>
+                        </td>
+                        <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500">
+                          {new Date(claim.claimedAt).toLocaleDateString()}
+                        </td>
+                      </tr>
+                    ))}
+                    {claimedRewards.length === 0 && (
+                      <tr>
+                        <td colSpan="4" className="px-6 py-4 text-center text-sm text-gray-500">
+                          No rewards claimed yet
+                        </td>
+                      </tr>
+                    )}
+                  </tbody>
+                </table>
+              </div>
             </div>
           </motion.div>
         )}
@@ -2551,11 +3023,11 @@ export default function AdminPage() {
             <div className="flex items-center space-x-3 mb-6">
               <div className="p-2 bg-purple-100 rounded-lg">
                 <BellIcon className="w-6 h-6 text-purple-600" />
-      </div>
+              </div>
               <div>
                 <h2 className="text-2xl font-bold text-gray-800">Send Notifications</h2>
                 <p className="text-gray-600 mt-1">Send notifications to multiple users</p>
-    </div>
+              </div>
             </div>
 
             <div className="bg-gradient-to-br from-purple-50 to-indigo-50 p-6 rounded-xl border border-purple-100 mb-8">
@@ -2785,6 +3257,117 @@ export default function AdminPage() {
                   </div>
                 </div>
               </div>
+            </div>
+
+            {/* Analytics Section */}
+            <div className="mt-6">
+              <div className="bg-gradient-to-br from-purple-50 to-indigo-50 p-6 rounded-xl border border-purple-100">
+                <div className="flex items-center space-x-2 mb-4">
+                  <svg className="w-5 h-5 text-purple-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M9 19v-6a2 2 0 00-2-2H5a2 2 0 00-2 2v6a2 2 0 002 2h2a2 2 0 002-2zm0 0V9a2 2 0 012-2h2a2 2 0 012 2v10m-6 0a2 2 0 002 2h2a2 2 0 002-2m0 0V5a2 2 0 012-2h2a2 2 0 012 2v14a2 2 0 01-2 2h-2a2 2 0 01-2-2z" />
+                  </svg>
+                  <h3 className="text-lg font-semibold text-gray-800">Analytics</h3>
+                </div>
+                <p className="text-gray-600 mb-4">Export the borrowed data from the Overview tab.</p>
+                
+                {/* Date Range Inputs */}
+                <div className="grid grid-cols-2 gap-4 mb-4">
+                  <div>
+                    <label className="block text-sm font-medium text-gray-700 mb-1">Start Date</label>
+                    <input
+                      type="date"
+                      value={analyticsStartDate}
+                      onChange={handleAnalyticsStartDateChange}
+                      className="w-full px-4 py-2 border border-gray-300 rounded-xl focus:ring-2 focus:ring-purple-500 focus:border-transparent bg-white"
+                    />
+                  </div>
+                  <div>
+                    <label className="block text-sm font-medium text-gray-700 mb-1">End Date</label>
+                    <input
+                      type="date"
+                      value={analyticsEndDate}
+                      onChange={handleAnalyticsEndDateChange}
+                      className="w-full px-4 py-2 border border-gray-300 rounded-xl focus:ring-2 focus:ring-purple-500 focus:border-transparent bg-white"
+                    />
+                  </div>
+                </div>
+
+                <div className="grid grid-cols-2 gap-4">
+                  <button
+                    onClick={() => handleExportAnalytics('excel')}
+                    className="w-full px-4 py-3 bg-purple-600 text-white rounded-xl hover:bg-purple-700 flex items-center justify-center space-x-2 transition-all transform hover:scale-105"
+                  >
+                    <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M9 17v-2m3 2v-4m3 4v-6m2 10H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z" />
+                    </svg>
+                    <span>Excel</span>
+                  </button>
+                  <button
+                    onClick={() => handleExportAnalytics('pdf')}
+                    className="w-full px-4 py-3 bg-purple-600 text-white rounded-xl hover:bg-purple-700 flex items-center justify-center space-x-2 transition-all transform hover:scale-105"
+                  >
+                    <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M7 21h10a2 2 0 002-2V9.414a1 1 0 00-.293-.707l-5.414-5.414A1 1 0 0012.586 3H7a2 2 0 00-2 2v14a2 2 0 002 2z" />
+                    </svg>
+                    <span>PDF</span>
+                  </button>
+                </div>
+              </div>
+            </div>
+          </motion.div>
+        )}
+
+        {/* Feedback Tab */}
+        {activeTab === 'feedback' && (
+          <motion.div
+            initial={{ opacity: 0, y: 20 }}
+            animate={{ opacity: 1, y: 0 }}
+            className="bg-white rounded-2xl shadow-lg p-4 sm:p-6"
+          >
+            <div className="flex items-center space-x-3 mb-6">
+              <div className="p-2 bg-purple-100 rounded-lg">
+                <ChatAltIcon className="w-6 h-6 text-purple-600" />
+              </div>
+              <div>
+                <h2 className="text-2xl font-bold text-gray-800">Feedback Statistics</h2>
+                <p className="text-gray-600 mt-1">Overall ratings from customer feedback</p>
+              </div>
+            </div>
+
+            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6">
+              {[
+                { key: 'taste', label: 'Taste/Flavor', color: 'from-blue-50 to-indigo-50', border: 'border-blue-100' },
+                { key: 'variety', label: 'Variety', color: 'from-green-50 to-emerald-50', border: 'border-green-100' },
+                { key: 'value', label: 'Value for Money', color: 'from-purple-50 to-pink-50', border: 'border-purple-100' },
+                { key: 'dietary', label: 'Special Dietary', color: 'from-yellow-50 to-amber-50', border: 'border-yellow-100' },
+                { key: 'portion', label: 'Portion Size', color: 'from-red-50 to-rose-50', border: 'border-red-100' },
+                { key: 'speed', label: 'Speed of Service', color: 'from-indigo-50 to-violet-50', border: 'border-indigo-100' },
+                { key: 'cleanliness', label: 'Cleanliness', color: 'from-emerald-50 to-teal-50', border: 'border-emerald-100' },
+                { key: 'service', label: 'Customer Service', color: 'from-pink-50 to-rose-50', border: 'border-pink-100' }
+              ].map(({ key, label, color, border }) => (
+                <div key={key} className={`bg-gradient-to-br ${color} p-6 rounded-xl border ${border}`}>
+                  <h3 className="text-sm font-medium text-gray-800">{label}</h3>
+                  <div className="mt-2 flex items-baseline">
+                    <p className="text-3xl font-bold text-gray-900">
+                      {feedbackStats[key] ? (feedbackStats[key] / feedbackStats.totalFeedbacks).toFixed(1) : '0.0'}
+                    </p>
+                    <p className="ml-2 text-sm text-gray-500">/ 5.0</p>
+                  </div>
+                  <div className="mt-2">
+                    <div className="flex items-center">
+                      <div className="flex-1 h-2 bg-gray-200 rounded-full overflow-hidden">
+                        <div
+                          className="h-full bg-gradient-to-r from-purple-500 to-pink-500"
+                          style={{ width: `${(feedbackStats[key] / (feedbackStats.totalFeedbacks * 5)) * 100}%` }}
+                        />
+                      </div>
+                      <span className="ml-2 text-sm text-gray-500">
+                        {feedbackStats.totalFeedbacks} reviews
+                      </span>
+                    </div>
+                  </div>
+                </div>
+              ))}
             </div>
           </motion.div>
         )}
