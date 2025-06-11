@@ -74,7 +74,7 @@ app.use('/api/student', studentRoutes);
 app.use('/api/rewards', rewardRoutes);
 app.use('/api/cashier', cashierRoutes);
 app.use('/api/code', codeRoutes);
-app.use('/apicge', conciergeRoutes);
+app.use('/api/concierge', conciergeRoutes);
 
 // Routes
 app.get('/', (req, res) => res.send('API is running...'));

@@ -223,7 +223,7 @@ export const getReturnedItemHistory = async (req, res) => {
 export const processReturnQR = async (req, res) => {
   try {
     const { studentId, items, timestamp } = req.body;
-    console.log('Processing return QR for student ID:', studentId);
+    console.log('Processing return for student ID:', studentId);
 
     // Find the borrowed item for this student that matches the timestamp
     const borrowedItem = await BorrowedItemHistory.findOne({
@@ -275,10 +275,10 @@ export const processReturnQR = async (req, res) => {
       data: returnedItemHistory
     });
   } catch (error) {
-    console.error('Error processing return QR:', error);
+    console.error('Error processing return:', error);
     res.status(500).json({
       success: false,
-      message: 'Error processing return QR'
+      message: 'Error processing return'
     });
   }
 };
