@@ -66,7 +66,7 @@ export const getFeedbackStats = async (req, res) => {
   try {
     const feedback = await Feedback.find();
     
-    // Initialize stats object
+    // Initialize stats object with default values
     const stats = {
       taste: 0,
       variety: 0,
@@ -76,14 +76,30 @@ export const getFeedbackStats = async (req, res) => {
       speed: 0,
       cleanliness: 0,
       service: 0,
-      totalFeedbacks: feedback.length
+      totalFeedbacks: feedback.length || 0 // Ensure it's never undefined
     };
 
-    // Calculate total ratings for each category
-    feedback.forEach(item => {
-      Object.keys(item.ratings).forEach(category => {
-        stats[category] += item.ratings[category];
+    // Only calculate if there are feedbacks
+    if (feedback.length > 0) {
+      // Calculate total ratings for each category
+      feedback.forEach(item => {
+        if (item.ratings) { // Check if ratings exist
+          Object.keys(item.ratings).forEach(category => {
+            const rating = Number(item.ratings[category]);
+            // Only add valid numbers
+            if (!isNaN(rating) && rating >= 1 && rating <= 5) {
+              stats[category] += rating;
+            }
+          });
+        }
       });
+    }
+
+    // Ensure all values are numbers
+    Object.keys(stats).forEach(key => {
+      if (key !== 'totalFeedbacks') {
+        stats[key] = Number(stats[key]) || 0;
+      }
     });
 
     res.status(200).json(stats);

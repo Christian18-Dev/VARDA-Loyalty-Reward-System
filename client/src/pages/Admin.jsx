@@ -1429,7 +1429,9 @@ export default function AdminPage() {
       if (!data[key]) {
         data[key] = 0;
       }
-      data[key]++;
+      // Sum up the quantities of all items in this borrow record
+      const totalQuantity = item.items.reduce((sum, currentItem) => sum + currentItem.quantity, 0);
+      data[key] += totalQuantity;
     });
     
     // Sort the data chronologically
@@ -3065,7 +3067,9 @@ export default function AdminPage() {
                   <h3 className="text-sm font-medium text-gray-800">{label}</h3>
                   <div className="mt-2 flex items-baseline">
                     <p className="text-3xl font-bold text-gray-900">
-                      {feedbackStats[key] ? (feedbackStats[key] / feedbackStats.totalFeedbacks).toFixed(1) : '0.0'}
+                      {feedbackStats.totalFeedbacks > 0 
+                        ? (feedbackStats[key] / feedbackStats.totalFeedbacks).toFixed(1)
+                        : '0.0'}
                     </p>
                     <p className="ml-2 text-sm text-gray-500">/ 5.0</p>
                   </div>
@@ -3074,7 +3078,11 @@ export default function AdminPage() {
                       <div className="flex-1 h-2 bg-gray-200 rounded-full overflow-hidden">
                         <div
                           className="h-full bg-gradient-to-r from-purple-500 to-pink-500"
-                          style={{ width: `${(feedbackStats[key] / (feedbackStats.totalFeedbacks * 5)) * 100}%` }}
+                          style={{ 
+                            width: `${feedbackStats.totalFeedbacks > 0 
+                              ? (feedbackStats[key] / (feedbackStats.totalFeedbacks * 5)) * 100 
+                              : 0}%` 
+                          }}
                         />
                       </div>
                       <span className="ml-2 text-sm text-gray-500">
