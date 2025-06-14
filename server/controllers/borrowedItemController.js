@@ -5,7 +5,6 @@ import User from '../models/User.js';
 export const createBorrowedItem = async (req, res) => {
   try {
     const { items, studentId, timestamp } = req.body;
-    console.log('Creating borrowed item for student ID:', studentId);
 
     // First verify the user exists
     const user = await User.findById(studentId);

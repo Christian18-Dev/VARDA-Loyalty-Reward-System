@@ -516,9 +516,11 @@ export default function StudentPage() {
         return await operation();
       } catch (error) {
         lastError = error;
-        if (error.code === 'ECONNRESET' || error.message.includes('network')) {
-          // Wait before retrying (exponential backoff)
-          await new Promise(resolve => setTimeout(resolve, Math.pow(2, i) * 1000));
+        if (error.code === 'ECONNABORTED' || error.code === 'ECONNRESET') {
+          // Exponential backoff: wait 2^i * 1000ms before retrying
+          const delay = Math.min(1000 * Math.pow(2, i), 10000);
+          console.log(`Attempt ${i + 1} failed, retrying in ${delay}ms...`);
+          await new Promise(resolve => setTimeout(resolve, delay));
           continue;
         }
         throw error;
@@ -721,6 +723,7 @@ export default function StudentPage() {
       return;
     }
 
+    console.log('Starting borrow process...');
     const timestamp = new Date().toISOString();
     const orderDetails = {
       studentId: user._id,
@@ -734,6 +737,7 @@ export default function StudentPage() {
 
     try {
       setIsSubmitting(true);
+      console.log('Making API call to borrow items...');
       // Use retry logic for the API call
       const response = await retryOperation(async () => {
         return await axios.post(
@@ -741,17 +745,25 @@ export default function StudentPage() {
           orderDetails,
           {
             headers: { Authorization: `Bearer ${token}` },
-            timeout: 10000 // 10 second timeout
+            timeout: 30000 // Increased timeout to 30 seconds
           }
         );
       });
+      console.log('API call successful:', response.data);
 
       // Store items and time for modal display
+      console.log('Setting modal state...');
       setModalItems(itemsToBorrow);
       setModalTime(new Date().toLocaleString());
       setModalType('borrow');
       setSuccessMessage('Borrow Complete!');
       setShowSuccessModal(true);
+      console.log('Modal state set:', {
+        modalItems: itemsToBorrow,
+        modalTime: new Date().toLocaleString(),
+        modalType: 'borrow',
+        showSuccessModal: true
+      });
       setShowCart(false); // Close cart only after successful borrow
 
       // Reset cart quantities
@@ -763,8 +775,10 @@ export default function StudentPage() {
       await retryOperation(fetchBorrowedItems);
     } catch (error) {
       console.error('Error creating borrow record:', error);
-      if (error.code === 'ECONNRESET') {
-        setErrorMessage('Network connection was lost. Please try again.');
+      if (error.code === 'ECONNABORTED') {
+        setErrorMessage('Request timed out. Please check your connection and try again.');
+      } else if (error.code === 'ECONNRESET') {
+        setErrorMessage('Network connection was lost. Please refresh the page.');
       } else {
         setErrorMessage('Failed to create borrow record. Please try again.');
       }
@@ -793,7 +807,7 @@ export default function StudentPage() {
           returnData,
           {
             headers: { Authorization: `Bearer ${token}` },
-            timeout: 10000 // 10 second timeout
+            timeout: 30000 // Increased timeout to 30 seconds
           }
         );
       });
@@ -809,8 +823,10 @@ export default function StudentPage() {
       await retryOperation(fetchBorrowedItems);
     } catch (error) {
       console.error('Error returning items:', error);
-      if (error.code === 'ECONNRESET') {
-        setErrorMessage('Network connection was lost. Please try again.');
+      if (error.code === 'ECONNABORTED') {
+        setErrorMessage('Request timed out. Please check your connection and try again.');
+      } else if (error.code === 'ECONNRESET') {
+        setErrorMessage('Network connection was lost. Please refresh the page.');
       } else {
         setErrorMessage('Failed to return items. Please try again.');
       }
@@ -826,14 +842,16 @@ export default function StudentPage() {
         `${baseUrl}/api/student/borrowed-items`,
         {
           headers: { Authorization: `Bearer ${token}` },
-          timeout: 10000 // 10 second timeout
+          timeout: 30000 // Increased timeout to 30 seconds
         }
       );
       setBorrowedItems(response.data.data);
     } catch (error) {
       console.error('Error fetching borrowed items:', error);
-      if (error.code === 'ECONNRESET') {
-        setErrorMessage('Network connection was lost while fetching items. Please refresh the page.');
+      if (error.code === 'ECONNABORTED') {
+        setErrorMessage('Request timed out. Please check your connection and try again.');
+      } else if (error.code === 'ECONNRESET') {
+        setErrorMessage('Network connection was lost. Please refresh the page.');
       } else {
         setErrorMessage('Failed to fetch borrowed items. Please refresh the page.');
       }
