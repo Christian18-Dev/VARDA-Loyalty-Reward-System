@@ -13,8 +13,6 @@ const generateToken = (user) => {
 export const registerUser = async (req, res) => {
   const { firstName, lastName, password, termsAccepted, idNumber } = req.body;
   
-  console.log('Received registration data:', { firstName, lastName, idNumber });
-  
   if (!termsAccepted) {
     return res.status(400).json({ message: 'Terms and conditions must be accepted' });
   }
@@ -31,48 +29,34 @@ export const registerUser = async (req, res) => {
     return res.status(400).json({ message: 'Password must be at least 6 characters long' });
   }
 
-  const existing = await User.findOne({ idNumber });
-  if (existing) {
-    return res.status(400).json({ message: 'ID Number already registered' });
-  }
-
-  const hashed = await bcrypt.hash(password, 10);
-  const userData = { 
-    firstName,
-    lastName,
-    password: hashed,
-    idNumber,
-    termsAccepted: true,
-    termsAcceptedAt: new Date()
-  };
-  
-  console.log('Creating user with data:', { ...userData, password: '[HIDDEN]' });
-  
   try {
-    const user = await User.create(userData);
-    console.log('Created user:', { 
-      _id: user._id,
-      firstName: user.firstName,
-      lastName: user.lastName,
-      idNumber: user.idNumber,
-      role: user.role
-    });
+    const existing = await User.findOne({ idNumber }).lean();
+    if (existing) {
+      return res.status(400).json({ message: 'ID Number already registered' });
+    }
 
-    // Create response object with all user data
-    const responseData = {
-      _id: user._id,
-      firstName: user.firstName,
-      lastName: user.lastName,
-      idNumber: user.idNumber,
-      role: user.role,
-      token: generateToken(user)
+    const hashed = await bcrypt.hash(password, 10);
+    const userData = { 
+      firstName,
+      lastName,
+      password: hashed,
+      idNumber,
+      termsAccepted: true,
+      termsAcceptedAt: new Date()
     };
+    
+    const user = await User.create(userData);
+    
+    // Create response object without password
+    const { password: _, ...userWithoutPassword } = user.toObject();
 
-    console.log('Sending response:', responseData);
-    res.status(201).json(responseData);
+    res.status(201).json({
+      ...userWithoutPassword,
+      token: generateToken(user)
+    });
   } catch (error) {
     console.error('Error creating user:', error);
-    res.status(500).json({ message: 'Error creating user', error: error.message });
+    res.status(500).json({ message: 'Error creating user' });
   }
 };
 
