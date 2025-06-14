@@ -1,3 +1,6 @@
+// Set Node.js memory limit to 384MB to leave room for system processes
+process.env.NODE_OPTIONS = '--max-old-space-size=384';
+
 import express from 'express';
 import cors from 'cors';
 import dotenv from 'dotenv';
@@ -9,7 +12,7 @@ import cashierRoutes from './routes/cashierRoutes.js';
 import codeRoutes from './routes/codeRoutes.js';
 import conciergeRoutes from './routes/conciergeRoutes.js';
 import mongoose from 'mongoose';
-import { MongoClient } from 'mongodb'; // Corrected import
+import { MongoClient } from 'mongodb';
 import User from './models/User.js';
 
 dotenv.config();
@@ -17,6 +20,17 @@ const app = express();
 const PORT = process.env.PORT || 10000;
 const mongoURI = process.env.MONGO_URI;
 const isProd = process.env.NODE_ENV === "production";
+
+// Memory monitoring
+const logMemoryUsage = () => {
+  const used = process.memoryUsage();
+  console.log(`Memory usage - heapTotal: ${Math.round(used.heapTotal / 1024 / 1024)}MB, heapUsed: ${Math.round(used.heapUsed / 1024 / 1024)}MB`);
+};
+
+// Set up periodic memory logging in production
+if (isProd) {
+  setInterval(logMemoryUsage, 30000); // Log every 30 seconds
+}
 
 // ✅ Logging info
 console.log(`🔧 Environment: ${isProd ? "🚀 Production" : "🛠 Development"}`);
@@ -36,9 +50,7 @@ const allowedOrigins = [
 
 app.use(cors({
   origin: function(origin, callback) {
-    // Allow requests with no origin (like mobile apps or curl requests)
     if (!origin) return callback(null, true);
-    
     if (allowedOrigins.indexOf(origin) === -1) {
       const msg = 'The CORS policy for this site does not allow access from the specified Origin.';
       return callback(new Error(msg), false);
@@ -49,17 +61,32 @@ app.use(cors({
   methods: ['GET', 'POST', 'PUT', 'DELETE', 'OPTIONS'],
   allowedHeaders: ['Content-Type', 'Authorization']
 }));
-app.use(express.json());
+
+// Add request timeout
+app.use((req, res, next) => {
+  req.setTimeout(30000); // 30 second timeout
+  res.setTimeout(30000);
+  next();
+});
+
+app.use(express.json({ limit: '10mb' })); // Limit JSON payload size
 
 async function connectDB() {
   try {
-    await mongoose.connect(mongoURI);
+    // Configure Mongoose connection
+    const mongooseOptions = {
+      maxPoolSize: 10,
+      minPoolSize: 5,
+      socketTimeoutMS: 45000,
+      connectTimeoutMS: 10000,
+    };
+
+    await mongoose.connect(mongoURI, mongooseOptions);
     console.log("✅ Connected to MongoDB Atlas via Mongoose");
 
-    const client = new MongoClient(mongoURI);
-    await client.connect();
-    app.locals.db = client.db();
-    console.log("✅ Native MongoDB client connected");
+    // Use Mongoose connection for native operations
+    app.locals.db = mongoose.connection.db;
+    console.log("✅ Using Mongoose connection for native operations");
 
     startServer();
   } catch (err) {

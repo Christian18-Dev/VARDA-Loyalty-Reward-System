@@ -77,38 +77,34 @@ export const registerUser = async (req, res) => {
 };
 
 export const loginUser = async (req, res) => {
-  console.log('Login attempt for ID:', req.body.idNumber);
   const { idNumber, password } = req.body;
   
   if (!idNumber || !password) {
-    console.log('Missing credentials:', { idNumber: !!idNumber, password: !!password });
     return res.status(400).json({ message: 'ID number and password are required' });
   }
 
   try {
-    const user = await User.findOne({ idNumber });
+    // Use lean() to get plain JavaScript objects instead of Mongoose documents
+    const user = await User.findOne({ idNumber }).lean();
+    
     if (!user) {
-      console.log('User not found for ID:', idNumber);
       return res.status(400).json({ message: 'Invalid ID number or password' });
     }
 
     const isMatch = await bcrypt.compare(password, user.password);
     if (!isMatch) {
-      console.log('Password mismatch for user:', idNumber);
       return res.status(400).json({ message: 'Invalid ID number or password' });
     }
 
-    console.log('Login successful for user:', idNumber);
+    // Remove password from response
+    const { password: _, ...userWithoutPassword } = user;
+
     res.status(200).json({
-      _id: user._id,
-      firstName: user.firstName,
-      lastName: user.lastName,
-      idNumber: user.idNumber,
-      role: user.role,
+      ...userWithoutPassword,
       token: generateToken(user),
     });
   } catch (error) {
     console.error('Login error:', error);
-    res.status(500).json({ message: error.message });
+    res.status(500).json({ message: 'Internal server error' });
   }
 };

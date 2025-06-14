@@ -3,8 +3,8 @@ import mongoose from 'mongoose';
 const userSchema = new mongoose.Schema({
   firstName: { type: String, required: true },
   lastName: { type: String, required: true },
-  password: { type: String, required: true },
   idNumber: { type: String, required: true, unique: true },
+  password: { type: String, required: true },
   role: {
     type: String,
     enum: [
@@ -42,7 +42,9 @@ const userSchema = new mongoose.Schema({
   },
   cateringPointsUsed: { type: Number, default: 0 }, // Total catering points spent
   termsAccepted: { type: Boolean, default: false },
-  termsAcceptedAt: { type: Date }
+  termsAcceptedAt: { type: Date },
+  createdAt: { type: Date, default: Date.now },
+  updatedAt: { type: Date, default: Date.now }
 }, {
   // Ensure we don't have any unwanted indexes
   autoIndex: false
