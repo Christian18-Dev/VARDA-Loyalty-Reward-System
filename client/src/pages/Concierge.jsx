@@ -7,13 +7,24 @@ import {
   ArrowRightIcon,
   ExclamationIcon,
   LogoutIcon,
-  DocumentReportIcon
+  DocumentReportIcon,
+  MinusIcon,
+  PlusIcon,
+  CheckIcon,
+  ShoppingBagIcon
 } from '@heroicons/react/outline';
 import { motion, AnimatePresence } from 'framer-motion';
 import ExcelJS from 'exceljs';
 import { PDFDownloadLink, Document, Page, Text, View, StyleSheet, Image } from '@react-pdf/renderer';
 import { pdf } from '@react-pdf/renderer';
 import logo from '../assets/2gonzlogo.png';
+import completeSetImage from '../assets/completeset.png';
+import spoonImage from '../assets/spoon.png';
+import forkImage from '../assets/fork.png';
+import plateImage from '../assets/plate.png';
+import bowlImage from '../assets/bowl.png';
+import glassImage from '../assets/glassofwater.png';
+import saucerImage from '../assets/saucer.png';
 
 // More robust Buffer polyfill
 if (typeof window !== 'undefined' && !window.Buffer) {
@@ -62,6 +73,65 @@ export default function ConciergePage() {
   const [currentReturnedPage, setCurrentReturnedPage] = useState(1);
   const [startDate, setStartDate] = useState('');
   const [endDate, setEndDate] = useState('');
+  const [processingReturnId, setProcessingReturnId] = useState(null);
+  const [availableItems, setAvailableItems] = useState([
+    {
+      id: 1,
+      name: 'Complete Set',
+      image: completeSetImage,
+      description: 'Complete dining set (Plate, Bowl, Spoon, Fork, Glass, Tray)',
+      cartQuantity: 0,
+      isSet: true
+    },
+    { 
+      id: 2, 
+      name: 'Spoon', 
+      image: spoonImage,
+      description: 'Stainless steel spoon for your dining needs',
+      cartQuantity: 0
+    },
+    { 
+      id: 3, 
+      name: 'Fork', 
+      image: forkImage,
+      description: 'Stainless steel fork for your dining needs',
+      cartQuantity: 0
+    },
+    { 
+      id: 4, 
+      name: 'Plate', 
+      image: plateImage,
+      description: 'Ceramic plate',
+      cartQuantity: 0
+    },
+    { 
+      id: 5, 
+      name: 'Bowl', 
+      image: bowlImage,
+      description: 'Ceramic bowl',
+      cartQuantity: 0
+    },
+    { 
+      id: 6, 
+      name: 'Saucer', 
+      image: saucerImage,
+      description: 'Smaller plate',
+      cartQuantity: 0
+    },
+    { 
+      id: 7, 
+      name: 'Glass', 
+      image: glassImage,
+      description: 'Glass for water and beverages',
+      cartQuantity: 0
+    },
+  ]);
+  const [showCart, setShowCart] = useState(false);
+  const [isSubmitting, setIsSubmitting] = useState(false);
+  const [showSuccessModal, setShowSuccessModal] = useState(false);
+  const [modalItems, setModalItems] = useState([]);
+  const [modalTime, setModalTime] = useState('');
+  const [modalType, setModalType] = useState('');
   const itemsPerPage = 5;
 
   const baseUrl = import.meta.env.VITE_API_BASE_URL;
@@ -85,10 +155,6 @@ export default function ConciergePage() {
         const reader = new FileReader();
         reader.onloadend = () => {
           setLogoDataUrl(reader.result);
-          setLogoError(null);
-        };
-        reader.onerror = () => {
-          setLogoError('Failed to convert logo to data URL');
         };
         reader.readAsDataURL(blob);
       } catch (error) {
@@ -124,31 +190,24 @@ export default function ConciergePage() {
         headers: { Authorization: `Bearer ${token}` },
       });
       const items = res.data.data;
-      const sortedBorrowed = items
-        .filter(item => item.status === 'borrowed')
-        .sort((a, b) => new Date(b.borrowTime) - new Date(a.borrowTime));
+      const sortedBorrowed = items.sort((a, b) => new Date(b.borrowTime) - new Date(a.borrowTime));
       setBorrowedItems(sortedBorrowed);
     } catch (err) {
       setError('Failed to fetch borrowed items');
     }
   };
 
-  // Polling for borrowed items
+  // Polling for borrowed tab
   useEffect(() => {
-    fetchBorrowedItems();
-    const pollInterval = setInterval(fetchBorrowedItems, 3000);
-    return () => clearInterval(pollInterval);
+    let pollInterval;
+    if (activeTab === 'borrowed') {
+      fetchBorrowedItems();
+      pollInterval = setInterval(fetchBorrowedItems, 3000);
+    }
+    return () => {
+      if (pollInterval) clearInterval(pollInterval);
+    };
   }, [token, startDate, endDate]);
-
-  // Filter and paginate borrowed items
-  const filteredBorrowedItems = borrowedItems.filter(item =>
-    item?.studentIdNumber?.toLowerCase().includes(borrowedSearchTerm.toLowerCase())
-  );
-  const totalBorrowedPages = Math.ceil(filteredBorrowedItems.length / itemsPerPage);
-  const paginatedBorrowedItems = filteredBorrowedItems.slice(
-    (currentBorrowedPage - 1) * itemsPerPage,
-    currentBorrowedPage * itemsPerPage
-  );
 
   // Fetch returned items with date filter
   const fetchReturnedItems = async () => {
@@ -179,6 +238,16 @@ export default function ConciergePage() {
       if (pollInterval) clearInterval(pollInterval);
     };
   }, [activeTab, token]);
+
+  // Filter and paginate
+  const filteredBorrowedItems = borrowedItems.filter(item =>
+    item?.studentIdNumber?.toLowerCase().includes(borrowedSearchTerm.toLowerCase())
+  );
+  const totalBorrowedPages = Math.ceil(filteredBorrowedItems.length / itemsPerPage);
+  const paginatedBorrowedItems = filteredBorrowedItems.slice(
+    (currentBorrowedPage - 1) * itemsPerPage,
+    currentBorrowedPage * itemsPerPage
+  );
 
   // Filter and paginate
   const filteredReturnedItems = returnedItems.filter(item =>
@@ -616,9 +685,12 @@ export default function ConciergePage() {
     setError('');
   };
 
-  // Add function to manually process returns
+  // Handle manual return
   const handleManualReturn = async (item) => {
+    if (processingReturnId) return; // Prevent multiple returns at once
+    
     try {
+      setProcessingReturnId(item._id);
       const returnData = {
         studentId: item.studentId,
         studentIdNumber: item.studentIdNumber,
@@ -626,7 +698,6 @@ export default function ConciergePage() {
         timestamp: item.borrowTime
       };
 
-      // Make API call to process return
       const response = await axios.post(
         `${baseUrl}/api/concierge/manual-return`,
         returnData,
@@ -635,14 +706,72 @@ export default function ConciergePage() {
         }
       );
 
-      // Show success message
       setSuccess('Item returned successfully!');
       
-      // Fetch updated borrowed items
+      // Immediately update the borrowed items list
       await fetchBorrowedItems();
+      setProcessingReturnId(null);
+      
+      // Also update the returned items list
+      await fetchReturnedItems();
+
     } catch (error) {
       console.error('Error returning item:', error);
       setError('Failed to return item. Please try again.');
+      setProcessingReturnId(null);
+    }
+  };
+
+  // Handle borrow confirmation
+  const handleConfirmOrder = async () => {
+    if (isSubmitting) return;
+    
+    const itemsToBorrow = availableItems.filter(item => item.cartQuantity > 0);
+    
+    if (itemsToBorrow.length === 0) {
+      setError('Your cart is empty. Please add items before confirming your borrow.');
+      return;
+    }
+
+    const timestamp = new Date().toISOString();
+    const orderDetails = {
+      studentId: user._id,
+      studentIdNumber: user.idNumber,
+      items: itemsToBorrow.map(item => ({
+        name: item.name,
+        quantity: item.cartQuantity
+      })),
+      timestamp: timestamp
+    };
+
+    try {
+      setIsSubmitting(true);
+      const response = await axios.post(
+        `${baseUrl}/api/student/borrow-items`,
+        orderDetails,
+        {
+          headers: { Authorization: `Bearer ${token}` },
+          timeout: 30000
+        }
+      );
+
+      setModalItems(itemsToBorrow);
+      setModalTime(new Date().toLocaleString());
+      setModalType('borrow');
+      setSuccess('Borrow Complete!');
+      setShowSuccessModal(true);
+      setShowCart(false);
+
+      setAvailableItems(prevItems => 
+        prevItems.map(item => ({ ...item, cartQuantity: 0 }))
+      );
+
+      await fetchBorrowedItems();
+    } catch (error) {
+      console.error('Error creating borrow record:', error);
+      setError('Failed to create borrow record. Please try again.');
+    } finally {
+      setIsSubmitting(false);
     }
   };
 
@@ -753,7 +882,8 @@ export default function ConciergePage() {
           {[
             { id: 'borrowed', icon: ArrowLeftIcon, label: 'Borrowed' },
             { id: 'returned', icon: ArrowRightIcon, label: 'Returned' },
-            { id: 'reports', icon: DocumentReportIcon, label: 'Reports' }
+            { id: 'reports', icon: DocumentReportIcon, label: 'Reports' },
+            { id: 'borrow', icon: ShoppingBagIcon, label: 'Borrow' }
           ].map(({ id, icon: Icon, label }) => (
             <button
               key={id}
@@ -835,9 +965,14 @@ export default function ConciergePage() {
                       <td className="px-4 sm:px-6 py-4 whitespace-nowrap text-sm text-gray-500">
                         <button
                           onClick={() => handleManualReturn(item)}
-                          className="px-4 py-2 bg-green-600 text-white rounded-lg hover:bg-green-700 transition-colors"
+                          disabled={processingReturnId === item._id}
+                          className={`px-4 py-2 rounded-lg transition-colors ${
+                            processingReturnId === item._id
+                              ? 'bg-gray-400 cursor-not-allowed'
+                              : 'bg-green-600 hover:bg-green-700 text-white'
+                          }`}
                         >
-                          Process Return
+                          {processingReturnId === item._id ? 'Processing...' : 'Process Return'}
                         </button>
                       </td>
                     </tr>
@@ -1093,7 +1228,170 @@ export default function ConciergePage() {
             </div>
           </motion.div>
         )}
+        {activeTab === 'borrow' && (
+          <motion.div
+            initial={{ opacity: 0, y: 20 }}
+            animate={{ opacity: 1, y: 0 }}
+            className="space-y-6"
+          >
+            <div className="text-center">
+              <h2 className="text-2xl font-bold text-gray-800">Borrow Items</h2>
+              <p className="text-gray-600 mt-1">Select items to borrow for your needs</p>
+            </div>
+
+            {/* Available Items Grid */}
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+              {availableItems.map((item) => (
+                <motion.div 
+                  key={item.id}
+                  whileHover={{ scale: 1.02 }}
+                  className={`bg-white rounded-xl shadow-md overflow-hidden border border-gray-200 ${
+                    item.isSet ? 'md:col-span-2' : ''
+                  }`}
+                >
+                  <div className="p-4">
+                    <div className="flex items-start space-x-4">
+                      <div className="flex-shrink-0">
+                        <img 
+                          src={item.image} 
+                          alt={item.name}
+                          className="w-16 h-16 object-contain"
+                        />
+                      </div>
+                      <div className="flex-1">
+                        <h3 className="font-medium text-gray-900">{item.name}</h3>
+                        <p className="text-sm text-gray-500 mt-1">{item.description}</p>
+                        <div className="mt-3 flex items-center space-x-2">
+                          <button
+                            onClick={() => {
+                              setAvailableItems(prevItems =>
+                                prevItems.map(i =>
+                                  i.id === item.id
+                                    ? { ...i, cartQuantity: Math.max(0, i.cartQuantity - 1) }
+                                    : i
+                                )
+                              );
+                            }}
+                            className="p-1 rounded-full hover:bg-gray-100"
+                          >
+                            <MinusIcon className="w-5 h-5 text-gray-500" />
+                          </button>
+                          <span className="w-8 text-center font-medium text-gray-700">
+                            {item.cartQuantity}
+                          </span>
+                          <button
+                            onClick={() => {
+                              setAvailableItems(prevItems =>
+                                prevItems.map(i =>
+                                  i.id === item.id
+                                    ? { ...i, cartQuantity: i.cartQuantity + 1 }
+                                    : i
+                                )
+                              );
+                            }}
+                            className="p-1 rounded-full hover:bg-gray-100"
+                          >
+                            <PlusIcon className="w-5 h-5 text-gray-500" />
+                          </button>
+                        </div>
+                      </div>
+                    </div>
+                  </div>
+                </motion.div>
+              ))}
+            </div>
+
+            {/* Cart Summary */}
+            {availableItems.some(item => item.cartQuantity > 0) && (
+              <div className="fixed bottom-0 left-0 right-0 bg-white border-t border-gray-200 p-4">
+                <div className="max-w-7xl mx-auto flex justify-between items-center">
+                  <div className="flex items-center space-x-4">
+                    <span className="text-gray-600">
+                      {availableItems.filter(item => item.cartQuantity > 0).length} items selected
+                    </span>
+                  </div>
+                  <button
+                    onClick={handleConfirmOrder}
+                    disabled={isSubmitting}
+                    className={`px-6 py-2 rounded-lg font-medium text-white ${
+                      isSubmitting
+                        ? 'bg-purple-400 cursor-not-allowed'
+                        : 'bg-purple-600 hover:bg-purple-700'
+                    }`}
+                  >
+                    {isSubmitting ? 'Processing...' : 'Confirm Borrow'}
+                  </button>
+                </div>
+              </div>
+            )}
+          </motion.div>
+        )}
       </div>
+
+      {/* Success Modal */}
+      {showSuccessModal && (
+        <div className="fixed inset-0 z-50 overflow-y-auto">
+          <div className="flex items-center justify-center min-h-screen px-4 pt-4 pb-20 text-center sm:block sm:p-0">
+            <div 
+              className="fixed inset-0 transition-opacity" 
+              aria-hidden="true"
+              onClick={() => {
+                setShowSuccessModal(false);
+                setModalItems([]);
+                setModalTime('');
+              }}
+            >
+              <div className="absolute inset-0"></div>
+            </div>
+            <span className="hidden sm:inline-block sm:align-middle sm:h-screen" aria-hidden="true">&#8203;</span>
+            <div className="inline-block align-bottom bg-white rounded-lg text-left overflow-hidden shadow-xl transform transition-all sm:my-8 sm:align-middle sm:max-w-lg sm:w-full">
+              <div className="bg-white px-4 pt-5 pb-4 sm:p-6 sm:pb-4">
+                <div className="sm:flex sm:items-start">
+                  <div className="mx-auto flex-shrink-0 flex items-center justify-center h-12 w-12 rounded-full bg-green-100 sm:mx-0 sm:h-10 sm:w-10">
+                    <CheckIcon className="h-6 w-6 text-green-600" />
+                  </div>
+                  <div className="mt-3 text-center sm:mt-0 sm:ml-4 sm:text-left">
+                    <h3 className="text-lg leading-6 font-medium text-gray-900">
+                      {success}
+                    </h3>
+                    <div className="mt-4 bg-gray-50 p-4 rounded-lg">
+                      <p className="text-gray-700">
+                        <span className="font-medium">ID Number:</span> {user.idNumber}
+                      </p>
+                      <p className="text-gray-700 mt-2">
+                        <span className="font-medium">Time:</span> {modalTime}
+                      </p>
+                      <p className="text-gray-700 mt-2">
+                        <span className="font-medium">Items:</span>
+                      </p>
+                      <ul className="mt-1 space-y-1">
+                        {modalItems.map((item, index) => (
+                          <li key={index} className="text-gray-600">
+                            • {item.name} (x{item.quantity || item.cartQuantity})
+                          </li>
+                        ))}
+                      </ul>
+                    </div>
+                  </div>
+                </div>
+              </div>
+              <div className="bg-gray-50 px-4 py-3 sm:px-6 sm:flex sm:flex-row-reverse">
+                <button
+                  type="button"
+                  onClick={() => {
+                    setShowSuccessModal(false);
+                    setModalItems([]);
+                    setModalTime('');
+                  }}
+                  className="w-full inline-flex justify-center rounded-md border border-transparent shadow-sm px-4 py-2 bg-purple-600 text-base font-medium text-white hover:bg-purple-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-purple-500 sm:ml-3 sm:w-auto sm:text-sm"
+                >
+                  OK
+                </button>
+              </div>
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   );
 } 

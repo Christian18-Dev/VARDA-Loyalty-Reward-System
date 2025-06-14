@@ -302,6 +302,14 @@ export const processReturnQR = async (req, res) => {
     });
     await returnedItemHistory.save();
 
+    // Update the status of the borrowed item to 'returned'
+    borrowedItem.status = 'returned';
+    borrowedItem.returnTime = returnTime;
+    await borrowedItem.save();
+
+    // Clear cache after return
+    clearCache();
+
     res.status(200).json({
       success: true,
       data: returnedItemHistory
