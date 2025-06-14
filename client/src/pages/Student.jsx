@@ -835,17 +835,21 @@ export default function StudentPage() {
     }
   };
 
-  // Update fetchBorrowedItems function
+  // Update fetchBorrowedItems function with better error handling and caching
   const fetchBorrowedItems = async () => {
     try {
       const response = await axios.get(
         `${baseUrl}/api/student/borrowed-items`,
         {
           headers: { Authorization: `Bearer ${token}` },
-          timeout: 30000 // Increased timeout to 30 seconds
+          timeout: 10000 // Reduced timeout to 10 seconds
         }
       );
-      setBorrowedItems(response.data.data);
+      
+      // Only update state if we have new data
+      if (response.data.data) {
+        setBorrowedItems(response.data.data);
+      }
     } catch (error) {
       console.error('Error fetching borrowed items:', error);
       if (error.code === 'ECONNABORTED') {
@@ -858,10 +862,12 @@ export default function StudentPage() {
     }
   };
 
+  // Update polling interval for borrowed items
   useEffect(() => {
     if (currentPage === 'borrow' || currentPage === 'home') {
       fetchBorrowedItems();
-      const pollInterval = setInterval(fetchBorrowedItems, 3000);
+      // Increase polling interval to 10 seconds
+      const pollInterval = setInterval(fetchBorrowedItems, 10000);
       return () => clearInterval(pollInterval);
     }
   }, [currentPage, token]);

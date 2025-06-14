@@ -2,12 +2,21 @@ import { BorrowedItemHistory } from '../models/BorrowedItemHistory.js';
 import { ReturnedItemHistory } from '../models/ReturnedItemHistory.js';
 import User from '../models/User.js';
 
+// Add caching for frequently accessed data
+const cache = new Map();
+const CACHE_TTL = 30000; // 30 seconds
+
+// Helper function to clear cache
+const clearCache = () => {
+  cache.clear();
+};
+
 export const createBorrowedItem = async (req, res) => {
   try {
     const { items, studentId, timestamp } = req.body;
 
     // First verify the user exists
-    const user = await User.findById(studentId);
+    const user = await User.findById(studentId).lean();
     if (!user) {
       console.log('User not found with ID:', studentId);
       return res.status(404).json({
@@ -25,7 +34,7 @@ export const createBorrowedItem = async (req, res) => {
         quantity: item.quantity 
       }))},
       status: 'borrowed'
-    });
+    }).lean();
 
     if (existingBorrow) {
       console.log('Duplicate borrow attempt detected for student:', user.idNumber);
@@ -47,6 +56,9 @@ export const createBorrowedItem = async (req, res) => {
     await borrowedItem.save();
     console.log('Created borrowed item record for student:', user.idNumber);
 
+    // Clear cache after new borrow
+    clearCache();
+
     res.status(201).json({
       success: true,
       data: borrowedItem
@@ -63,6 +75,17 @@ export const createBorrowedItem = async (req, res) => {
 export const getBorrowedItems = async (req, res) => {
   try {
     const { startDate, endDate } = req.query;
+    const cacheKey = `borrowed_${startDate}_${endDate}_${req.user?._id || 'all'}`;
+    
+    // Check cache first
+    const cachedData = cache.get(cacheKey);
+    if (cachedData && Date.now() - cachedData.timestamp < CACHE_TTL) {
+      return res.status(200).json({
+        success: true,
+        data: cachedData.data
+      });
+    }
+
     let query = {};
 
     // Filter by user's ID for student, teacher, and ateneo staff roles
@@ -77,14 +100,15 @@ export const getBorrowedItems = async (req, res) => {
       };
     }
 
-    // Get all borrowed items
+    // Get all borrowed items with lean() for better performance
     const borrowedItems = await BorrowedItemHistory.find(query)
-      .sort({ borrowTime: -1 });
+      .sort({ borrowTime: -1 })
+      .lean();
 
-    // Get all returned items
+    // Get all returned items with lean() for better performance
     const returnedItems = await ReturnedItemHistory.find({
       studentId: { $in: borrowedItems.map(item => item.studentId) }
-    });
+    }).lean();
 
     // Filter out items that have been returned
     const activeBorrowedItems = borrowedItems.filter(borrowedItem => {
@@ -95,6 +119,12 @@ export const getBorrowedItems = async (req, res) => {
       );
     });
     
+    // Cache the results
+    cache.set(cacheKey, {
+      data: activeBorrowedItems,
+      timestamp: Date.now()
+    });
+
     res.status(200).json({
       success: true,
       data: activeBorrowedItems
@@ -113,7 +143,7 @@ export const returnBorrowedItem = async (req, res) => {
     const { id } = req.params;
     console.log('Processing return for item ID:', id);
 
-    const borrowedItem = await BorrowedItemHistory.findById(id);
+    const borrowedItem = await BorrowedItemHistory.findById(id).lean();
     console.log('Found borrowed item:', borrowedItem);
     
     if (!borrowedItem) {
@@ -128,7 +158,7 @@ export const returnBorrowedItem = async (req, res) => {
       studentId: borrowedItem.studentId,
       'items.name': borrowedItem.items[0].name,
       borrowTime: borrowedItem.borrowTime
-    });
+    }).lean();
 
     if (existingReturn) {
       return res.status(400).json({
@@ -149,6 +179,9 @@ export const returnBorrowedItem = async (req, res) => {
       status: 'returned'
     });
     await returnedItemHistory.save();
+
+    // Clear cache after return
+    clearCache();
 
     res.status(200).json({
       success: true,

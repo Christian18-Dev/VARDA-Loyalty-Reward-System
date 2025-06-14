@@ -253,7 +253,7 @@ export default function AdminPage() {
     setShowStatusModal(true);
   };
 
-  // Update fetchData to handle pagination and search
+  // Update fetchData to be more efficient
   const fetchData = async (page = 1, search = '') => {
     try {
       // Only show loading state for initial load or user search, not during polling
@@ -263,7 +263,8 @@ export default function AdminPage() {
         setIsPageLoading(true);
       }
 
-      const [statsRes, usersRes, claimedRes, rewardsRes, borrowedRes] = await Promise.all([
+      // Use Promise.allSettled instead of Promise.all to handle partial failures
+      const [statsRes, usersRes, claimedRes, rewardsRes, borrowedRes] = await Promise.allSettled([
         axios.get(`${baseUrl}/api/admin/stats`, {
           headers: { Authorization: `Bearer ${token}` },
         }),
@@ -281,16 +282,22 @@ export default function AdminPage() {
         })
       ]);
 
-      setStats(statsRes.data);
-      setUsers(usersRes.data.users);
-      setCurrentPage(usersRes.data.currentPage);
-      setTotalPages(usersRes.data.totalPages);
-      setTotalUsers(usersRes.data.totalUsers);
-      setClaimedRewards(claimedRes.data);
-      setAvailableRewards(rewardsRes.data);
-      setTotalBorrowedItems(borrowedRes.data.data.length);
-      // Calculate total pages for rewards
-      setRewardsTotalPages(Math.ceil(rewardsRes.data.length / rewardsPerPage));
+      // Only update state if the request was successful
+      if (statsRes.status === 'fulfilled') setStats(statsRes.value.data);
+      if (usersRes.status === 'fulfilled') {
+        setUsers(usersRes.value.data.users);
+        setCurrentPage(usersRes.value.data.currentPage);
+        setTotalPages(usersRes.value.data.totalPages);
+        setTotalUsers(usersRes.value.data.totalUsers);
+      }
+      if (claimedRes.status === 'fulfilled') setClaimedRewards(claimedRes.value.data);
+      if (rewardsRes.status === 'fulfilled') {
+        setAvailableRewards(rewardsRes.value.data);
+        setRewardsTotalPages(Math.ceil(rewardsRes.value.data.length / rewardsPerPage));
+      }
+      if (borrowedRes.status === 'fulfilled') {
+        setTotalBorrowedItems(borrowedRes.value.data.data.length);
+      }
     } catch (error) {
       console.error("Error fetching data:", error);
       setError("Failed to fetch data. Please try again.");
@@ -303,7 +310,7 @@ export default function AdminPage() {
     }
   };
 
-  // Add polling effect for overview tab
+  // Update polling effect for overview tab
   useEffect(() => {
     let pollInterval;
     
@@ -312,10 +319,10 @@ export default function AdminPage() {
       setIsOverviewPolling(true);
       // Initial fetch
       fetchData();
-      // Set up polling every 10 seconds
+      // Set up polling every 30 seconds instead of 10
       pollInterval = setInterval(() => {
         fetchData();
-      }, 10000); // 10 seconds
+      }, 30000); // 30 seconds
     }
 
     // Cleanup interval on unmount or tab change
@@ -581,7 +588,20 @@ export default function AdminPage() {
     setPasswordError('');
   };
 
-  // Add new functions for borrow and return
+  // Update borrowed items polling
+  useEffect(() => {
+    let pollInterval;
+    if (activeTab === 'borrowed') {
+      fetchBorrowedItems();
+      // Increase polling interval to 10 seconds
+      pollInterval = setInterval(fetchBorrowedItems, 10000);
+    }
+    return () => {
+      if (pollInterval) clearInterval(pollInterval);
+    };
+  }, [activeTab, token]);
+
+  // Update fetchBorrowedItems to be more efficient
   const fetchBorrowedItems = async () => {
     try {
       const queryParams = new URLSearchParams();
@@ -591,27 +611,20 @@ export default function AdminPage() {
       const res = await axios.get(`${baseUrl}/api/admin/borrowed-items?${queryParams}`, {
         headers: { Authorization: `Bearer ${token}` },
       });
+      
+      // Only process and update state if we have new data
       const items = res.data.data;
-      const sortedBorrowed = items
-        .filter(item => item.status === 'borrowed')
-        .sort((a, b) => new Date(b.borrowTime) - new Date(a.borrowTime));
-      setBorrowedItems(sortedBorrowed);
+      if (items && items.length > 0) {
+        const sortedBorrowed = items
+          .filter(item => item.status === 'borrowed')
+          .sort((a, b) => new Date(b.borrowTime) - new Date(a.borrowTime));
+        setBorrowedItems(sortedBorrowed);
+      }
     } catch (err) {
+      console.error('Error fetching borrowed items:', err);
       setError('Failed to fetch borrowed items');
     }
   };
-
-  // Polling for borrowed tab
-  useEffect(() => {
-    let pollInterval;
-    if (activeTab === 'borrowed') {
-      fetchBorrowedItems();
-      pollInterval = setInterval(fetchBorrowedItems, 3000);
-    }
-    return () => {
-      if (pollInterval) clearInterval(pollInterval);
-    };
-  }, [activeTab, token]);
 
   // Filter and paginate borrowed items
   const filteredBorrowedItems = borrowedItems.filter(item =>
