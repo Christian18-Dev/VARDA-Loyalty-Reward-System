@@ -17,7 +17,12 @@ export function AuthProvider({ children }) {
       (response) => response,
       (error) => {
         if (error.response?.status === 401) {
-          // Token expired or invalid
+          // Check if it's a token expiration error
+          if (error.response.data?.code === 'TOKEN_EXPIRED') {
+            // Show a toast or notification about session expiration
+            alert('Your session has expired. Please login again.');
+          }
+          // Clear user data and redirect
           localStorage.removeItem('cafeteria-user');
           setUser(null);
           window.location.href = '/login';

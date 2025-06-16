@@ -255,7 +255,17 @@ export const getReturnedItemHistory = async (req, res) => {
 export const processReturnQR = async (req, res) => {
   try {
     const { studentId, items, timestamp } = req.body;
-    console.log('Processing return for student ID:', studentId);
+    
+    // Get user information
+    const user = await User.findById(studentId).lean();
+    if (!user) {
+      return res.status(404).json({
+        success: false,
+        message: 'Student not found'
+      });
+    }
+    
+    console.log('Created returned item record for student:', user.idNumber);
 
     // Find the borrowed item for this student that matches the timestamp
     const borrowedItem = await BorrowedItemHistory.findOne({
