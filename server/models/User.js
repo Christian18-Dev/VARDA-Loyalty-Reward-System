@@ -4,7 +4,14 @@ const userSchema = new mongoose.Schema({
   firstName: { type: String, required: true },
   lastName: { type: String, required: true },
   idNumber: { type: String, required: true, unique: true },
-  email: { type: String, required: true, unique: true },
+  email: { 
+    type: String, 
+    unique: true,
+    required: function() {
+      // Only require email for new documents (when _id doesn't exist)
+      return !this._id;
+    }
+  },
   password: { type: String, required: true },
   resetToken: { type: String },
   resetTokenExpiry: { type: Date },
