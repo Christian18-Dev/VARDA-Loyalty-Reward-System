@@ -16,6 +16,41 @@ export const recordPointsUsage = async (req, res) => {
       idNumber
     });
 
+    // Validate meal type
+    if (!mealType || !['breakfast', 'lunch', 'dinner'].includes(mealType)) {
+      return res.status(400).json({ 
+        message: 'Invalid meal type. Must be breakfast, lunch, or dinner' 
+      });
+    }
+
+    // Validate store name
+    if (!storeName || !VALID_STORES.includes(storeName)) {
+      return res.status(400).json({ 
+        message: 'Invalid store name' 
+      });
+    }
+
+    // Validate items array
+    if (!Array.isArray(items)) {
+      return res.status(400).json({ 
+        message: 'Items must be an array' 
+      });
+    }
+
+    // Validate pointsUsed 
+    if (!pointsUsed || pointsUsed <= 0) {
+      return res.status(400).json({ 
+        message: 'Invalid :)' 
+      });
+    }
+
+    // Validate totalAmount matches pointsUsed
+    if (totalAmount !== pointsUsed) {
+      return res.status(400).json({ 
+        message: 'Total amount must match points used' 
+      });
+    }
+
     // Find user first
     const user = await User.findOne({ idNumber });
     if (!user) {

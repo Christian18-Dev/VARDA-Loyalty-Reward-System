@@ -299,10 +299,7 @@ export const submitFeedback = async (req, res) => {
 
     await feedback.save();
 
-    req.user.points += 10;
-    await req.user.save();
-
-    res.json({ message: 'Feedback submitted and points added' });
+    res.json({ message: 'Feedback submitted successfully' });
   } catch (error) {
     console.error('Error in submitFeedback:', error);
     res.status(500).json({ message: 'Server error' });

@@ -25,7 +25,7 @@ router.get('/export/borrowed-items', protect, admin, exportBorrowedItems);
 router.get('/export/returned-items', protect, admin, exportReturnedItems);
 
 // Points usage route
-router.get('/points-usage', getAllPointsUsage);
+router.get('/points-usage', protect, admin, getAllPointsUsage);
 
 // Get feedback statistics
 router.get('/feedback-stats', protect, admin, getFeedbackStats);
