@@ -6,6 +6,7 @@ import { HomeIcon, TicketIcon, GiftIcon, LogoutIcon, ShoppingBagIcon, XIcon, Tra
 import { motion, AnimatePresence } from 'framer-motion';
 import confetti from 'canvas-confetti';
 import completeSetImage from '../assets/completeset.png';
+import basicSetImage from '../assets/basicset.png';
 import spoonImage from '../assets/spoon.png';
 import forkImage from '../assets/fork.png';
 import plateImage from '../assets/plate.png';
@@ -35,6 +36,14 @@ export default function StudentPage() {
   const [availableItems, setAvailableItems] = useState([
     {
       id: 1,
+      name: 'Basic Set',
+      image: basicSetImage,
+      description: 'Basic dining set (Plate, Spoon, Fork, Tray)',
+      cartQuantity: 0,
+      isSet: true
+    },
+    {
+      id: 2,
       name: 'Complete Set',
       image: completeSetImage,
       description: 'Complete dining set (Plate, Bowl, Spoon, Fork, Glass, Tray)',
@@ -42,42 +51,42 @@ export default function StudentPage() {
       isSet: true
     },
     { 
-      id: 2, 
+      id: 3, 
       name: 'Spoon', 
       image: spoonImage,
       description: 'Stainless steel spoon for your dining needs',
       cartQuantity: 0
     },
     { 
-      id: 3, 
+      id: 4, 
       name: 'Fork', 
       image: forkImage,
       description: 'Stainless steel fork for your dining needs',
       cartQuantity: 0
     },
     { 
-      id: 4, 
+      id: 5, 
       name: 'Plate', 
       image: plateImage,
       description: 'Ceramic plate',
       cartQuantity: 0
     },
     { 
-      id: 5, 
+      id: 6, 
       name: 'Bowl', 
       image: bowlImage,
       description: 'Ceramic bowl',
       cartQuantity: 0
     },
     { 
-      id: 6, 
+      id: 7, 
       name: 'Saucer', 
       image: saucerImage,
       description: 'Smaller plate',
       cartQuantity: 0
     },
     { 
-      id: 7, 
+      id: 8, 
       name: 'Glass', 
       image: glassImage,
       description: 'Glass for water and beverages',
@@ -1537,18 +1546,6 @@ export default function StudentPage() {
                       alt={item.name}
                       className="w-full h-full object-cover"
                     />
-                    {item.isSet && (
-                      <div className="absolute bottom-0 left-0 right-0 bg-gradient-to-t from-black/60 to-transparent p-4">
-                        <div className="flex items-center space-x-2">
-                          <span className="text-white text-sm">Includes:</span>
-                          <span className="text-white/90 text-sm">1 Plate</span>
-                          <span className="text-white/90 text-sm">•</span>
-                          <span className="text-white/90 text-sm">1 Spoon</span>
-                          <span className="text-white/90 text-sm">•</span>
-                          <span className="text-white/90 text-sm">1 Fork</span>
-                        </div>
-                      </div>
-                    )}
                   </div>
                   <div className="p-4">
                     <h4 className="font-bold text-lg text-gray-200">{item.name}</h4>

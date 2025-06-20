@@ -153,6 +153,10 @@ export default function Login() {
           </div>
           <div className="text-center text-sm text-gray-400">
             Forgot password?{' '}
+            <Link to="/forgot-password" className="text-blue-400 hover:text-blue-300 hover:underline font-semibold">
+              Reset via Email
+            </Link>
+            {' '}or{' '}
             <a
               href="https://web.facebook.com/people/VARDA-I-T-Support/61575392403660/"
               target="_blank"

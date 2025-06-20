@@ -1,6 +1,8 @@
 import User from '../models/User.js';
 import bcrypt from 'bcryptjs';
 import jwt from 'jsonwebtoken';
+import crypto from 'crypto';
+import { sendPasswordResetEmail, sendPasswordResetConfirmation } from '../utils/emailService.js';
 
 const generateToken = (user) => {
   return jwt.sign(
@@ -11,7 +13,7 @@ const generateToken = (user) => {
 };
 
 export const registerUser = async (req, res) => {
-  const { firstName, lastName, password, termsAccepted, idNumber } = req.body;
+  const { firstName, lastName, password, termsAccepted, idNumber, email } = req.body;
   
   if (!termsAccepted) {
     return res.status(400).json({ message: 'Terms and conditions must be accepted' });
@@ -19,6 +21,10 @@ export const registerUser = async (req, res) => {
 
   if (!idNumber) {
     return res.status(400).json({ message: 'ID Number is required' });
+  }
+
+  if (!email) {
+    return res.status(400).json({ message: 'Email is required' });
   }
 
   if (!firstName || !lastName) {
@@ -30,15 +36,21 @@ export const registerUser = async (req, res) => {
   }
 
   try {
-    const existing = await User.findOne({ idNumber }).lean();
-    if (existing) {
+    const existingId = await User.findOne({ idNumber }).lean();
+    if (existingId) {
       return res.status(400).json({ message: 'ID Number already registered' });
+    }
+
+    const existingEmail = await User.findOne({ email }).lean();
+    if (existingEmail) {
+      return res.status(400).json({ message: 'Email already registered' });
     }
 
     const hashed = await bcrypt.hash(password, 10);
     const userData = { 
       firstName,
       lastName,
+      email,
       password: hashed,
       idNumber,
       termsAccepted: true,
@@ -89,6 +101,116 @@ export const loginUser = async (req, res) => {
     });
   } catch (error) {
     console.error('Login error:', error);
+    res.status(500).json({ message: 'Internal server error' });
+  }
+};
+
+export const forgotPassword = async (req, res) => {
+  const { email } = req.body;
+
+  if (!email) {
+    return res.status(400).json({ message: 'Email is required' });
+  }
+
+  try {
+    const user = await User.findOne({ email });
+    
+    if (!user) {
+      // Don't reveal if email exists or not for security
+      return res.status(200).json({ 
+        message: 'If an account with that email exists, a password reset link has been sent.' 
+      });
+    }
+
+    // Generate reset token
+    const resetToken = crypto.randomBytes(32).toString('hex');
+    const resetTokenExpiry = new Date(Date.now() + 60 * 60 * 1000); // 1 hour
+
+    // Save reset token to user
+    user.resetToken = resetToken;
+    user.resetTokenExpiry = resetTokenExpiry;
+    await user.save();
+
+    // Create reset URL
+    const resetUrl = `${process.env.CLIENT_URL || 'www.2gonz.com'}/#/reset-password/${resetToken}`;
+
+    // Send email
+    const emailSent = await sendPasswordResetEmail(user.email, resetToken, resetUrl);
+
+    if (emailSent) {
+      res.status(200).json({ 
+        message: 'If an account with that email exists, a password reset link has been sent.' 
+      });
+    } else {
+      // If email fails, remove the reset token
+      user.resetToken = undefined;
+      user.resetTokenExpiry = undefined;
+      await user.save();
+      
+      res.status(500).json({ message: 'Error sending password reset email. Please try again.' });
+    }
+  } catch (error) {
+    console.error('Forgot password error:', error);
+    res.status(500).json({ message: 'Internal server error' });
+  }
+};
+
+export const resetPassword = async (req, res) => {
+  const { token, password } = req.body;
+
+  if (!token || !password) {
+    return res.status(400).json({ message: 'Token and new password are required' });
+  }
+
+  if (password.length < 6) {
+    return res.status(400).json({ message: 'Password must be at least 6 characters long' });
+  }
+
+  try {
+    const user = await User.findOne({
+      resetToken: token,
+      resetTokenExpiry: { $gt: Date.now() }
+    });
+
+    if (!user) {
+      return res.status(400).json({ message: 'Invalid or expired reset token' });
+    }
+
+    // Hash new password
+    const hashedPassword = await bcrypt.hash(password, 10);
+    
+    // Update user password and clear reset token
+    user.password = hashedPassword;
+    user.resetToken = undefined;
+    user.resetTokenExpiry = undefined;
+    await user.save();
+
+    // Send confirmation email
+    await sendPasswordResetConfirmation(user.email, user.firstName);
+
+    res.status(200).json({ message: 'Password has been reset successfully' });
+  } catch (error) {
+    console.error('Reset password error:', error);
+    res.status(500).json({ message: 'Internal server error' });
+  }
+};
+
+export const verifyResetToken = async (req, res) => {
+  const { token } = req.params;
+
+  try {
+    const user = await User.findOne({
+      resetToken: token,
+      resetTokenExpiry: { $gt: Date.now() }
+    });
+
+    if (!user) {
+      return res.status(400).json({ message: 'Invalid or expired reset token' });
+    }
+
+    res.status(200).json({ message: 'Token is valid' });
+  } catch (error) {
+    console.error('Verify reset token error:', error);
     res.status(500).json({ message: 'Internal server error' });
   }
 };

@@ -3,6 +3,8 @@ import { useAuth } from './context/AuthContext';
 
 import Login from './pages/Auth/Login';
 import Register from './pages/Auth/Register';
+import ForgotPassword from './pages/Auth/ForgotPassword';
+import ResetPassword from './pages/Auth/ResetPassword';
 import StudentPage from './pages/Student';
 import CashierPage from './pages/Cashier';
 import AdminPage from './pages/Admin';
@@ -42,6 +44,8 @@ function App() {
         <Route path="/" element={<Navigate to="/login" />} />
         <Route path="/login" element={<Login />} />
         <Route path="/register" element={<Register />} />
+        <Route path="/forgot-password" element={<ForgotPassword />} />
+        <Route path="/reset-password/:token" element={<ResetPassword />} />
 
         <Route
           path="/student"

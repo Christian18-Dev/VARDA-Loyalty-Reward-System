@@ -9,6 +9,7 @@ const API_BASE_URL = import.meta.env.VITE_API_BASE_URL;
 export default function Register() {
   const [firstName, setFirstName] = useState('');
   const [lastName, setLastName] = useState('');
+  const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
   const [confirmPassword, setConfirmPassword] = useState('');
   const [showPassword, setShowPassword] = useState(false);
@@ -40,6 +41,10 @@ export default function Register() {
     }
     if (!lastName.trim()) {
       setErrorMessage('Please enter your Last Name');
+      return false;
+    }
+    if (!email.trim()) {
+      setErrorMessage('Please enter your Email');
       return false;
     }
     if (!idNumber.trim()) {
@@ -86,6 +91,7 @@ export default function Register() {
       const userData = {
         firstName,
         lastName,
+        email,
         password,
         idNumber,
         termsAccepted: true,
@@ -223,6 +229,20 @@ export default function Register() {
                 value={lastName}
                 onChange={(e) => {
                   setLastName(e.target.value);
+                  setErrorMessage('');
+                }}
+                required
+              />
+            </div>
+            <div>
+              <label className="block mb-1 text-sm font-medium text-gray-200">Email</label>
+              <input
+                type="email"
+                className="w-full px-4 py-2 bg-gray-800/50 border border-gray-700 rounded-xl focus:ring-2 focus:ring-blue-500 focus:outline-none transition text-white placeholder-gray-400"
+                placeholder="Enter your email"
+                value={email}
+                onChange={(e) => {
+                  setEmail(e.target.value);
                   setErrorMessage('');
                 }}
                 required
@@ -439,7 +459,7 @@ export default function Register() {
           We collect the following types of information:
         </p>
         <ul>
-          <li>Account information (First Name, Last Name, ID Number/Phone Number, password)</li>
+          <li>Account information (First Name, Last Name, Email, ID Number/Phone Number, password)</li>
           <li>Points and reward history</li>
           <li>Usage data and interactions with the system</li>
         </ul>
