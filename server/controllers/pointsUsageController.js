@@ -1,6 +1,16 @@
 import PointsUsage from '../models/PointsUsage.js';
 import User from '../models/User.js';
 
+// Valid store names
+const VALID_STORES = [
+  'varda',
+  'blueCafe',
+  'colonelsCurry',
+  'chillers',
+  'luckyShawarma',
+  'yumdimdum'
+];
+
 // Record points usage
 export const recordPointsUsage = async (req, res) => {
   try {
@@ -37,10 +47,10 @@ export const recordPointsUsage = async (req, res) => {
       });
     }
 
-    // Validate pointsUsed 
+    // Validate pointsUsed is reasonable (positive and not zero)
     if (!pointsUsed || pointsUsed <= 0) {
       return res.status(400).json({ 
-        message: 'Invalid :)' 
+        message: 'Invalid Points' 
       });
     }
 
