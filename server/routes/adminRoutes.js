@@ -3,7 +3,7 @@ import { protect, admin } from '../middleware/authMiddleware.js';
 import { getStats, createReward, getUsers, getClaimedRewards, updateUserRole, updateUserPassword, getAllPointsUsage } from '../controllers/adminController.js';
 import { getBorrowedItems, getBorrowedItemHistory, getReturnedItemHistory, deleteReturnedItem } from '../controllers/borrowedItemController.js';
 import { exportBorrowedItems, exportReturnedItems } from '../controllers/exportController.js';
-import { getFeedbackStats } from '../controllers/feedbackController.js';
+import { getFeedbackStats, exportFeedback } from '../controllers/feedbackController.js';
 
 const router = express.Router();
 
@@ -23,6 +23,7 @@ router.delete('/returned-history/:id', protect, admin, deleteReturnedItem);
 // Export routes
 router.get('/export/borrowed-items', protect, admin, exportBorrowedItems);
 router.get('/export/returned-items', protect, admin, exportReturnedItems);
+router.get('/export/feedback', protect, admin, exportFeedback);
 
 // Points usage route
 router.get('/points-usage', protect, admin, getAllPointsUsage);

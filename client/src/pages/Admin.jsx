@@ -180,6 +180,68 @@ export default function AdminPage() {
   const [analyticsStartDate, setAnalyticsStartDate] = useState('');
   const [analyticsEndDate, setAnalyticsEndDate] = useState('');
 
+  // Feedback export state
+  const [feedbackStartDate, setFeedbackStartDate] = useState('');
+  const [feedbackEndDate, setFeedbackEndDate] = useState('');
+
+  const handleFeedbackStartDateChange = (e) => setFeedbackStartDate(e.target.value);
+  const handleFeedbackEndDateChange = (e) => setFeedbackEndDate(e.target.value);
+
+  const handleExportFeedback = async () => {
+    if (!feedbackStartDate || !feedbackEndDate) {
+      showStatusMessage('error', 'Please select both start and end dates');
+      return;
+    }
+    try {
+      const queryParams = new URLSearchParams();
+      if (feedbackStartDate) queryParams.append('startDate', feedbackStartDate);
+      if (feedbackEndDate) queryParams.append('endDate', feedbackEndDate);
+      const res = await axios.get(`${baseUrl}/api/admin/export/feedback?${queryParams}`, {
+        headers: { Authorization: `Bearer ${token}` },
+        timeout: 30000
+      });
+      const data = res.data.data;
+      if (!data || data.length === 0) {
+        showStatusMessage('error', 'No feedback found for the selected date range');
+        return;
+      }
+      // Prepare Excel
+      const workbook = new ExcelJS.Workbook();
+      const worksheet = workbook.addWorksheet('Feedback');
+      worksheet.columns = [
+        { header: 'Overall Comment', key: 'overallComment', width: 50 },
+        { header: 'Created At', key: 'createdAt', width: 25 },
+      ];
+      // Header styling
+      worksheet.getRow(1).eachCell(cell => {
+        cell.font = { bold: true, size: 12 };
+        cell.alignment = { vertical: 'middle', horizontal: 'center' };
+      });
+      // Add data rows
+      data.sort((a, b) => new Date(b.createdAt) - new Date(a.createdAt)).forEach(item => {
+        worksheet.addRow({
+          overallComment: item.overallComment,
+          createdAt: new Date(item.createdAt).toLocaleString(),
+        });
+      });
+      // Download
+      const buffer = await workbook.xlsx.writeBuffer();
+      const blob = new Blob([buffer], { type: 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet' });
+      const url = window.URL.createObjectURL(blob);
+      const a = document.createElement('a');
+      a.href = url;
+      a.download = 'feedbacks.xlsx';
+      document.body.appendChild(a);
+      a.click();
+      window.URL.revokeObjectURL(url);
+      document.body.removeChild(a);
+      showStatusMessage('success', 'Feedback exported to Excel');
+    } catch (error) {
+      console.error('Error exporting feedback:', error);
+      showStatusMessage('error', 'Error exporting feedback');
+    }
+  };
+
   const token = user.token;
   const baseUrl = import.meta.env.VITE_API_BASE_URL;
 
@@ -3055,6 +3117,40 @@ export default function AdminPage() {
             animate={{ opacity: 1, y: 0 }}
             className="bg-white rounded-2xl shadow-lg p-4 sm:p-6"
           >
+            {/* Feedback Export UI */}
+            <div className="mb-6">
+              <div className="grid grid-cols-1 md:grid-cols-3 gap-4 items-end">
+                <div>
+                  <label className="block text-sm font-medium text-gray-700 mb-1">Start Date</label>
+                  <input
+                    type="date"
+                    value={feedbackStartDate}
+                    onChange={handleFeedbackStartDateChange}
+                    className="w-full px-4 py-2 border border-gray-300 rounded-xl focus:ring-2 focus:ring-purple-500 focus:border-transparent bg-white"
+                  />
+                </div>
+                <div>
+                  <label className="block text-sm font-medium text-gray-700 mb-1">End Date</label>
+                  <input
+                    type="date"
+                    value={feedbackEndDate}
+                    onChange={handleFeedbackEndDateChange}
+                    className="w-full px-4 py-2 border border-gray-300 rounded-xl focus:ring-2 focus:ring-purple-500 focus:border-transparent bg-white"
+                  />
+                </div>
+                <div>
+                  <button
+                    onClick={handleExportFeedback}
+                    className="w-full px-4 py-3 bg-purple-600 text-white rounded-xl hover:bg-purple-700 flex items-center justify-center space-x-2 transition-all transform hover:scale-105"
+                  >
+                    <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M9 17v-2m3 2v-4m3 4v-6m2 10H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z" />
+                    </svg>
+                    <span>Export to Excel</span>
+                  </button>
+                </div>
+              </div>
+            </div>
             <div className="flex items-center space-x-3 mb-6">
               <div className="p-2 bg-purple-100 rounded-lg">
                 <ChatAltIcon className="w-6 h-6 text-purple-600" />

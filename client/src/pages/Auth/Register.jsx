@@ -454,80 +454,79 @@ export default function Register() {
       </Modal>
 
       <Modal isOpen={showPrivacy} onClose={() => setShowPrivacy(false)} title="Privacy Policy">
-        <h2>1. Information We Collect</h2>
+        <h2>Privacy Policy for Varda Group</h2>
+        <p><strong>Effective Date: June 1, 2025</strong></p>
         <p>
-          We collect the following types of information:
+          At Varda Group, we are committed to protecting your privacy. This Privacy Policy outlines our practices regarding the collection, use, and disclosure of information that we may collect from you or receive from your use of our services.
         </p>
+
+        <p><em><strong>Disclaimer:</strong> Varda Group is a concessionaire operating the canteen on the 2nd floor of the Gonzaga Building at Ateneo de Manila University. The "2Gonz Website Privacy Act" is an internal policy, initiated and implemented solely by Varda Group, and is not an Ateneo de Manila University policy or initiative.</em></p>
+
+        <h2>1. Information We Collect</h2>
+        <p>We may collect the following types of information:</p>
         <ul>
-          <li>Account information (First Name, Last Name, Email, ID Number/Phone Number, password)</li>
-          <li>Points and reward history</li>
-          <li>Usage data and interactions with the system</li>
+          <li><strong>Personal Information:</strong> This includes your name, email address, phone number, and any other information you provide to us when you register for our services, contact us for support, or participate in surveys or promotions.</li>
+          <li><strong>Usage Data:</strong> We may collect information about how you access and use our services. This may include your IP address, browser type, operating system, the pages you visit, and the time and date of your visit.</li>
+          <li><strong>Cookies and Tracking Technologies:</strong> We use cookies and similar tracking technologies to monitor activity on our services and store certain information. You can set your browser to refuse cookies or to alert you when cookies are being sent.</li>
         </ul>
 
         <h2>2. How We Use Your Information</h2>
-        <p>
-          We use your information to:
-        </p>
+        <p>Varda Group uses the information we collect for various purposes, including to:</p>
         <ul>
-          <li>Provide and maintain the loyalty reward system</li>
-          <li>Process your points and rewards</li>
-          <li>Send you important updates about the system</li>
-          <li>Improve our services</li>
-          <li>Personalize your experience using your name</li>
+          <li>Provide and maintain our services.</li>
+          <li>Notify you about changes to our services.</li>
+          <li>Allow you to participate in interactive features of our services when you choose to do so.</li>
+          <li>Provide customer support.</li>
+          <li>Gather analysis or valuable information so that we can improve our services.</li>
+          <li>Monitor the usage of our services.</li>
+          <li>Detect, prevent and address technical issues.</li>
+          <li>Send you newsletters, marketing or promotional materials, and other information that may be of interest to you (you can opt out of receiving any, or all, of these communications from us by following the unsubscribe link or instructions provided in any email we send).</li>
         </ul>
 
-        <h2>3. Data Security</h2>
-        <p>
-          We implement appropriate security measures to protect your personal information:
-        </p>
+        <h2>3. Disclosure of Your Information</h2>
+        <p>We may share your information in the following circumstances:</p>
         <ul>
-          <li>Encryption of sensitive data</li>
-          <li>Secure password storage</li>
-          <li>Regular security assessments</li>
-          <li>Access controls and authentication</li>
+          <li><strong>Service Providers:</strong> We may employ third-party companies and individuals to facilitate our services, to provide the services on our behalf, to perform service-related services, or to assist us in analyzing how our services are used.</li>
+          <li><strong>Legal Requirements:</strong> We may disclose your personal information in the good faith belief that such action is necessary to:
+            <ul>
+              <li>Comply with a legal obligation.</li>
+              <li>Protect and defend the rights or property of Varda Group.</li>
+              <li>Prevent or investigate possible wrongdoing in connection with the services.</li>
+              <li>Protect the personal safety of users of the services or the public.</li>
+              <li>Protect against legal liability.</li>
+            </ul>
+          </li>
         </ul>
 
-        <h2>4. Data Sharing</h2>
+        <h2>4. Security of Your Information</h2>
         <p>
-          We do not sell or share your personal information with third parties except:
+          The security of your personal information is important to us, but remember that no method of transmission over the internet or method of electronic storage is 100% secure. While we strive to use commercially acceptable means to protect your personal information, we cannot guarantee its absolute security.
         </p>
-        <ul>
-          <li>When required by law</li>
-          <li>To protect our rights and safety</li>
-          <li>With your explicit consent</li>
-        </ul>
 
         <h2>5. Your Rights</h2>
-        <p>
-          You have the right to:
-        </p>
+        <p>Depending on your location, you may have certain rights regarding your personal information, including:</p>
         <ul>
-          <li>Access your personal information</li>
-          <li>Correct inaccurate data</li>
-          <li>Request deletion of your account</li>
-          <li>Opt-out of communications</li>
+          <li>The right to access, update, or delete the information we have on you.</li>
+          <li>The right to rectification.</li>
+          <li>The right to object.</li>
+          <li>The right of restriction.</li>
+          <li>The right to data portability.</li>
+          <li>The right to withdraw consent.</li>
+        </ul>
+        <p>To exercise these rights, please contact us using the contact information provided below.</p>
+
+        <h2>6. Changes to This Privacy Policy</h2>
+        <p>
+          We may update our Privacy Policy from time to time. We will notify you of any changes by posting the new Privacy Policy on this page. You are advised to review this Privacy Policy periodically for any changes. Changes to this Privacy Policy are effective when they are posted on this page.
+        </p>
+
+        <h2>7. Contact Us</h2>
+        <p>If you have any questions about this Privacy Policy, please contact us:</p>
+        <ul>
+          <li>By email: vardaenterp@gmail.com</li>
         </ul>
 
-        <h2>6. Cookies and Tracking</h2>
-        <p>
-          We use cookies and similar technologies to:
-        </p>
-        <ul>
-          <li>Maintain your session</li>
-          <li>Remember your preferences</li>
-          <li>Analyze system usage</li>
-        </ul>
-
-        <h2>7. Changes to Privacy Policy</h2>
-        <p>
-          We may update this privacy policy from time to time. We will notify you of any changes by posting the
-          new policy on this page.
-        </p>
-
-        <h2>8. Contact Us</h2>
-        <p>
-          If you have questions about this privacy policy, please contact our support team.
-        </p>
+        <p>Thank you for choosing Varda Group. We value your trust and are committed to protecting your privacy.</p>
       </Modal>
     </div>
   );

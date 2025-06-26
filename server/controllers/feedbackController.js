@@ -110,4 +110,49 @@ export const getFeedbackStats = async (req, res) => {
       message: 'Error fetching feedback statistics'
     });
   }
+};
+
+// Export feedback data with date filtering
+export const exportFeedback = async (req, res) => {
+  try {
+    const { startDate, endDate } = req.query;
+    console.log('Received feedback export date range:', { startDate, endDate });
+    let query = {};
+
+    if (startDate && endDate) {
+      // Create UTC dates to avoid timezone issues
+      const start = new Date(startDate + 'T00:00:00.000Z');
+      const end = new Date(endDate + 'T23:59:59.999Z');
+
+      console.log('Feedback query date range:', {
+        start: start.toISOString(),
+        end: end.toISOString()
+      });
+
+      query.createdAt = {
+        $gte: start,
+        $lte: end
+      };
+    }
+
+    const feedback = await Feedback.find(query)
+      .populate('studentId', 'name idNumber')
+      .sort({ createdAt: -1 });
+
+    console.log('Found feedback items:', feedback.length);
+    if (feedback.length > 0) {
+      console.log('Sample feedback creation time:', feedback[0].createdAt);
+    }
+
+    res.status(200).json({
+      success: true,
+      data: feedback
+    });
+  } catch (error) {
+    console.error('Error exporting feedback:', error);
+    res.status(500).json({
+      success: false,
+      message: 'Error exporting feedback data'
+    });
+  }
 }; 
