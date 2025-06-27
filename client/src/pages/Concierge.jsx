@@ -132,6 +132,8 @@ export default function ConciergePage() {
   const [modalItems, setModalItems] = useState([]);
   const [modalTime, setModalTime] = useState('');
   const [modalType, setModalType] = useState('');
+  const [showReturnSuccessModal, setShowReturnSuccessModal] = useState(false);
+  const [returnedItemData, setReturnedItemData] = useState(null);
   const itemsPerPage = 5;
 
   const baseUrl = import.meta.env.VITE_API_BASE_URL;
@@ -698,26 +700,48 @@ export default function ConciergePage() {
         timestamp: item.borrowTime
       };
 
+      // Optimistic UI update - remove item from borrowed list immediately
+      setBorrowedItems(prevItems => 
+        prevItems.filter(borrowedItem => borrowedItem._id !== item._id)
+      );
+
       const response = await axios.post(
         `${baseUrl}/api/concierge/manual-return`,
         returnData,
         {
           headers: { Authorization: `Bearer ${token}` },
+          timeout: 10000 // 10 second timeout
         }
       );
 
-      setSuccess('Item returned successfully!');
-      
-      // Immediately update the borrowed items list
-      await fetchBorrowedItems();
+      // Show success popup with returned item details
+      setReturnedItemData({
+        studentIdNumber: item.studentIdNumber,
+        items: item.items,
+        borrowTime: item.borrowTime,
+        returnTime: new Date()
+      });
+      setShowReturnSuccessModal(true);
       setProcessingReturnId(null);
       
-      // Also update the returned items list
-      await fetchReturnedItems();
+      // Only fetch returned items to update the returned tab
+      if (activeTab === 'returned') {
+        await fetchReturnedItems();
+      }
 
     } catch (error) {
       console.error('Error returning item:', error);
-      setError('Failed to return item. Please try again.');
+      
+      // Revert optimistic update on error
+      setBorrowedItems(prevItems => [...prevItems, item]);
+      
+      if (error.code === 'ECONNABORTED') {
+        setError('Request timed out. Please try again.');
+      } else if (error.response?.status === 400) {
+        setError(error.response.data.message || 'Item already returned.');
+      } else {
+        setError('Failed to return item. Please try again.');
+      }
       setProcessingReturnId(null);
     }
   };
@@ -874,6 +898,80 @@ export default function ConciergePage() {
             type={statusModalData.type}
             message={statusModalData.message}
           />
+        )}
+      </AnimatePresence>
+      {/* Return Success Modal */}
+      <AnimatePresence>
+        {showReturnSuccessModal && (
+          <div className="fixed inset-0 z-[100] overflow-y-auto">
+            <div className="flex items-center justify-center min-h-screen px-4 pt-4 pb-20 text-center sm:block sm:p-0">
+              <motion.div
+                initial={{ opacity: 0 }}
+                animate={{ opacity: 1 }}
+                exit={{ opacity: 0 }}
+                className="fixed inset-0 backdrop-blur-sm bg-white/30 transition-opacity"
+                aria-hidden="true"
+                onClick={() => setShowReturnSuccessModal(false)}
+              />
+              <span className="hidden sm:inline-block sm:align-middle sm:h-screen" aria-hidden="true">&#8203;</span>
+              <motion.div
+                initial={{ opacity: 0, scale: 0.95 }}
+                animate={{ opacity: 1, scale: 1 }}
+                exit={{ opacity: 0, scale: 0.95 }}
+                className="relative inline-block align-bottom bg-white rounded-2xl text-left overflow-hidden shadow-xl transform transition-all sm:my-8 sm:align-middle sm:max-w-lg sm:w-full"
+                role="dialog"
+                aria-modal="true"
+                aria-labelledby="modal-headline"
+              >
+                <div className="bg-white px-6 pt-6 pb-4 sm:p-6">
+                  <div className="sm:flex sm:items-start">
+                    <div className="mx-auto flex-shrink-0 flex items-center justify-center h-16 w-16 rounded-full bg-green-100 sm:mx-0 sm:h-12 sm:w-12">
+                      <svg className="h-8 w-8 text-green-600 sm:h-6 sm:w-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M5 13l4 4L19 7" />
+                      </svg>
+                    </div>
+                    <div className="mt-3 text-center sm:mt-0 sm:ml-4 sm:text-left">
+                      <h3 className="text-lg leading-6 font-medium text-gray-900" id="modal-headline">
+                        Return Successful! ✅
+                      </h3>
+                      <div className="mt-4 space-y-3">
+                        <div className="bg-green-50 p-4 rounded-lg border border-green-200">
+                          <p className="text-sm text-green-800 font-medium">
+                            Item has been successfully returned
+                          </p>
+                        </div>
+                        {returnedItemData && (
+                          <div className="bg-gray-50 p-4 rounded-lg border border-gray-200">
+                            <div className="space-y-2 text-sm text-gray-700">
+                              <p><span className="font-medium">Student ID:</span> {returnedItemData.studentIdNumber}</p>
+                              <p><span className="font-medium">Return Time:</span> {returnedItemData.returnTime.toLocaleString()}</p>
+                              <p><span className="font-medium">Items Returned:</span></p>
+                              <ul className="ml-4 space-y-1">
+                                {returnedItemData.items.map((item, index) => (
+                                  <li key={index} className="text-gray-600">
+                                    • {item.name} (x{item.quantity})
+                                  </li>
+                                ))}
+                              </ul>
+                            </div>
+                          </div>
+                        )}
+                      </div>
+                    </div>
+                  </div>
+                </div>
+                <div className="bg-gray-50 px-6 py-4 sm:px-6 sm:flex sm:flex-row-reverse">
+                  <button
+                    type="button"
+                    onClick={() => setShowReturnSuccessModal(false)}
+                    className="w-full inline-flex justify-center rounded-xl border border-transparent shadow-sm px-4 py-3 bg-green-600 text-base font-medium text-white hover:bg-green-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-green-500 sm:ml-3 sm:w-auto sm:text-sm transition-colors"
+                  >
+                    Great! 👍
+                  </button>
+                </div>
+              </motion.div>
+            </div>
+          </div>
         )}
       </AnimatePresence>
       {/* Tab Navigation */}
@@ -1153,7 +1251,7 @@ export default function ConciergePage() {
               <div className="bg-gradient-to-br from-purple-50 to-indigo-50 p-6 rounded-xl border border-purple-100">
                 <div className="flex items-center space-x-2 mb-4">
                   <svg className="w-5 h-5 text-purple-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M8 7V3m8 4V3m-9 8h10M5 21h14a2 2 0 002-2V7a2 2 0 00-2-2H5a2 2 0 00-2 2v12a2 2 0 002 2z" />
+                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M8 7V3m8 4V3m-9 8h10M5 21h14a2 2 0 002-2V7a2 2 0 00-2-2H5a2 2 0 00-2 2v14a2 2 0 002 2z" />
                   </svg>
                   <h3 className="text-lg font-semibold text-gray-800">Select Date Range</h3>
                 </div>

@@ -35,6 +35,11 @@ const returnedItemHistorySchema = new mongoose.Schema({
   }
 }, { timestamps: true });
 
+// Add indexes for better query performance
+returnedItemHistorySchema.index({ studentId: 1, borrowTime: 1, status: 1 });
+returnedItemHistorySchema.index({ returnTime: -1 });
+returnedItemHistorySchema.index({ studentId: 1, returnTime: -1 });
+
 const ReturnedItemHistory = mongoose.model('ReturnedItemHistory', returnedItemHistorySchema);
 
 export { ReturnedItemHistory }; 

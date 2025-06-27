@@ -8,7 +8,12 @@ const CACHE_TTL = 30000; // 30 seconds
 
 // Helper function to clear cache
 const clearCache = () => {
-  cache.clear();
+  // Only clear cache keys that might be affected by returns
+  // This is more efficient than clearing the entire cache
+  const keysToClear = Array.from(cache.keys()).filter(key => 
+    key.includes('borrowed_') || key.includes('returned_')
+  );
+  keysToClear.forEach(key => cache.delete(key));
 };
 
 export const createBorrowedItem = async (req, res) => {
@@ -237,7 +242,8 @@ export const getReturnedItemHistory = async (req, res) => {
     }
 
     const history = await ReturnedItemHistory.find(query)
-      .sort({ returnTime: -1 });
+      .sort({ returnTime: -1 })
+      .limit(1000);
     
     res.status(200).json({
       success: true,
@@ -256,23 +262,12 @@ export const processReturnQR = async (req, res) => {
   try {
     const { studentId, items, timestamp } = req.body;
     
-    // Get user information
-    const user = await User.findById(studentId).lean();
-    if (!user) {
-      return res.status(404).json({
-        success: false,
-        message: 'Student not found'
-      });
-    }
-    
-    console.log('Created returned item record for student:', user.idNumber);
-
     // Find the borrowed item for this student that matches the timestamp
     const borrowedItem = await BorrowedItemHistory.findOne({
       studentId,
       borrowTime: new Date(timestamp),
       status: 'borrowed'
-    });
+    }).lean();
 
     if (!borrowedItem) {
       return res.status(404).json({
@@ -290,7 +285,7 @@ export const processReturnQR = async (req, res) => {
         quantity: item.quantity 
       }))},
       status: 'returned'
-    });
+    }).lean();
 
     if (existingReturn) {
       return res.status(400).json({
@@ -301,23 +296,38 @@ export const processReturnQR = async (req, res) => {
 
     const returnTime = new Date();
 
-    // Create returned history record
-    const returnedItemHistory = new ReturnedItemHistory({
-      studentId: borrowedItem.studentId,
-      studentIdNumber: borrowedItem.studentIdNumber,
-      items: borrowedItem.items,
-      borrowTime: borrowedItem.borrowTime,
-      returnTime: returnTime,
-      status: 'returned'
-    });
-    await returnedItemHistory.save();
+    // Use database transaction for atomic operations
+    const session = await BorrowedItemHistory.startSession();
+    let returnedItemHistory;
 
-    // Update the status of the borrowed item to 'returned'
-    borrowedItem.status = 'returned';
-    borrowedItem.returnTime = returnTime;
-    await borrowedItem.save();
+    try {
+      await session.withTransaction(async () => {
+        // Create returned history record
+        returnedItemHistory = new ReturnedItemHistory({
+          studentId: borrowedItem.studentId,
+          studentIdNumber: borrowedItem.studentIdNumber,
+          items: borrowedItem.items,
+          borrowTime: borrowedItem.borrowTime,
+          returnTime: returnTime,
+          status: 'returned'
+        });
+        await returnedItemHistory.save({ session });
 
-    // Clear cache after return
+        // Update the status of the borrowed item to 'returned'
+        await BorrowedItemHistory.findByIdAndUpdate(
+          borrowedItem._id,
+          { 
+            status: 'returned',
+            returnTime: returnTime 
+          },
+          { session }
+        );
+      });
+    } finally {
+      await session.endSession();
+    }
+
+    // Clear cache after return (only clear relevant cache keys)
     clearCache();
 
     res.status(200).json({
