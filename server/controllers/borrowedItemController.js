@@ -5,6 +5,7 @@ import User from '../models/User.js';
 // Add caching for frequently accessed data
 const cache = new Map();
 const CACHE_TTL = 30000; // 30 seconds
+const MAX_CACHE_SIZE = 100; // Maximum number of cache entries
 
 // Helper function to generate unique order ID
 const generateOrderId = () => {
@@ -12,7 +13,7 @@ const generateOrderId = () => {
   return `ORD-${randomDigits}`;
 };
 
-// Helper function to clear cache
+// Helper function to clear cache with size limits
 const clearCache = () => {
   // Only clear cache keys that might be affected by returns
   // This is more efficient than clearing the entire cache
@@ -20,6 +21,15 @@ const clearCache = () => {
     key.includes('borrowed_') || key.includes('returned_')
   );
   keysToClear.forEach(key => cache.delete(key));
+};
+
+// Helper function to manage cache size
+const manageCacheSize = () => {
+  if (cache.size > MAX_CACHE_SIZE) {
+    // Remove oldest entries (first 20% of cache)
+    const keysToRemove = Array.from(cache.keys()).slice(0, Math.floor(MAX_CACHE_SIZE * 0.2));
+    keysToRemove.forEach(key => cache.delete(key));
+  }
 };
 
 export const createBorrowedItem = async (req, res) => {
@@ -144,6 +154,9 @@ export const getBorrowedItems = async (req, res) => {
       data: activeBorrowedItems,
       timestamp: Date.now()
     });
+
+    // Manage cache size
+    manageCacheSize();
 
     res.status(200).json({
       success: true,

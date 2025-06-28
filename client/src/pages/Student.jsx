@@ -2056,7 +2056,7 @@ function SettingsPage({ user, onBack }) {
               <label className="block text-sm font-medium text-gray-700 mb-1">Current Password</label>
               <input 
                 type="password" 
-                className="w-full border-2 border-purple-200 rounded-lg p-2" 
+                className="w-full border-2 border-purple-200 rounded-lg p-2 text-gray-900" 
                 value={currentPassword} 
                 onChange={e => setCurrentPassword(e.target.value)} 
                 placeholder="Enter current password"
@@ -2067,7 +2067,7 @@ function SettingsPage({ user, onBack }) {
               <label className="block text-sm font-medium text-gray-700 mb-1">New Password</label>
               <input 
                 type="password" 
-                className="w-full border-2 border-purple-200 rounded-lg p-2" 
+                className="w-full border-2 border-purple-200 rounded-lg p-2 text-gray-900" 
                 value={password} 
                 onChange={e => setPassword(e.target.value)} 
                 placeholder="Enter new password"
@@ -2078,7 +2078,7 @@ function SettingsPage({ user, onBack }) {
               <label className="block text-sm font-medium text-gray-700 mb-1">Confirm New Password</label>
               <input 
                 type="password" 
-                className="w-full border-2 border-purple-200 rounded-lg p-2" 
+                className="w-full border-2 border-purple-200 rounded-lg p-2 text-gray-900" 
                 value={confirmPassword} 
                 onChange={e => setConfirmPassword(e.target.value)} 
                 placeholder="Confirm new password"

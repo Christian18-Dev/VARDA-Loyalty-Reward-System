@@ -290,7 +290,7 @@ export default function AdminPage() {
         setTotalPages(usersRes.value.data.totalPages);
         setTotalUsers(usersRes.value.data.totalUsers);
       }
-      if (claimedRes.status === 'fulfilled') setClaimedRewards(claimedRes.value.data);
+      if (claimedRes.status === 'fulfilled') setClaimedRewards(claimedRes.value.data.claimedRewards || []);
       if (rewardsRes.status === 'fulfilled') {
         setAvailableRewards(rewardsRes.value.data);
         setRewardsTotalPages(Math.ceil(rewardsRes.value.data.length / rewardsPerPage));
@@ -1857,7 +1857,7 @@ export default function AdminPage() {
                             value={newPassword}
                             onChange={(e) => setNewPassword(e.target.value)}
                             placeholder="Enter new password"
-                            className="mt-1 w-full px-4 py-2 border border-gray-300 rounded-xl focus:ring-2 focus:ring-purple-500 focus:border-transparent"
+                            className="mt-1 w-full px-4 py-2 border border-gray-300 rounded-xl focus:ring-2 focus:ring-purple-500 focus:border-transparent text-gray-900"
                           />
                         </div>
                         <div>
@@ -1870,7 +1870,7 @@ export default function AdminPage() {
                             value={confirmPassword}
                             onChange={(e) => setConfirmPassword(e.target.value)}
                             placeholder="Confirm new password"
-                            className="mt-1 w-full px-4 py-2 border border-gray-300 rounded-xl focus:ring-2 focus:ring-purple-500 focus:border-transparent"
+                            className="mt-1 w-full px-4 py-2 border border-gray-300 rounded-xl focus:ring-2 focus:ring-purple-500 focus:border-transparent text-gray-900"
                           />
                         </div>
                         {passwordError && (
@@ -1945,7 +1945,7 @@ export default function AdminPage() {
                             value={adminCode}
                             onChange={(e) => setAdminCode(e.target.value)}
                             placeholder="Enter admin code"
-                            className="mt-1 w-full px-4 py-2 border border-gray-300 rounded-xl focus:ring-2 focus:ring-purple-500 focus:border-transparent"
+                            className="mt-1 w-full px-4 py-2 border border-gray-300 rounded-xl focus:ring-2 focus:ring-purple-500 focus:border-transparent text-gray-900"
                           />
                         </div>
                         {passwordError && (

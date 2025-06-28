@@ -1,5 +1,5 @@
-// Set Node.js memory limit to 384MB to leave room for system processes
-process.env.NODE_OPTIONS = '--max-old-space-size=384';
+// Set Node.js memory limit to 400MB to stay within Render's 512MB RAM limit
+process.env.NODE_OPTIONS = '--max-old-space-size=400';
 
 import express from 'express';
 import cors from 'cors';
@@ -22,12 +22,28 @@ const isProd = process.env.NODE_ENV === "production";
 // Memory monitoring
 const logMemoryUsage = () => {
   const used = process.memoryUsage();
-  console.log(`Memory usage - heapTotal: ${Math.round(used.heapTotal / 1024 / 1024)}MB, heapUsed: ${Math.round(used.heapUsed / 1024 / 1024)}MB`);
+  const heapUsedMB = Math.round(used.heapUsed / 1024 / 1024);
+  const heapTotalMB = Math.round(used.heapTotal / 1024 / 1024);
+  
+  console.log(`Memory usage - heapTotal: ${heapTotalMB}MB, heapUsed: ${heapUsedMB}MB`);
+  
+  // Warn if memory usage is high
+  if (heapUsedMB > 350) {
+    console.warn(`⚠️ High memory usage detected: ${heapUsedMB}MB (approaching 512MB limit)`);
+  }
 };
 
-// Set up periodic memory logging in production
+// Set up periodic memory logging in production (reduced frequency)
 if (isProd) {
-  setInterval(logMemoryUsage, 30000); // Log every 30 seconds
+  setInterval(logMemoryUsage, 60000); // Log every 60 seconds instead of 30
+  
+  // Periodic garbage collection hint (every 2 minutes for 512MB RAM)
+  setInterval(() => {
+    if (global.gc) {
+      global.gc();
+      console.log('🧹 Garbage collection triggered');
+    }
+  }, 120000); // 2 minutes
 }
 
 // ✅ Logging info
@@ -73,10 +89,11 @@ async function connectDB() {
   try {
     // Configure Mongoose connection
     const mongooseOptions = {
-      maxPoolSize: 10,
-      minPoolSize: 5,
+      maxPoolSize: 3, // Reduced for 512MB RAM limit
+      minPoolSize: 1, // Reduced for 512MB RAM limit
       socketTimeoutMS: 45000,
       connectTimeoutMS: 10000,
+      serverSelectionTimeoutMS: 5000,
     };
 
     await mongoose.connect(mongoURI, mongooseOptions);

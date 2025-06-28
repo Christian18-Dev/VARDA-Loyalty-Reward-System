@@ -6,27 +6,35 @@ import PointsUsage from '../models/PointsUsage.js';
 
 export const getStats = async (req, res) => {
   try {
-    // Get all users
-    const users = await User.find();
-    
-    // Calculate total unused points by summing points from users
-    const totalPointsUnused = users.reduce((acc, user) => acc + user.points, 0);
+    // Use aggregation to calculate totals without loading all documents into memory
+    const userStats = await User.aggregate([
+      {
+        $group: {
+          _id: null,
+          totalUsers: { $sum: 1 },
+          totalPointsUnused: { $sum: '$points' }
+        }
+      }
+    ]);
 
-    // Get all claimed rewards and calculate total points used
-    const claimedRewards = await ClaimedReward.find();
-    
-    // Ensure that pointsUsed is valid and sum it
-    const totalPointsUsed = claimedRewards.reduce(
-      (sum, reward) => sum + (reward.pointsUsed > 0 ? reward.pointsUsed : 0), 
-      0
-    );
+    const claimedRewardsStats = await ClaimedReward.aggregate([
+      {
+        $group: {
+          _id: null,
+          totalPointsUsed: { $sum: { $max: ['$pointsUsed', 0] } }
+        }
+      }
+    ]);
 
-    res.json({
-      totalPointsUnused,
-      totalPointsUsed,
-      totalUsers: users.length
-    });
+    const stats = {
+      totalPointsUnused: userStats[0]?.totalPointsUnused || 0,
+      totalPointsUsed: claimedRewardsStats[0]?.totalPointsUsed || 0,
+      totalUsers: userStats[0]?.totalUsers || 0
+    };
+
+    res.json(stats);
   } catch (error) {
+    console.error('Error fetching stats:', error);
     res.status(500).json({ message: error.message });
   }
 };
@@ -74,8 +82,34 @@ export const getUsers = async (req, res) => {
 
 export const getClaimedRewards = async (req, res) => {
   try {
-    const claimedRewards = await ClaimedReward.find().sort({ dateClaimed: -1 });
-    res.json(claimedRewards);
+    const page = parseInt(req.query.page) || 1;
+    const limit = parseInt(req.query.limit) || 50;
+    const search = req.query.search || '';
+
+    // Create search query
+    const searchQuery = search ? {
+      $or: [
+        { idNumber: { $regex: search, $options: 'i' } },
+        { reward: { $regex: search, $options: 'i' } }
+      ]
+    } : {};
+
+    // Get total count for pagination
+    const total = await ClaimedReward.countDocuments(searchQuery);
+
+    // Get paginated claimed rewards with lean() for better performance
+    const claimedRewards = await ClaimedReward.find(searchQuery)
+      .sort({ dateClaimed: -1 })
+      .skip((page - 1) * limit)
+      .limit(limit)
+      .lean();
+
+    res.json({
+      claimedRewards,
+      currentPage: page,
+      totalPages: Math.ceil(total / limit),
+      totalRecords: total
+    });
   } catch (error) {
     console.error('Error fetching claimed rewards:', error);
     res.status(500).json({ message: 'Server error' });
