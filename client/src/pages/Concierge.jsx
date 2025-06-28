@@ -328,8 +328,8 @@ export default function ConciergePage() {
 
     // Calculate column widths based on type
     const columnWidths = type === 'borrowed' 
-      ? { studentId: '25%', items: '35%', borrowTime: '25%', status: '15%' }
-      : { studentId: '20%', items: '30%', borrowTime: '20%', returnTime: '20%', status: '10%' };
+      ? { studentId: '15%', orderId: '15%', items: '35%', borrowTime: '35%' }
+      : { studentId: '15%', orderId: '15%', items: '20%', borrowTime: '25%', returnTime: '25%' };
 
     return (
       <Document>
@@ -351,6 +351,9 @@ export default function ConciergePage() {
               <View style={[styles.tableCol, { width: columnWidths.studentId }]}>
                 <Text style={styles.headerCell}>Student ID</Text>
               </View>
+              <View style={[styles.tableCol, { width: columnWidths.orderId }]}>
+                <Text style={styles.headerCell}>Order ID</Text>
+              </View>
               <View style={[styles.tableCol, { width: columnWidths.items }]}>
                 <Text style={styles.headerCell}>Items</Text>
               </View>
@@ -362,14 +365,14 @@ export default function ConciergePage() {
                   <Text style={styles.headerCell}>Return Time</Text>
                 </View>
               )}
-              <View style={[styles.tableCol, { width: columnWidths.status }]}>
-                <Text style={styles.headerCell}>Status</Text>
-              </View>
             </View>
             {data.map((item, index) => (
               <View key={index} style={styles.tableRow}>
                 <View style={[styles.tableCol, { width: columnWidths.studentId }]}>
                   <Text style={styles.tableCell}>{item.studentIdNumber}</Text>
+                </View>
+                <View style={[styles.tableCol, { width: columnWidths.orderId }]}>
+                  <Text style={styles.tableCell}>{item.orderId || 'N/A'}</Text>
                 </View>
                 <View style={[styles.tableCol, { width: columnWidths.items }]}>
                   <Text style={styles.tableCell}>{item.items.map(i => `${i.name} (x${i.quantity})`).join('; ')}</Text>
@@ -382,9 +385,6 @@ export default function ConciergePage() {
                     <Text style={styles.tableCell}>{new Date(item.returnTime).toLocaleString()}</Text>
                   </View>
                 )}
-                <View style={[styles.tableCol, { width: columnWidths.status }]}>
-                  <Text style={styles.tableCell}>{type === 'borrowed' ? 'borrowed' : 'returned'}</Text>
-                </View>
               </View>
             ))}
           </View>
@@ -498,17 +498,17 @@ export default function ConciergePage() {
           // Define columns based on type with exact PDF widths
           const columns = type === 'borrowed' 
             ? [
-                { header: 'Student ID', key: 'studentId', width: 25 },
+                { header: 'Student ID', key: 'studentId', width: 15 },
+                { header: 'Order ID', key: 'orderId', width: 15 },
                 { header: 'Items', key: 'items', width: 35 },
-                { header: 'Borrow Time', key: 'borrowTime', width: 25 },
-                { header: 'Status', key: 'status', width: 15 }
+                { header: 'Borrow Time', key: 'borrowTime', width: 35 }
               ]
             : [
-                { header: 'Student ID', key: 'studentId', width: 20 },
-                { header: 'Items', key: 'items', width: 30 },
-                { header: 'Borrow Time', key: 'borrowTime', width: 20 },
-                { header: 'Return Time', key: 'returnTime', width: 20 },
-                { header: 'Status', key: 'status', width: 10 }
+                { header: 'Student ID', key: 'studentId', width: 15 },
+                { header: 'Order ID', key: 'orderId', width: 15 },
+                { header: 'Items', key: 'items', width: 20 },
+                { header: 'Borrow Time', key: 'borrowTime', width: 25 },
+                { header: 'Return Time', key: 'returnTime', width: 25 }
               ];
           
           worksheet.columns = columns;
@@ -544,14 +544,11 @@ export default function ConciergePage() {
           data.forEach((item) => {
             const rowData = {
               studentId: item.studentIdNumber,
+              orderId: item.orderId || 'N/A',
               items: item.items.map(i => `${i.name} (x${i.quantity})`).join('; '),
               borrowTime: new Date(item.borrowTime).toLocaleString(),
-              status: type === 'borrowed' ? 'borrowed' : 'returned',
+              returnTime: type === 'returned' ? new Date(item.returnTime).toLocaleString() : undefined
             };
-            
-            if (type === 'returned') {
-              rowData.returnTime = new Date(item.returnTime).toLocaleString();
-            }
             
             const row = worksheet.addRow(rowData);
             row.height = 20;
@@ -1026,18 +1023,24 @@ export default function ConciergePage() {
                 </div>
               </div>
             </div>
-            <div className="overflow-x-auto rounded-xl border border-gray-200">
+            <div className="overflow-x-auto">
               <table className="min-w-full divide-y divide-gray-200">
                 <thead className="bg-gray-50">
                   <tr>
                     <th className="px-4 sm:px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
-                      ID Number
+                      Student ID
+                    </th>
+                    <th className="px-4 sm:px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                      Order ID
                     </th>
                     <th className="px-4 sm:px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
                       Items
                     </th>
                     <th className="px-4 sm:px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
                       Borrow Time
+                    </th>
+                    <th className="px-4 sm:px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                      Status
                     </th>
                     <th className="px-4 sm:px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
                       Actions
@@ -1051,6 +1054,9 @@ export default function ConciergePage() {
                         {item.studentIdNumber}
                       </td>
                       <td className="px-4 sm:px-6 py-4 whitespace-nowrap text-sm text-gray-500">
+                        {item.orderId || 'N/A'}
+                      </td>
+                      <td className="px-4 sm:px-6 py-4 whitespace-nowrap text-sm text-gray-500">
                         {item.items.map((i, index) => (
                           <div key={index}>
                             {i.name} (x{i.quantity})
@@ -1061,16 +1067,19 @@ export default function ConciergePage() {
                         {new Date(item.borrowTime).toLocaleString()}
                       </td>
                       <td className="px-4 sm:px-6 py-4 whitespace-nowrap text-sm text-gray-500">
+                        <span className={`px-2 inline-flex text-xs leading-5 font-semibold rounded-full bg-yellow-100 text-yellow-800`}>
+                          {item.status}
+                        </span>
+                      </td>
+                      <td className="px-4 sm:px-6 py-4 whitespace-nowrap text-sm text-gray-500">
                         <button
                           onClick={() => handleManualReturn(item)}
                           disabled={processingReturnId === item._id}
-                          className={`px-4 py-2 rounded-lg transition-colors ${
-                            processingReturnId === item._id
-                              ? 'bg-gray-400 cursor-not-allowed'
-                              : 'bg-green-600 hover:bg-green-700 text-white'
+                          className={`px-3 py-1 bg-green-600 text-white rounded-lg hover:bg-green-700 transition-colors ${
+                            processingReturnId === item._id ? 'opacity-50 cursor-not-allowed' : ''
                           }`}
                         >
-                          {processingReturnId === item._id ? 'Processing...' : 'Process Return'}
+                          {processingReturnId === item._id ? 'Processing...' : 'Return'}
                         </button>
                       </td>
                     </tr>
@@ -1146,7 +1155,10 @@ export default function ConciergePage() {
                 <thead className="bg-gray-50">
                   <tr>
                     <th className="px-4 sm:px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
-                      ID Number
+                      Student ID
+                    </th>
+                    <th className="px-4 sm:px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                      Order ID
                     </th>
                     <th className="px-4 sm:px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
                       Items
@@ -1167,6 +1179,9 @@ export default function ConciergePage() {
                     <tr key={item._id} className="hover:bg-gray-50">
                       <td className="px-4 sm:px-6 py-4 whitespace-nowrap text-sm font-medium text-gray-900">
                         {item.studentIdNumber}
+                      </td>
+                      <td className="px-4 sm:px-6 py-4 whitespace-nowrap text-sm text-gray-500">
+                        {item.orderId || 'N/A'}
                       </td>
                       <td className="px-4 sm:px-6 py-4 whitespace-nowrap text-sm text-gray-500">
                         {item.items.map((i, index) => (

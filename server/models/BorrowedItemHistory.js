@@ -1,6 +1,11 @@
 import mongoose from 'mongoose';
 
 const borrowedItemHistorySchema = new mongoose.Schema({
+  orderId: {
+    type: String,
+    unique: true,
+    sparse: true // Allows multiple null/undefined values
+  },
   studentId: {
     type: mongoose.Schema.Types.ObjectId,
     ref: 'User',
@@ -42,6 +47,7 @@ borrowedItemHistorySchema.index({ studentId: 1, status: 1 });
 borrowedItemHistorySchema.index({ studentId: 1, borrowTime: 1, status: 1 });
 borrowedItemHistorySchema.index({ borrowTime: -1 });
 borrowedItemHistorySchema.index({ status: 1, borrowTime: -1 });
+borrowedItemHistorySchema.index({ studentId: 1, orderId: 1 });
 
 const BorrowedItemHistory = mongoose.model('BorrowedItemHistory', borrowedItemHistorySchema);
 

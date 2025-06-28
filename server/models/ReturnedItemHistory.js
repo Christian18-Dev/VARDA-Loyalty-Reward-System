@@ -1,6 +1,9 @@
 import mongoose from 'mongoose';
 
 const returnedItemHistorySchema = new mongoose.Schema({
+  orderId: {
+    type: String
+  },
   studentId: {
     type: mongoose.Schema.Types.ObjectId,
     ref: 'User',
@@ -39,6 +42,8 @@ const returnedItemHistorySchema = new mongoose.Schema({
 returnedItemHistorySchema.index({ studentId: 1, borrowTime: 1, status: 1 });
 returnedItemHistorySchema.index({ returnTime: -1 });
 returnedItemHistorySchema.index({ studentId: 1, returnTime: -1 });
+returnedItemHistorySchema.index({ orderId: 1 });
+returnedItemHistorySchema.index({ studentId: 1, orderId: 1 });
 
 const ReturnedItemHistory = mongoose.model('ReturnedItemHistory', returnedItemHistorySchema);
 

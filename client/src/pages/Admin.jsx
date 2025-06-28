@@ -857,8 +857,8 @@ export default function AdminPage() {
 
     // Calculate column widths based on type
     const columnWidths = type === 'borrowed' 
-      ? { studentId: '25%', items: '35%', borrowTime: '25%', status: '15%' }
-      : { studentId: '20%', items: '30%', borrowTime: '20%', returnTime: '20%', status: '10%' };
+      ? { studentId: '15%', orderId: '15%', items: '35%', borrowTime: '35%' }
+      : { studentId: '15%', orderId: '15%', items: '20%', borrowTime: '25%', returnTime: '25%' };
 
     return (
       <Document>
@@ -880,6 +880,9 @@ export default function AdminPage() {
               <View style={[styles.tableCol, { width: columnWidths.studentId }]}>
                 <Text style={styles.headerCell}>Student ID</Text>
               </View>
+              <View style={[styles.tableCol, { width: columnWidths.orderId }]}>
+                <Text style={styles.headerCell}>Order ID</Text>
+              </View>
               <View style={[styles.tableCol, { width: columnWidths.items }]}>
                 <Text style={styles.headerCell}>Items</Text>
               </View>
@@ -891,14 +894,14 @@ export default function AdminPage() {
                   <Text style={styles.headerCell}>Return Time</Text>
                 </View>
               )}
-              <View style={[styles.tableCol, { width: columnWidths.status }]}>
-                <Text style={styles.headerCell}>Status</Text>
-              </View>
             </View>
             {data.map((item, index) => (
               <View key={index} style={styles.tableRow}>
                 <View style={[styles.tableCol, { width: columnWidths.studentId }]}>
                   <Text style={styles.tableCell}>{item.studentIdNumber}</Text>
+                </View>
+                <View style={[styles.tableCol, { width: columnWidths.orderId }]}>
+                  <Text style={styles.tableCell}>{item.orderId || 'N/A'}</Text>
                 </View>
                 <View style={[styles.tableCol, { width: columnWidths.items }]}>
                   <Text style={styles.tableCell}>{item.items.map(i => `${i.name} (x${i.quantity})`).join('; ')}</Text>
@@ -911,9 +914,6 @@ export default function AdminPage() {
                     <Text style={styles.tableCell}>{new Date(item.returnTime).toLocaleString()}</Text>
                   </View>
                 )}
-                <View style={[styles.tableCol, { width: columnWidths.status }]}>
-                  <Text style={styles.tableCell}>{type === 'borrowed' ? 'borrowed' : 'returned'}</Text>
-                </View>
               </View>
             ))}
           </View>
@@ -956,17 +956,17 @@ export default function AdminPage() {
           // Define columns based on type with exact PDF widths
           const columns = type === 'borrowed' 
             ? [
-                { header: 'Student ID', key: 'studentId', width: 25 },
+                { header: 'Student ID', key: 'studentId', width: 15 },
+                { header: 'Order ID', key: 'orderId', width: 15 },
                 { header: 'Items', key: 'items', width: 35 },
-                { header: 'Borrow Time', key: 'borrowTime', width: 25 },
-                { header: 'Status', key: 'status', width: 15 }
+                { header: 'Borrow Time', key: 'borrowTime', width: 35 }
               ]
             : [
-                { header: 'Student ID', key: 'studentId', width: 20 },
-                { header: 'Items', key: 'items', width: 30 },
-                { header: 'Borrow Time', key: 'borrowTime', width: 20 },
-                { header: 'Return Time', key: 'returnTime', width: 20 },
-                { header: 'Status', key: 'status', width: 10 }
+                { header: 'Student ID', key: 'studentId', width: 15 },
+                { header: 'Order ID', key: 'orderId', width: 15 },
+                { header: 'Items', key: 'items', width: 20 },
+                { header: 'Borrow Time', key: 'borrowTime', width: 25 },
+                { header: 'Return Time', key: 'returnTime', width: 25 }
               ];
           
           worksheet.columns = columns;
@@ -1002,10 +1002,10 @@ export default function AdminPage() {
           data.forEach(item => {
             worksheet.addRow({
               studentId: item.studentIdNumber,
+              orderId: item.orderId || 'N/A',
               items: item.items.map(i => `${i.name} (x${i.quantity})`).join('; '),
               borrowTime: new Date(item.borrowTime).toLocaleString(),
-              returnTime: type === 'returned' ? new Date(item.returnTime).toLocaleString() : undefined,
-              status: item.status
+              returnTime: type === 'returned' ? new Date(item.returnTime).toLocaleString() : undefined
             });
           });
 
@@ -2540,7 +2540,10 @@ export default function AdminPage() {
                 <thead className="bg-gray-50">
                   <tr>
                     <th className="px-4 sm:px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
-                      ID Number
+                      Student ID
+                    </th>
+                    <th className="px-4 sm:px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                      Order ID
                     </th>
                     <th className="px-4 sm:px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
                       Items
@@ -2558,6 +2561,9 @@ export default function AdminPage() {
                     <tr key={item._id} className="hover:bg-gray-50">
                       <td className="px-4 sm:px-6 py-4 whitespace-nowrap text-sm font-medium text-gray-900">
                         {item.studentIdNumber}
+                      </td>
+                      <td className="px-4 sm:px-6 py-4 whitespace-nowrap text-sm text-gray-500">
+                        {item.orderId || 'N/A'}
                       </td>
                       <td className="px-4 sm:px-6 py-4 whitespace-nowrap text-sm text-gray-500">
                         {item.items.map((i, index) => (
@@ -2653,7 +2659,10 @@ export default function AdminPage() {
                 <thead className="bg-gray-50">
                   <tr>
                     <th className="px-4 sm:px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
-                      ID Number
+                      Student ID
+                    </th>
+                    <th className="px-4 sm:px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                      Order ID
                     </th>
                     <th className="px-4 sm:px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
                       Items
@@ -2674,6 +2683,9 @@ export default function AdminPage() {
                     <tr key={item._id} className="hover:bg-gray-50">
                       <td className="px-4 sm:px-6 py-4 whitespace-nowrap text-sm font-medium text-gray-900">
                         {item.studentIdNumber}
+                      </td>
+                      <td className="px-4 sm:px-6 py-4 whitespace-nowrap text-sm text-gray-500">
+                        {item.orderId || 'N/A'}
                       </td>
                       <td className="px-4 sm:px-6 py-4 whitespace-nowrap text-sm text-gray-500">
                         {item.items.map((i, index) => (

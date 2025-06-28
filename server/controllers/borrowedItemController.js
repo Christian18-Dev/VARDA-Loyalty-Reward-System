@@ -6,6 +6,12 @@ import User from '../models/User.js';
 const cache = new Map();
 const CACHE_TTL = 30000; // 30 seconds
 
+// Helper function to generate unique order ID
+const generateOrderId = () => {
+  const randomDigits = Math.floor(Math.random() * 1000000000).toString().padStart(9, '0');
+  return `ORD-${randomDigits}`;
+};
+
 // Helper function to clear cache
 const clearCache = () => {
   // Only clear cache keys that might be affected by returns
@@ -30,6 +36,9 @@ export const createBorrowedItem = async (req, res) => {
       });
     }
 
+    // Generate unique order ID
+    const orderId = generateOrderId();
+
     // Check for existing borrow with the same timestamp and items
     const existingBorrow = await BorrowedItemHistory.findOne({
       studentId: user._id,
@@ -51,6 +60,7 @@ export const createBorrowedItem = async (req, res) => {
 
     // Create borrowed item record
     const borrowedItem = new BorrowedItemHistory({
+      orderId: orderId,
       studentId: user._id,
       studentIdNumber: user.idNumber,
       items,
@@ -59,7 +69,7 @@ export const createBorrowedItem = async (req, res) => {
     });
 
     await borrowedItem.save();
-    console.log('Created borrowed item record for student:', user.idNumber);
+    console.log('Created borrowed item record for student:', user.idNumber, 'with orderId:', orderId);
 
     // Clear cache after new borrow
     clearCache();
@@ -115,13 +125,18 @@ export const getBorrowedItems = async (req, res) => {
       studentId: { $in: borrowedItems.map(item => item.studentId) }
     }).lean();
 
-    // Filter out items that have been returned
+    // Filter out items that have been returned using orderId for more accurate matching
     const activeBorrowedItems = borrowedItems.filter(borrowedItem => {
-      return !returnedItems.some(returnedItem => 
-        returnedItem.studentId.toString() === borrowedItem.studentId.toString() &&
-        returnedItem.borrowTime.getTime() === borrowedItem.borrowTime.getTime() &&
-        returnedItem.items[0].name === borrowedItem.items[0].name
-      );
+      return !returnedItems.some(returnedItem => {
+        // If both have orderId, use orderId for matching
+        if (borrowedItem.orderId && returnedItem.orderId) {
+          return returnedItem.orderId === borrowedItem.orderId;
+        }
+        // Fallback to old matching logic for records without orderId
+        return returnedItem.studentId.toString() === borrowedItem.studentId.toString() &&
+               returnedItem.borrowTime.getTime() === borrowedItem.borrowTime.getTime() &&
+               returnedItem.items[0].name === borrowedItem.items[0].name;
+      });
     });
     
     // Cache the results
@@ -158,11 +173,22 @@ export const returnBorrowedItem = async (req, res) => {
       });
     }
 
-    // Check if item is already in ReturnedItemHistory
+    // Check if item is already in ReturnedItemHistory using orderId
     const existingReturn = await ReturnedItemHistory.findOne({
-      studentId: borrowedItem.studentId,
-      'items.name': borrowedItem.items[0].name,
-      borrowTime: borrowedItem.borrowTime
+      $or: [
+        // If orderId exists, use it for matching
+        ...(borrowedItem.orderId ? [{ orderId: borrowedItem.orderId }] : []),
+        // Fallback to old matching logic for records without orderId
+        {
+          studentId: borrowedItem.studentId,
+          borrowTime: borrowedItem.borrowTime,
+          'items': { $all: borrowedItem.items.map(item => ({ 
+            name: item.name,
+            quantity: item.quantity 
+          }))}
+        }
+      ],
+      status: 'returned'
     }).lean();
 
     if (existingReturn) {
@@ -176,6 +202,7 @@ export const returnBorrowedItem = async (req, res) => {
 
     // Create returned history record
     const returnedItemHistory = new ReturnedItemHistory({
+      orderId: borrowedItem.orderId,
       studentId: borrowedItem.studentId,
       studentIdNumber: borrowedItem.studentIdNumber,
       items: borrowedItem.items,
@@ -276,14 +303,21 @@ export const processReturnQR = async (req, res) => {
       });
     }
 
-    // Check if item is already in ReturnedItemHistory with the same items
+    // Check if item is already in ReturnedItemHistory using orderId
     const existingReturn = await ReturnedItemHistory.findOne({
-      studentId: borrowedItem.studentId,
-      borrowTime: borrowedItem.borrowTime,
-      'items': { $all: items.map(item => ({ 
-        name: item.name,
-        quantity: item.quantity 
-      }))},
+      $or: [
+        // If orderId exists, use it for matching
+        ...(borrowedItem.orderId ? [{ orderId: borrowedItem.orderId }] : []),
+        // Fallback to old matching logic for records without orderId
+        {
+          studentId: borrowedItem.studentId,
+          borrowTime: borrowedItem.borrowTime,
+          'items': { $all: items.map(item => ({ 
+            name: item.name,
+            quantity: item.quantity 
+          }))}
+        }
+      ],
       status: 'returned'
     }).lean();
 
@@ -304,6 +338,7 @@ export const processReturnQR = async (req, res) => {
       await session.withTransaction(async () => {
         // Create returned history record
         returnedItemHistory = new ReturnedItemHistory({
+          orderId: borrowedItem.orderId,
           studentId: borrowedItem.studentId,
           studentIdNumber: borrowedItem.studentIdNumber,
           items: borrowedItem.items,
