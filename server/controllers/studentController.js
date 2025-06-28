@@ -4,7 +4,6 @@ import Feedback from '../models/Feedback.js';
 import ClaimedReward from '../models/ClaimedReward.js';
 import User from '../models/User.js';
 import bcrypt from 'bcryptjs';
-import PointsUsage from '../models/PointsUsage.js';
 
 export const claimCode = async (req, res) => {
   try {
@@ -24,10 +23,20 @@ export const claimCode = async (req, res) => {
       return res.status(400).json({ message: 'Code already used' });
     }
 
+    // Award points to the user (assuming 10 points per code, you can adjust this)
+    const pointsToAward = 10;
+    req.user.points += pointsToAward;
+    await req.user.save();
+
+    // Mark code as inactive
     foundCode.status = 'inactive';
     await foundCode.save();
 
-    res.status(200).json({ message: 'Code claimed successfully' });
+    res.status(200).json({ 
+      message: 'Code claimed successfully',
+      pointsAwarded: pointsToAward,
+      newPoints: req.user.points
+    });
   } catch (error) {
     console.error('Error in claimCode:', error);
     res.status(500).json({ message: 'Server error' });
@@ -72,168 +81,6 @@ export const claimReward = async (req, res) => {
   }
 };
 
-// Helper function to calculate total points
-const calculateTotalPoints = (items) => {
-  return items.reduce((total, item) => total + (item.price * item.quantity), 0);
-};
-
-// Add function to check and reset points if needed
-const checkAndResetPoints = async (user) => {
-  try {
-    const now = new Date(new Date().toLocaleString('en-US', { timeZone: 'Asia/Manila' }));
-    
-    if (!user.cateringPoints) {
-      user.cateringPoints = {
-        breakfast: 250,
-        lunch: 250,
-        dinner: 250,
-        lastReset: now
-      };
-      await user.save();
-      return;
-    }
-
-    const lastReset = new Date(user.cateringPoints.lastReset);
-    const daysSinceLastReset = Math.floor((now - lastReset) / (1000 * 60 * 60 * 24));
-
-    if (daysSinceLastReset >= 1) {
-      user.cateringPoints = {
-        breakfast: 250,
-        lunch: 250,
-        dinner: 250,
-        lastReset: now
-      };
-      await user.save();
-    }
-  } catch (error) {
-    console.error('Error checking/resetting points:', error);
-    throw error;
-  }
-};
-
-// Place order using pointsUsage
-export const placeOrder = async (req, res) => {
-  try {
-    const { userId, items, mealType, storeName } = req.body;
-    
-    // Validate input
-    if (!userId || !items || !mealType || !storeName) {
-      return res.status(400).json({ message: 'Missing required fields' });
-    }
-
-    // Get user and check points
-    const user = await User.findById(userId);
-    if (!user) {
-      return res.status(404).json({ message: 'User not found' });
-    }
-
-    // Check and reset points if needed
-    await checkAndResetPoints(user);
-
-    // Calculate total points needed
-    const totalPoints = calculateTotalPoints(items);
-
-    // Check if user has enough points
-    if (user.cateringPoints[mealType] < totalPoints) {
-      return res.status(400).json({ 
-        message: 'Insufficient points',
-        required: totalPoints,
-        available: user.cateringPoints[mealType]
-      });
-    }
-
-    // Create points usage record
-    const pointsUsage = await PointsUsage.create({
-      idNumber: user.idNumber,
-      firstName: user.firstName,
-      lastName: user.lastName,
-      mealType,
-      storeName,
-      pointsUsed: totalPoints,
-      items: items.map(item => ({
-        name: item.name,
-        points: item.price,
-        quantity: item.quantity
-      })),
-      totalAmount: totalPoints,
-      dateUsed: new Date()
-    });
-
-    // Update user's points
-    user.cateringPoints[mealType] -= totalPoints;
-    user.cateringPointsUsed += totalPoints;
-    await user.save();
-
-    res.status(200).json({
-      message: 'Order placed successfully',
-      pointsUsage,
-      remainingPoints: user.cateringPoints[mealType]
-    });
-  } catch (error) {
-    console.error('Error placing order:', error);
-    res.status(500).json({ message: 'Error placing order' });
-  }
-};
-
-// Get user's order history using pointsUsage
-export const getUserOrders = async (req, res) => {
-  try {
-    const { userId } = req.params;
-    const user = await User.findById(userId);
-    if (!user) {
-      return res.status(404).json({ message: 'User not found' });
-    }
-
-    const orders = await PointsUsage.find({ idNumber: user.idNumber })
-      .sort({ dateUsed: -1 })
-      .limit(10);
-    
-    res.status(200).json(orders);
-  } catch (error) {
-    console.error('Error fetching orders:', error);
-    res.status(500).json({ message: 'Error fetching orders' });
-  }
-};
-
-// Add indexes for better performance
-const addIndexes = async () => {
-  try {
-    await User.collection.createIndex({ 'cateringPoints.lastReset': 1 });
-    await PointsUsage.collection.createIndex({ idNumber: 1, dateUsed: -1 });
-    await PointsUsage.collection.createIndex({ storeName: 1 });
-    console.log('Indexes created successfully');
-  } catch (error) {
-    console.error('Error creating indexes:', error);
-  }
-};
-
-// Call addIndexes when the server starts
-addIndexes();
-
-// Update meal time checks to use Philippine timezone
-const checkMealHours = () => {
-  const now = new Date(new Date().toLocaleString('en-US', { timeZone: 'Asia/Manila' }));
-  const currentTimeInMinutes = now.getHours() * 60 + now.getMinutes();
-
-  // Breakfast: 6:00 AM - 11:00 AM (Philippine time)
-  const breakfastStart = 6 * 60;    // 6:00 AM
-  const breakfastEnd = 11 * 60;     // 11:00 AM
-
-  // Lunch: 11:00 AM - 4:00 PM (Philippine time)
-  const lunchStart = 11 * 60;       // 11:00 AM
-  const lunchEnd = 16 * 60;         // 4:00 PM
-
-  // Dinner: 4:00 PM - 12:00 AM (Philippine time)
-  const dinnerStart = 16 * 60;      // 4:00 PM
-  const dinnerEnd = 24 * 60;        // 12:00 AM (midnight)
-
-  setMealStatus({
-    breakfast: currentTimeInMinutes >= breakfastStart && currentTimeInMinutes <= breakfastEnd,
-    lunch: currentTimeInMinutes >= lunchStart && currentTimeInMinutes <= lunchEnd,
-    dinner: currentTimeInMinutes >= dinnerStart && currentTimeInMinutes <= dinnerEnd
-  });
-};
-
 export const getPoints = async (req, res) => {
   try {
     // Find the user to get their current points
@@ -242,23 +89,8 @@ export const getPoints = async (req, res) => {
       return res.status(404).json({ message: 'User not found' });
     }
 
-    // If cateringPoints doesn't exist, initialize it with default values
-    if (!user.cateringPoints) {
-      user.cateringPoints = {
-        breakfast: 250,
-        lunch: 250,
-        dinner: 250,
-        lastReset: new Date()
-      };
-      await user.save();
-    }
-
-    // Check and reset points if needed
-    await checkAndResetPoints(user);
-
     res.json({ 
-      points: user.points,
-      cateringPoints: user.cateringPoints
+      points: user.points
     });
   } catch (error) {
     console.error('Error getting points:', error);

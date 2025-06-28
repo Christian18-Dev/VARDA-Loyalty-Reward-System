@@ -2211,14 +2211,6 @@ export default function AdminPage() {
                               <option value="ateneoStaff">Ateneo Staff</option>
                               <option value="cashier">Cashier</option>
                               <option value="concierge">Concierge</option>
-                              <option value="catering">Catering</option>
-                              <option value="varda">Varda</option>
-                              <option value="blueCafe">Blue Cafe</option>
-                              <option value="colonelsCurry">Colonel's Curry</option>
-                              <option value="chillers">Chillers</option>
-                              <option value="luckyShawarma">Lucky Shawarma</option>
-                              <option value="yumdimdum">Yumdimdum</option>
-                              <option value="admin">Admin</option>
                             </select>
                           </td>
                           <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500 space-x-2">

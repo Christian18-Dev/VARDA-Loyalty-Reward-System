@@ -22,7 +22,6 @@ export default function StudentPage() {
   const [points, setPoints] = useState(0);
   const [rewards, setRewards] = useState([]);
   const [code, setCode] = useState('');
-  const [showFeedback, setShowFeedback] = useState(false);
   const [rating, setRating] = useState(0);
   const [errorMessage, setErrorMessage] = useState('');
   const [successMessage, setSuccessMessage] = useState('');
@@ -95,6 +94,8 @@ export default function StudentPage() {
   ]);
   const [showCart, setShowCart] = useState(false);
   const [showSuccessModal, setShowSuccessModal] = useState(false);
+  const [showCodeSuccessModal, setShowCodeSuccessModal] = useState(false);
+  const [codeSuccessMessage, setCodeSuccessMessage] = useState('');
   const [currentTime, setCurrentTime] = useState(new Date());
   const [mealStatus, setMealStatus] = useState({
     breakfast: false,
@@ -134,10 +135,6 @@ export default function StudentPage() {
       const response = await axios.get(`${baseUrl}/api/student/points`, {
         headers: { Authorization: `Bearer ${token}` }
       });
-      const { breakfast, lunch, dinner } = response.data.cateringPoints;
-      setBreakfastPoints(breakfast);
-      setLunchPoints(lunch);
-      setDinnerPoints(dinner);
       setPoints(response.data.points);
     } catch (error) {
       console.error('Error fetching user points:', error);
@@ -163,12 +160,6 @@ export default function StudentPage() {
           }),
         ]);
         setPoints(pointsRes.data.points);
-        // Update individual meal points from the cateringPoints object
-        if (pointsRes.data.cateringPoints) {
-          setBreakfastPoints(pointsRes.data.cateringPoints.breakfast || 250);
-          setLunchPoints(pointsRes.data.cateringPoints.lunch || 250);
-          setDinnerPoints(pointsRes.data.cateringPoints.dinner || 250);
-        }
         setRewards(rewardsRes.data);
       } catch (error) {
         console.error('Error fetching data:', error);
@@ -898,9 +889,10 @@ export default function StudentPage() {
         { headers: { Authorization: `Bearer ${token}` } }
       );
 
-      setShowFeedback(true);
       setErrorMessage('');
-      setSuccessMessage('Code accepted! Please rate your experience.');
+      setCodeSuccessMessage(`Code claimed successfully! You earned ${response.data.pointsAwarded} points!`);
+      setPoints(response.data.newPoints);
+      setShowCodeSuccessModal(true);
       confetti({ particleCount: 100, spread: 70, origin: { y: 0.6 } });
     } catch (error) {
       console.error('Error submitting code:', error);
@@ -940,7 +932,6 @@ export default function StudentPage() {
 
       setPoints(updated.data.points);
       setSuccessMessage('Feedback submitted!');
-      setShowFeedback(false);
       setCode('');
       setRating(0);
 
@@ -1313,20 +1304,6 @@ export default function StudentPage() {
                 <ShoppingBagIcon className="h-8 w-8 text-purple-400" />
                 <span className="mt-2 font-medium text-gray-200">Borrow</span>
               </motion.button>
-
-              {user.role === 'catering' && (
-                <motion.button
-                  whileHover={{ scale: 1.05 }}
-                  whileTap={{ scale: 0.95 }}
-                  onClick={() => setCurrentPage('catering')}
-                  className="flex flex-col items-center p-4 bg-[#1e293b] rounded-xl shadow-md hover:shadow-lg transition-all border border-gray-700/50"
-                >
-                  <svg xmlns="http://www.w3.org/2000/svg" className="h-8 w-8 text-purple-400" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 6.253v13m0-13C10.832 5.477 9.246 5 7.5 5S4.168 5.477 3 6.253v13C4.168 18.477 5.754 18 7.5 18s3.332.477 4.5 1.253m0-13C13.168 5.477 14.754 5 16.5 5c1.747 0 3.332.477 4.5 1.253v13C19.832 18.477 18.247 18 16.5 18c-1.746 0-3.332.477-4.5 1.253" />
-                  </svg>
-                  <span className="mt-2 font-medium text-gray-200">Catering</span>
-                </motion.button>
-              )}
             </div>
 
             {/* Borrowed Items Section */}
@@ -1411,47 +1388,6 @@ export default function StudentPage() {
                 </button>
               </div>
             </motion.div>
-
-            {showFeedback && (
-            <motion.div 
-              className="mt-6 w-full max-w-md mx-auto p-4 sm:p-6 bg-[#1e293b] rounded-2xl shadow-lg border-2 border-gray-700/50 space-y-6"
-              initial={{ opacity: 0, y: 20 }}
-              animate={{ opacity: 1, y: 0 }}
-            >
-              <div className="text-center">
-                <h3 className="text-xl font-bold text-blue-400">How was it? 🤔</h3>
-                <p className="text-gray-400 mt-1">Rate your experience to earn bonus points!</p>
-              </div>
-              
-              <div className="flex justify-center gap-2 flex-wrap">
-                {[1, 2, 3, 4, 5].map((star) => (
-                  <button
-                    key={star}
-                    aria-label={`Rate ${star} star`}
-                    className={`p-4 rounded-full border-4 text-2xl text-white ${rating >= star ? 'bg-yellow-900/50 border-yellow-600 scale-110' : 'bg-gray-800/50 border-gray-700'} transition-all`}
-                    onClick={() => setRating(star)}
-                    disabled={isLoading}
-                  >
-                    {star}⭐
-                  </button>
-                ))}
-              </div>
-              
-              <div className="text-center">
-                <button
-                  onClick={submitFeedback}
-                  disabled={!rating || isLoading}
-                  className={`px-6 py-3 w-full rounded-xl font-bold text-lg shadow-md transition-all ${!rating || isLoading ? 'bg-gray-800 text-gray-600' : 'bg-gradient-to-r from-blue-600 to-blue-700 hover:from-blue-700 hover:to-blue-800 text-white'}`}
-                >
-                  {isLoading ? 'Sending...' : (
-                    <span className="flex items-center justify-center gap-2">
-                      Submit
-                    </span>
-                  )}
-                </button>
-              </div>
-            </motion.div>
-          )}
           </motion.div>
         )}
 
@@ -1720,511 +1656,6 @@ export default function StudentPage() {
           </motion.div>
         )}
 
-        {/* Catering Page */}
-        {currentPage === 'catering' && (
-          <motion.div variants={itemVariants} className="space-y-6">
-            {!showBreakfastMenu && !showLunchMenu && !showDinnerMenu ? (
-              <>
-                <div className="text-center">
-                  <img src={twoGonzLogo} alt="2gonz Logo" className="h-16 sm:h-20 mx-auto mb-8" />
-                  <h2 className="text-2xl font-bold text-blue-400">Catering Services</h2>
-                  <p className="text-gray-400 mt-1">Select your meal time</p>
-                </div>
-
-                <motion.div 
-                  className="bg-[#1e293b] p-6 rounded-2xl shadow-lg border-2 border-gray-700/50"
-                  initial={{ scale: 0.9 }}
-                  animate={{ scale: 1 }}
-                >
-                  <div className="space-y-4">
-                    <div className="text-center mb-4">
-                      <div className="inline-block bg-blue-900/50 px-4 py-2 rounded-full">
-                        <span className="font-bold text-blue-300">
-                          Current Time: {currentTime.toLocaleString('en-US', { 
-                            timeZone: 'Asia/Manila',
-                            hour: '2-digit',
-                            minute: '2-digit',
-                            hour12: true 
-                          })}
-                        </span>
-                      </div>
-                    </div>
-
-                    <div className="grid grid-cols-1 sm:grid-cols-3 gap-6">
-                      {/* Breakfast Button */}
-                      <motion.button
-                        whileHover={mealStatus.breakfast ? { scale: 1.02 } : {}}
-                        onClick={() => mealStatus.breakfast && setShowBreakfastMenu(true)}
-                        className={`p-6 rounded-xl shadow-lg ${
-                          mealStatus.breakfast
-                            ? 'bg-blue-600 hover:bg-blue-500 text-white'
-                            : 'bg-gray-600 text-gray-400 cursor-not-allowed'
-                        } transition-colors`}
-                        disabled={!mealStatus.breakfast}
-                      >
-                        <div className="text-center">
-                          <h3 className="text-xl font-bold mb-2">Breakfast</h3>
-                          <p className="text-sm opacity-80">
-                            {mealStatus.breakfast ? 'Available' : 'Not available at this time'}
-                          </p>
-                          <p className="text-sm mt-2">
-                            {mealStatus.breakfast ? '6:00 AM - 11:00 AM' : 'Available 6:00 AM - 11:00 AM'}
-                          </p>
-                        </div>
-                      </motion.button>
-
-                      {/* Lunch Button */}
-                      <motion.button
-                        whileHover={mealStatus.lunch ? { scale: 1.02 } : {}}
-                        onClick={() => mealStatus.lunch && setShowLunchMenu(true)}
-                        className={`p-6 rounded-xl shadow-lg ${
-                          mealStatus.lunch
-                            ? 'bg-blue-600 hover:bg-blue-500 text-white'
-                            : 'bg-gray-600 text-gray-400 cursor-not-allowed'
-                        } transition-colors`}
-                        disabled={!mealStatus.lunch}
-                      >
-                        <div className="text-center">
-                          <h3 className="text-xl font-bold mb-2">Lunch</h3>
-                          <p className="text-sm opacity-80">
-                            {mealStatus.lunch ? 'Available' : 'Not available at this time'}
-                          </p>
-                          <p className="text-sm mt-2">
-                            {mealStatus.lunch ? '11:00 AM - 4:00 PM' : 'Available 11:00 AM - 4:00 PM'}
-                          </p>
-                        </div>
-                      </motion.button>
-
-                      {/* Dinner Button */}
-                      <motion.button
-                        whileHover={mealStatus.dinner ? { scale: 1.02 } : {}}
-                        onClick={() => mealStatus.dinner && setShowDinnerMenu(true)}
-                        className={`p-6 rounded-xl shadow-lg ${
-                          mealStatus.dinner
-                            ? 'bg-blue-600 hover:bg-blue-500 text-white'
-                            : 'bg-gray-600 text-gray-400 cursor-not-allowed'
-                        } transition-colors`}
-                        disabled={!mealStatus.dinner}
-                      >
-                        <div className="text-center">
-                          <h3 className="text-xl font-bold mb-2">Dinner</h3>
-                          <p className="text-sm opacity-80">
-                            {mealStatus.dinner ? 'Available' : 'Not available at this time'}
-                          </p>
-                          <p className="text-sm mt-2">
-                            {mealStatus.dinner ? '4:00 PM - 12:00 AM' : 'Available 4:00 PM - 12:00 AM'}
-                          </p>
-                        </div>
-                      </motion.button>
-                    </div>
-                  </div>
-                </motion.div>
-              </>
-            ) : showBreakfastMenu ? (
-              <motion.div
-                initial={{ opacity: 0 }}
-                animate={{ opacity: 1 }}
-                className="space-y-6"
-              >
-                <div className="flex items-center justify-between">
-                  <button
-                    onClick={() => {
-                      if (selectedStore) {
-                        setSelectedStore(null);
-                      } else {
-                        setShowBreakfastMenu(false);
-                        setSelectedStore(null);
-                      }
-                    }}
-                    className="flex items-center text-gray-400 hover:text-white transition-colors p-2 rounded-full hover:bg-gray-800/50"
-                  >
-                    <svg xmlns="http://www.w3.org/2000/svg" className="h-6 w-6" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 19l-7-7 7-7" />
-                    </svg>
-                  </button>
-                  <div className="bg-blue-900/50 px-4 py-2 rounded-full">
-                    <span className="font-bold text-blue-300">
-                      Breakfast Points: {breakfastPoints}
-                    </span>
-                  </div>
-                </div>
-
-                {!selectedStore ? (
-                  // Show stores grid
-                  <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
-                    {breakfastStores.map((store) => (
-                      <motion.div
-                        key={store.id}
-                        whileHover={{ scale: 1.02 }}
-                        onClick={() => setSelectedStore(store)}
-                        className="bg-[#1e293b] rounded-xl shadow-lg overflow-hidden border border-gray-700/50 cursor-pointer"
-                      >
-                        <div className="relative h-48">
-                          <img
-                            src={store.image}
-                            alt={store.name}
-                            className="w-full h-full object-cover"
-                          />
-                          <div className="absolute inset-0 bg-gradient-to-t from-black/60 to-transparent" />
-                          <h3 className="absolute bottom-4 left-4 text-xl font-bold text-white">
-                            {store.name}
-                          </h3>
-                        </div>
-                      </motion.div>
-                    ))}
-                  </div>
-                ) : (
-                  // Show selected store's menu
-                  <div className="space-y-6">
-                    <div className="bg-[#1e293b] rounded-xl shadow-lg overflow-hidden border border-gray-700/50">
-                      <div className="relative h-48">
-                        <img
-                          src={selectedStore.image}
-                          alt={selectedStore.name}
-                          className="w-full h-full object-cover"
-                        />
-                        <div className="absolute inset-0 bg-gradient-to-t from-black/60 to-transparent" />
-                        <h3 className="absolute bottom-4 left-4 text-xl font-bold text-white">
-                          {selectedStore.name}
-                        </h3>
-                      </div>
-                      <div className="p-4 space-y-4">
-                        {selectedStore.menu.map((item) => (
-                          <div
-                            key={item.id}
-                            className="flex justify-between items-center p-3 bg-gray-800/50 rounded-lg"
-                          >
-                            <div>
-                              <h4 className="font-medium text-white">{item.name}</h4>
-                              <p className="text-sm text-gray-400">{item.description}</p>
-                              <p className="text-sm text-blue-400 mt-1">{item.points} points</p>
-                            </div>
-                            <button
-                              onClick={() => handleAddToBreakfastCart(item, selectedStore.id)}
-                              className={`px-3 py-1 rounded-lg transition-colors ${
-                                breakfastPoints >= item.points
-                                  ? 'bg-purple-600 hover:bg-purple-500 text-white'
-                                  : 'bg-gray-700 text-gray-400 cursor-not-allowed'
-                              }`}
-                              disabled={breakfastPoints < item.points}
-                            >
-                              Add
-                            </button>
-                          </div>
-                        ))}
-                      </div>
-                    </div>
-                  </div>
-                )}
-
-                {/* Cart Summary */}
-                {breakfastCart.length > 0 && (
-                  <motion.div
-                    initial={{ opacity: 0, y: 20 }}
-                    animate={{ opacity: 1, y: 0 }}
-                    className="fixed bottom-0 left-0 right-0 bg-[#1e293b] border-t border-gray-700/50 p-4"
-                  >
-                    <div className="max-w-7xl mx-auto flex justify-between items-center">
-                      <div>
-                        <h3 className="text-lg font-bold text-white">Breakfast Cart</h3>
-                        <p className="text-gray-400">
-                          {breakfastCart.length} items • {250 - breakfastPoints} points used
-                        </p>
-                      </div>
-                      <div className="flex space-x-4">
-                        <button
-                          onClick={handleClearBreakfastCart}
-                          className="px-4 py-2 bg-red-600 text-white rounded-lg hover:bg-red-700 transition-colors"
-                        >
-                          Clear Cart
-                        </button>
-                        <button
-                          onClick={() => {
-                            console.log('Confirm breakfast order button clicked');
-                            handlePlaceBreakfastOrder();
-                          }}
-                          className="px-4 py-2 bg-blue-600 hover:bg-blue-500 text-white rounded-lg transition-colors"
-                        >
-                          Confirm Order
-                        </button>
-                      </div>
-                    </div>
-                  </motion.div>
-                )}
-              </motion.div>
-            ) : showLunchMenu ? (
-              <motion.div
-                initial={{ opacity: 0 }}
-                animate={{ opacity: 1 }}
-                className="space-y-6"
-              >
-                <div className="flex items-center justify-between">
-                  <button
-                    onClick={() => {
-                      if (selectedStore) {
-                        setSelectedStore(null);
-                      } else {
-                        setShowLunchMenu(false);
-                        setSelectedStore(null);
-                      }
-                    }}
-                    className="flex items-center text-gray-400 hover:text-white transition-colors p-2 rounded-full hover:bg-gray-800/50"
-                  >
-                    <svg xmlns="http://www.w3.org/2000/svg" className="h-6 w-6" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 19l-7-7 7-7" />
-                    </svg>
-                  </button>
-                  <div className="bg-blue-900/50 px-4 py-2 rounded-full">
-                    <span className="font-bold text-blue-300">
-                      Lunch Points: {lunchPoints}
-                    </span>
-                  </div>
-                </div>
-
-                {!selectedStore ? (
-                  // Show stores grid
-                  <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
-                    {lunchStores.map((store) => (
-                      <motion.div
-                        key={store.id}
-                        whileHover={{ scale: 1.02 }}
-                        onClick={() => setSelectedStore(store)}
-                        className="bg-[#1e293b] rounded-xl shadow-lg overflow-hidden border border-gray-700/50 cursor-pointer"
-                      >
-                        <div className="relative h-48">
-                          <img
-                            src={store.image}
-                            alt={store.name}
-                            className="w-full h-full object-cover"
-                          />
-                          <div className="absolute inset-0 bg-gradient-to-t from-black/60 to-transparent" />
-                          <h3 className="absolute bottom-4 left-4 text-xl font-bold text-white">
-                            {store.name}
-                          </h3>
-                        </div>
-                      </motion.div>
-                    ))}
-                  </div>
-                ) : (
-                  // Show selected store's menu
-                  <div className="space-y-6">
-                    <div className="bg-[#1e293b] rounded-xl shadow-lg overflow-hidden border border-gray-700/50">
-                      <div className="relative h-48">
-                        <img
-                          src={selectedStore.image}
-                          alt={selectedStore.name}
-                          className="w-full h-full object-cover"
-                        />
-                        <div className="absolute inset-0 bg-gradient-to-t from-black/60 to-transparent" />
-                        <h3 className="absolute bottom-4 left-4 text-xl font-bold text-white">
-                          {selectedStore.name}
-                        </h3>
-                      </div>
-                      <div className="p-4 space-y-4">
-                        {selectedStore.menu.map((item) => (
-                          <div
-                            key={item.id}
-                            className="flex justify-between items-center p-3 bg-gray-800/50 rounded-lg"
-                          >
-                            <div>
-                              <h4 className="font-medium text-white">{item.name}</h4>
-                              <p className="text-sm text-gray-400">{item.description}</p>
-                              <p className="text-sm text-blue-400 mt-1">{item.points} points</p>
-                            </div>
-                            <button
-                              onClick={() => handleAddToLunchCart(item, selectedStore.id)}
-                              className={`px-3 py-1 rounded-lg transition-colors ${
-                                lunchPoints >= item.points
-                                  ? 'bg-purple-600 hover:bg-purple-500 text-white'
-                                  : 'bg-gray-700 text-gray-400 cursor-not-allowed'
-                              }`}
-                              disabled={lunchPoints < item.points}
-                            >
-                              Add
-                            </button>
-                          </div>
-                        ))}
-                      </div>
-                    </div>
-                  </div>
-                )}
-
-                {/* Cart Summary */}
-                {lunchCart.length > 0 && (
-                  <motion.div
-                    initial={{ opacity: 0, y: 20 }}
-                    animate={{ opacity: 1, y: 0 }}
-                    className="fixed bottom-0 left-0 right-0 bg-[#1e293b] border-t border-gray-700/50 p-4"
-                  >
-                    <div className="max-w-7xl mx-auto flex justify-between items-center">
-                      <div>
-                        <h3 className="text-lg font-bold text-white">Lunch Cart</h3>
-                        <p className="text-gray-400">
-                          {lunchCart.length} items • {250 - lunchPoints} points used
-                        </p>
-                      </div>
-                      <div className="flex space-x-4">
-                        <button
-                          onClick={handleClearLunchCart}
-                          className="px-4 py-2 bg-red-600 text-white rounded-lg hover:bg-red-700 transition-colors"
-                        >
-                          Clear Cart
-                        </button>
-                        <button
-                          onClick={() => {
-                            console.log('Confirm lunch order button clicked');
-                            handlePlaceLunchOrder();
-                          }}
-                          className="px-4 py-2 bg-blue-600 hover:bg-blue-500 text-white rounded-lg transition-colors"
-                        >
-                          Confirm Order
-                        </button>
-                      </div>
-                    </div>
-                  </motion.div>
-                )}
-              </motion.div>
-            ) : showDinnerMenu ? (
-              <motion.div
-                initial={{ opacity: 0 }}
-                animate={{ opacity: 1 }}
-                className="space-y-6"
-              >
-                <div className="flex items-center justify-between">
-                  <button
-                    onClick={() => {
-                      if (selectedStore) {
-                        setSelectedStore(null);
-                      } else {
-                        setShowDinnerMenu(false);
-                        setSelectedStore(null);
-                      }
-                    }}
-                    className="flex items-center text-gray-400 hover:text-white transition-colors p-2 rounded-full hover:bg-gray-800/50"
-                  >
-                    <svg xmlns="http://www.w3.org/2000/svg" className="h-6 w-6" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 19l-7-7 7-7" />
-                    </svg>
-                  </button>
-                  <div className="bg-blue-900/50 px-4 py-2 rounded-full">
-                    <span className="font-bold text-blue-300">
-                      Dinner Points: {dinnerPoints}
-                    </span>
-                  </div>
-                </div>
-
-                {!selectedStore ? (
-                  // Show stores grid
-                  <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
-                    {dinnerStores.map((store) => (
-                      <motion.div
-                        key={store.id}
-                        whileHover={{ scale: 1.02 }}
-                        onClick={() => setSelectedStore(store)}
-                        className="bg-[#1e293b] rounded-xl shadow-lg overflow-hidden border border-gray-700/50 cursor-pointer"
-                      >
-                        <div className="relative h-48">
-                          <img
-                            src={store.image}
-                            alt={store.name}
-                            className="w-full h-full object-cover"
-                          />
-                          <div className="absolute inset-0 bg-gradient-to-t from-black/60 to-transparent" />
-                          <h3 className="absolute bottom-4 left-4 text-xl font-bold text-white">
-                            {store.name}
-                          </h3>
-                        </div>
-                      </motion.div>
-                    ))}
-                  </div>
-                ) : (
-                  // Show selected store's menu
-                  <div className="space-y-6">
-                    <div className="bg-[#1e293b] rounded-xl shadow-lg overflow-hidden border border-gray-700/50">
-                      <div className="relative h-48">
-                        <img
-                          src={selectedStore.image}
-                          alt={selectedStore.name}
-                          className="w-full h-full object-cover"
-                        />
-                        <div className="absolute inset-0 bg-gradient-to-t from-black/60 to-transparent" />
-                        <h3 className="absolute bottom-4 left-4 text-xl font-bold text-white">
-                          {selectedStore.name}
-                        </h3>
-                      </div>
-                      <div className="p-4 space-y-4">
-                        {selectedStore.menu.map((item) => (
-                          <div
-                            key={item.id}
-                            className="flex justify-between items-center p-3 bg-gray-800/50 rounded-lg"
-                          >
-                            <div>
-                              <h4 className="font-medium text-white">{item.name}</h4>
-                              <p className="text-sm text-gray-400">{item.description}</p>
-                              <p className="text-sm text-blue-400 mt-1">{item.points} points</p>
-                            </div>
-                            <button
-                              onClick={() => handleAddToDinnerCart(item, selectedStore.id)}
-                              className={`px-3 py-1 rounded-lg transition-colors ${
-                                dinnerPoints >= item.points
-                                  ? 'bg-purple-600 hover:bg-purple-500 text-white'
-                                  : 'bg-gray-700 text-gray-400 cursor-not-allowed'
-                              }`}
-                              disabled={dinnerPoints < item.points}
-                            >
-                              Add
-                            </button>
-                          </div>
-                        ))}
-                      </div>
-                    </div>
-                  </div>
-                )}
-
-                {/* Cart Summary */}
-                {dinnerCart.length > 0 && (
-                  <motion.div
-                    initial={{ opacity: 0, y: 20 }}
-                    animate={{ opacity: 1, y: 0 }}
-                    className="fixed bottom-0 left-0 right-0 bg-[#1e293b] border-t border-gray-700/50 p-4"
-                  >
-                    <div className="max-w-7xl mx-auto flex justify-between items-center">
-                      <div>
-                        <h3 className="text-lg font-bold text-white">Dinner Cart</h3>
-                        <p className="text-gray-400">
-                          {dinnerCart.length} items • {250 - dinnerPoints} points used
-                        </p>
-                      </div>
-                      <div className="flex space-x-4">
-                        <button
-                          onClick={handleClearDinnerCart}
-                          className="px-4 py-2 bg-red-600 text-white rounded-lg hover:bg-red-700 transition-colors"
-                        >
-                          Clear Cart
-                        </button>
-                        <button
-                          onClick={() => {
-                            console.log('Confirm dinner order button clicked');
-                            handlePlaceDinnerOrder();
-                          }}
-                          className="px-4 py-2 bg-blue-600 hover:bg-blue-500 text-white rounded-lg transition-colors"
-                        >
-                          Confirm Order
-                        </button>
-                      </div>
-                    </div>
-                  </motion.div>
-                )}
-              </motion.div>
-            ) : (
-              <div className="text-center">
-                <h3 className="text-xl font-bold text-gray-400">No meal selected</h3>
-                <p className="text-gray-500">Please select a meal time to proceed</p>
-              </div>
-            )}
-          </motion.div>
-        )}
-
         {/* Settings Page */}
         {currentPage === 'settings' && (
           <SettingsPage user={user} onBack={() => setCurrentPage('home')} />
@@ -2350,6 +1781,40 @@ export default function StudentPage() {
                   }
                   setModalItems([]); // Clear modal items
                   setModalTime(''); // Clear modal time
+                }}
+                className="w-full py-3 bg-blue-600 text-white rounded-xl font-bold hover:bg-blue-700 transition-all"
+              >
+                OK
+              </button>
+            </div>
+          </motion.div>
+        </div>
+      )}
+
+      {/* Code Success Modal */}
+      {showCodeSuccessModal && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 backdrop-blur-sm">
+          <motion.div 
+            initial={{ scale: 0.9, opacity: 0 }}
+            animate={{ scale: 1, opacity: 1 }}
+            className="bg-[#1e293b] rounded-2xl p-6 max-w-sm w-full shadow-xl border-2 border-gray-700/50"
+          >
+            <div className="text-center space-y-4">
+              <div className="w-16 h-16 bg-green-900/50 rounded-full flex items-center justify-center mx-auto">
+                <svg xmlns="http://www.w3.org/2000/svg" className="h-8 w-8 text-green-400" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M5 13l4 4L19 7" />
+                </svg>
+              </div>
+              <h3 className="text-xl font-bold text-gray-200">
+                Congratulations!
+              </h3>
+              <p className="text-gray-300">
+                {codeSuccessMessage}
+              </p>
+              <button 
+                onClick={() => {
+                  setShowCodeSuccessModal(false);
+                  setCodeSuccessMessage('');
                 }}
                 className="w-full py-3 bg-blue-600 text-white rounded-xl font-bold hover:bg-blue-700 transition-all"
               >

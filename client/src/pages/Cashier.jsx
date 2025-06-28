@@ -8,8 +8,7 @@ import {
   LogoutIcon, 
   ExclamationIcon,
   ClipboardCopyIcon,
-  CheckIcon,
-  ShoppingCartIcon
+  CheckIcon
 } from '@heroicons/react/outline';
 import { motion, AnimatePresence } from 'framer-motion';
 
@@ -19,13 +18,10 @@ export default function CashierPage() {
   const [activeTab, setActiveTab] = useState('generator');
   const [generatedCode, setGeneratedCode] = useState('');
   const [claimedRewards, setClaimedRewards] = useState([]);
-  const [pointsUsageHistory, setPointsUsageHistory] = useState([]);
   const [error, setError] = useState('');
   const [success, setSuccess] = useState('');
   const [currentRewardsPage, setCurrentRewardsPage] = useState(1);
-  const [currentPurchasesPage, setCurrentPurchasesPage] = useState(1);
   const [rewardsSearchTerm, setRewardsSearchTerm] = useState('');
-  const [purchasesSearchTerm, setPurchasesSearchTerm] = useState('');
   const itemsPerPage = 5;
   const [showLogoutModal, setShowLogoutModal] = useState(false);
   const [isGenerating, setIsGenerating] = useState(false);
@@ -122,55 +118,6 @@ export default function CashierPage() {
   const handleRewardsSearch = (e) => {
     setRewardsSearchTerm(e.target.value);
     setCurrentRewardsPage(1);
-  };
-
-  // Add new function to fetch points usage history
-  const fetchPointsUsageHistory = async () => {
-    try {
-      const res = await axios.get(`${baseUrl}/api/cashier/points-usage`, {
-        headers: { Authorization: `Bearer ${token}` },
-      });
-      setPointsUsageHistory(res.data);
-    } catch (err) {
-      console.error('Error fetching points usage history:', err);
-    }
-  };
-
-  // Set up polling for purchases tab
-  useEffect(() => {
-    let pollInterval;
-    if (activeTab === 'purchases') {
-      fetchPointsUsageHistory();
-      pollInterval = setInterval(fetchPointsUsageHistory, 3000);
-    }
-    return () => {
-      if (pollInterval) clearInterval(pollInterval);
-    };
-  }, [activeTab, token]);
-
-  // Filter purchases based on search term
-  const filteredPurchases = pointsUsageHistory.filter(purchase => 
-    purchase?.idNumber?.toLowerCase().includes(purchasesSearchTerm.toLowerCase()) ||
-    purchase?.mealType?.toLowerCase().includes(purchasesSearchTerm.toLowerCase()) ||
-    purchase?.storeName?.toLowerCase().includes(purchasesSearchTerm.toLowerCase())
-  );
-
-  // Pagination calculations for purchases
-  const totalPurchasesPages = Math.ceil(filteredPurchases.length / itemsPerPage);
-  const paginatedPurchases = filteredPurchases.slice(
-    (currentPurchasesPage - 1) * itemsPerPage,
-    currentPurchasesPage * itemsPerPage
-  );
-
-  // Handle purchases page change
-  const handlePurchasesPageChange = (page) => {
-    setCurrentPurchasesPage(page);
-  };
-
-  // Handle purchases search
-  const handlePurchasesSearch = (e) => {
-    setPurchasesSearchTerm(e.target.value);
-    setCurrentPurchasesPage(1);
   };
 
   const handleLogoutClick = () => {
@@ -282,8 +229,7 @@ export default function CashierPage() {
         <div className="flex space-x-2 overflow-x-auto pb-2 scrollbar-hide">
           {[
             { id: 'generator', icon: KeyIcon, label: 'Generate Code' },
-            { id: 'rewards', icon: GiftIcon, label: 'Rewards' },
-            { id: 'purchases', icon: ShoppingCartIcon, label: 'Purchases' }
+            { id: 'rewards', icon: GiftIcon, label: 'Rewards' }
           ].map(({ id, icon: Icon, label }) => (
             <button
               key={id}
@@ -498,150 +444,6 @@ export default function CashierPage() {
                       </svg>
                     </button>
                   </div>
-            )}
-          </motion.div>
-        )}
-
-        {/* Purchases Tab */}
-        {activeTab === 'purchases' && (
-          <motion.div
-            initial={{ opacity: 0, y: 20 }}
-            animate={{ opacity: 1, y: 0 }}
-            className="bg-white rounded-2xl shadow-lg p-4 sm:p-6"
-          >
-            <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center mb-6 space-y-4 sm:space-y-0">
-              <div className="flex items-center space-x-3">
-                <div className="p-2 bg-blue-100 rounded-lg">
-                  <ShoppingCartIcon className="w-6 h-6 text-blue-600" />
-                </div>
-                <div>
-                  <h2 className="text-2xl font-bold text-gray-800">Purchase History</h2>
-                  <p className="text-gray-600 mt-1">View all points usage transactions</p>
-                </div>
-              </div>
-              <div className="w-full sm:w-64">
-                <div className="relative">
-                  <input
-                    type="text"
-                    placeholder="Search purchases..."
-                    value={purchasesSearchTerm}
-                    onChange={handlePurchasesSearch}
-                    className="w-full px-4 py-2 pl-10 border border-gray-300 rounded-xl focus:ring-2 focus:ring-purple-500 focus:border-transparent"
-                  />
-                  <svg className="w-5 h-5 text-gray-400 absolute left-3 top-2.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z" />
-                  </svg>
-                </div>
-              </div>
-            </div>
-
-            <div className="overflow-x-auto rounded-xl border border-gray-200">
-              <table className="min-w-full divide-y divide-gray-200">
-                <thead className="bg-gray-50">
-                  <tr>
-                    <th className="px-4 sm:px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
-                      ID Number
-                    </th>
-                    <th className="px-4 sm:px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
-                      Name
-                    </th>
-                    <th className="px-4 sm:px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
-                      Meal Type
-                    </th>
-                    <th className="px-4 sm:px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
-                      Store
-                    </th>
-                    <th className="px-4 sm:px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
-                      Items Ordered
-                    </th>
-                    <th className="px-4 sm:px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
-                      Points Used
-                    </th>
-                    <th className="px-4 sm:px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
-                      Date
-                    </th>
-                  </tr>
-                </thead>
-                <tbody>
-                  {paginatedPurchases.map((purchase) => (
-                    <tr key={purchase._id} className="hover:bg-gray-50 transition-colors">
-                      <td className="px-4 sm:px-6 py-4 whitespace-nowrap">
-                        <div className="text-sm font-medium text-gray-900">{purchase.idNumber}</div>
-                      </td>
-                      <td className="px-4 sm:px-6 py-4 whitespace-nowrap">
-                        <div className="text-sm text-gray-900">{purchase.firstName} {purchase.lastName}</div>
-                      </td>
-                      <td className="px-4 sm:px-6 py-4 whitespace-nowrap">
-                        <span className="px-3 py-1 inline-flex text-xs leading-5 font-semibold rounded-full bg-blue-100 text-blue-800 capitalize">
-                          {purchase.mealType}
-                        </span>
-                      </td>
-                      <td className="px-4 sm:px-6 py-4 whitespace-nowrap">
-                        <div className="text-sm text-gray-900">{purchase.storeName}</div>
-                      </td>
-                      <td className="px-4 sm:px-6 py-4">
-                        <div className="text-sm text-gray-900">
-                          {purchase.items.map((item, index) => (
-                            <div key={index} className="mb-1">
-                              {item.name} (x{item.quantity})
-                            </div>
-                          ))}
-                        </div>
-                      </td>
-                      <td className="px-4 sm:px-6 py-4 whitespace-nowrap">
-                        <span className="px-3 py-1 inline-flex text-xs leading-5 font-semibold rounded-full bg-purple-100 text-purple-800">
-                          {purchase.pointsUsed} points
-                        </span>
-                      </td>
-                      <td className="px-4 sm:px-6 py-4 whitespace-nowrap">
-                        <div className="text-sm text-gray-900">
-                          {new Date(purchase.dateUsed).toLocaleString()}
-                        </div>
-                      </td>
-                    </tr>
-                  ))}
-                </tbody>
-              </table>
-              {paginatedPurchases.length === 0 && (
-                <div className="text-center py-12">
-                  <p className="text-gray-500">No purchase history found.</p>
-                </div>
-              )}
-            </div>
-
-            {/* Pagination for Purchases */}
-            {totalPurchasesPages > 1 && (
-              <div className="flex justify-center items-center mt-6 space-x-4">
-                <button
-                  onClick={() => handlePurchasesPageChange(Math.max(1, currentPurchasesPage - 1))}
-                  disabled={currentPurchasesPage === 1}
-                  className={`p-2 rounded-lg transition-colors ${
-                    currentPurchasesPage === 1
-                      ? 'text-gray-400 cursor-not-allowed'
-                      : 'text-gray-700 hover:bg-gray-100'
-                  }`}
-                >
-                  <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M15 19l-7-7 7-7" />
-                  </svg>
-                </button>
-                <span className="text-gray-700 font-medium">
-                  Page {currentPurchasesPage} of {totalPurchasesPages}
-                </span>
-                <button
-                  onClick={() => handlePurchasesPageChange(Math.min(totalPurchasesPages, currentPurchasesPage + 1))}
-                  disabled={currentPurchasesPage === totalPurchasesPages}
-                  className={`p-2 rounded-lg transition-colors ${
-                    currentPurchasesPage === totalPurchasesPages
-                      ? 'text-gray-400 cursor-not-allowed'
-                      : 'text-gray-700 hover:bg-gray-100'
-                  }`}
-                >
-                  <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M9 5l7 7-7 7" />
-                  </svg>
-                </button>
-              </div>
             )}
           </motion.div>
         )}

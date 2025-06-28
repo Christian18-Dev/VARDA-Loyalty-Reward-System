@@ -94,13 +94,6 @@ export const updateUserRole = async (req, res) => {
       'ateneoStaff', 
       'cashier', 
       'concierge', 
-      'catering',
-      'varda',
-      'blueCafe',
-      'colonelsCurry',
-      'chillers',
-      'luckyShawarma',
-      'yumdimdum'
     ];
     if (!validRoles.includes(role)) {
       return res.status(400).json({ message: 'Invalid role' });

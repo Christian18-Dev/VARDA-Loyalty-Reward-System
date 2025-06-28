@@ -12,8 +12,6 @@ import cashierRoutes from './routes/cashierRoutes.js';
 import codeRoutes from './routes/codeRoutes.js';
 import conciergeRoutes from './routes/conciergeRoutes.js';
 import mongoose from 'mongoose';
-import { MongoClient } from 'mongodb';
-import User from './models/User.js';
 
 dotenv.config();
 const app = express();
