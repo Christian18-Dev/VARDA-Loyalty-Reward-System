@@ -1,4 +1,4 @@
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useRef } from 'react';
 import axios from 'axios';
 import { useAuth } from '../context/AuthContext';
 import { useNavigate } from 'react-router-dom';
@@ -19,6 +19,7 @@ import { PDFDownloadLink, Document, Page, Text, View, StyleSheet, Image } from '
 import { pdf } from '@react-pdf/renderer';
 import logo from '../assets/2gonzlogo.png';
 import completeSetImage from '../assets/completeset.png';
+import basicSetImage from '../assets/basicset.png';
 import spoonImage from '../assets/spoon.png';
 import forkImage from '../assets/fork.png';
 import plateImage from '../assets/plate.png';
@@ -61,6 +62,19 @@ if (typeof window !== 'undefined' && !window.Buffer) {
 export default function ConciergePage() {
   const { user, logout } = useAuth();
   const navigate = useNavigate();
+  
+  // Smart caching system with memory management
+  const [tabCache, setTabCache] = useState({});
+  const [cacheExpiry, setCacheExpiry] = useState({});
+  const [cacheTimestamps, setCacheTimestamps] = useState({});
+  const [loadingStates, setLoadingStates] = useState({});
+  
+  // Cache configuration
+  const MAX_CACHE_SIZE = 3;
+  const CACHE_DURATION = 2 * 60 * 1000; // 2 minutes
+  const isMountedRef = useRef(true);
+  
+  // Legacy state variables (will be gradually replaced by cache)
   const [activeTab, setActiveTab] = useState('borrowed');
   const [error, setError] = useState('');
   const [success, setSuccess] = useState('');
@@ -77,6 +91,14 @@ export default function ConciergePage() {
   const [availableItems, setAvailableItems] = useState([
     {
       id: 1,
+      name: 'Basic Set',
+      image: basicSetImage,
+      description: 'Basic dining set (Plate, Spoon, Fork, Tray)',
+      cartQuantity: 0,
+      isSet: true
+    },
+    {
+      id: 2,
       name: 'Complete Set',
       image: completeSetImage,
       description: 'Complete dining set (Plate, Bowl, Spoon, Fork, Glass, Tray)',
@@ -84,42 +106,42 @@ export default function ConciergePage() {
       isSet: true
     },
     { 
-      id: 2, 
+      id: 3, 
       name: 'Spoon', 
       image: spoonImage,
       description: 'Stainless steel spoon for your dining needs',
       cartQuantity: 0
     },
     { 
-      id: 3, 
+      id: 4, 
       name: 'Fork', 
       image: forkImage,
       description: 'Stainless steel fork for your dining needs',
       cartQuantity: 0
     },
     { 
-      id: 4, 
+      id: 5, 
       name: 'Plate', 
       image: plateImage,
       description: 'Ceramic plate',
       cartQuantity: 0
     },
     { 
-      id: 5, 
+      id: 6, 
       name: 'Bowl', 
       image: bowlImage,
       description: 'Ceramic bowl',
       cartQuantity: 0
     },
     { 
-      id: 6, 
+      id: 7, 
       name: 'Saucer', 
       image: saucerImage,
       description: 'Smaller plate',
       cartQuantity: 0
     },
     { 
-      id: 7, 
+      id: 8, 
       name: 'Glass', 
       image: glassImage,
       description: 'Glass for water and beverages',
@@ -145,6 +167,114 @@ export default function ConciergePage() {
 
   const [showStatusModal, setShowStatusModal] = useState(false);
   const [statusModalData, setStatusModalData] = useState({ type: '', message: '' });
+
+  // Add new state for polling
+  const [isBorrowedPolling, setIsBorrowedPolling] = useState(false);
+  const [isReturnedPolling, setIsReturnedPolling] = useState(false);
+
+  // Cache management functions
+  const isCacheValid = (tabName) => {
+    const expiry = cacheExpiry[tabName];
+    return expiry && Date.now() < expiry;
+  };
+
+  const getCachedData = (tabName) => {
+    return isCacheValid(tabName) ? tabCache[tabName] : null;
+  };
+
+  const cleanupCache = () => {
+    const now = Date.now();
+    const validEntries = Object.entries(cacheExpiry)
+      .filter(([key, expiry]) => now < expiry)
+      .sort(([,a], [,b]) => a - b); // Sort by expiry time
+
+    // Remove oldest entries if cache is too large
+    if (validEntries.length > MAX_CACHE_SIZE) {
+      const toRemove = validEntries.slice(0, validEntries.length - MAX_CACHE_SIZE);
+      setTabCache(prev => {
+        const newCache = { ...prev };
+        toRemove.forEach(([key]) => delete newCache[key]);
+        return newCache;
+      });
+      setCacheExpiry(prev => {
+        const newExpiry = { ...prev };
+        toRemove.forEach(([key]) => delete newExpiry[key]);
+        return newExpiry;
+      });
+      setCacheTimestamps(prev => {
+        const newTimestamps = { ...prev };
+        toRemove.forEach(([key]) => delete newTimestamps[key]);
+        return newTimestamps;
+      });
+    }
+  };
+
+  const setCachedData = (tabName, data) => {
+    if (!isMountedRef.current) return; // Don't update if component is unmounted
+    
+    cleanupCache(); // Clean before adding new data
+    setTabCache(prev => ({ ...prev, [tabName]: data }));
+    setCacheExpiry(prev => ({ 
+      ...prev, 
+      [tabName]: Date.now() + CACHE_DURATION 
+    }));
+    setCacheTimestamps(prev => ({ 
+      ...prev, 
+      [tabName]: Date.now() 
+    }));
+  };
+
+  const clearCache = (tabName) => {
+    setTabCache(prev => {
+      const newCache = { ...prev };
+      delete newCache[tabName];
+      return newCache;
+    });
+    setCacheExpiry(prev => {
+      const newExpiry = { ...prev };
+      delete newExpiry[tabName];
+      return newExpiry;
+    });
+    setCacheTimestamps(prev => {
+      const newTimestamps = { ...prev };
+      delete newTimestamps[tabName];
+      return newTimestamps;
+    });
+  };
+
+  const setLoadingState = (tabName, loading) => {
+    if (!isMountedRef.current) return;
+    setLoadingStates(prev => ({ ...prev, [tabName]: loading }));
+  };
+
+  // Component cleanup on unmount
+  useEffect(() => {
+    isMountedRef.current = true;
+    
+    return () => {
+      isMountedRef.current = false;
+    };
+  }, []);
+
+  // Cache cleanup effect to prevent memory leaks
+  useEffect(() => {
+    const cleanup = () => {
+      // Clean up data for tabs not currently active after a delay
+      Object.keys(tabCache).forEach(tabName => {
+        if (tabName !== activeTab) {
+          // Only clear cache for tabs that haven't been accessed recently
+          const timestamp = cacheTimestamps[tabName];
+          if (timestamp && (Date.now() - timestamp) > CACHE_DURATION) {
+            clearCache(tabName);
+          }
+        }
+      });
+    };
+
+    // Cleanup after a delay to allow for quick tab switching
+    const timeoutId = setTimeout(cleanup, 30000); // 30 seconds
+    return () => clearTimeout(timeoutId);
+  }, [activeTab, tabCache, cacheTimestamps]);
 
   useEffect(() => {
     const convertLogoToDataUrl = async () => {
@@ -181,65 +311,245 @@ export default function ConciergePage() {
     return true;
   };
 
-  // Fetch borrowed items with date filter
-  const fetchBorrowedItems = async () => {
+  // Optimized fetchBorrowedItems function with smart caching
+  const fetchBorrowedItems = async (forceRefresh = false) => {
+    const tabName = 'borrowed';
+    const cacheKey = `${tabName}_${startDate}_${endDate}`;
+    
+    // Check cache first (unless force refresh)
+    if (!forceRefresh) {
+      const cached = getCachedData(cacheKey);
+      if (cached) {
+        // Use cached data and update legacy state
+        setBorrowedItems(cached.items || []);
+        return cached;
+      }
+    }
+
     try {
+      // Only show loading state for initial load, not during polling
+      if (!isBorrowedPolling) {
+        setLoadingState(tabName, true);
+      }
+
+      // Use AbortController to prevent memory leaks
+      const controller = new AbortController();
+      const timeoutId = setTimeout(() => controller.abort(), 15000); // 15 second timeout
+
       const queryParams = new URLSearchParams();
       if (startDate) queryParams.append('startDate', startDate);
       if (endDate) queryParams.append('endDate', endDate);
       
       const res = await axios.get(`${baseUrl}/api/concierge/borrowed-items?${queryParams}`, {
         headers: { Authorization: `Bearer ${token}` },
+        signal: controller.signal
       });
+
+      clearTimeout(timeoutId);
+
+      // Only update state if component is still mounted
+      if (!isMountedRef.current) return;
+
       const items = res.data.data;
       const sortedBorrowed = items.sort((a, b) => new Date(b.borrowTime) - new Date(a.borrowTime));
+      
+      // Update legacy state
       setBorrowedItems(sortedBorrowed);
-    } catch (err) {
-      setError('Failed to fetch borrowed items');
+
+      // Cache the processed data
+      const processedData = {
+        items: sortedBorrowed,
+        timestamp: Date.now(),
+        startDate,
+        endDate
+      };
+      setCachedData(cacheKey, processedData);
+
+      return processedData;
+    } catch (error) {
+      if (error.name === 'AbortError') {
+        console.log('Request was aborted due to timeout');
+      } else {
+        console.error('Error fetching borrowed items:', error);
+        setError('Failed to fetch borrowed items');
+      }
+    } finally {
+      // Only clear loading state if we're not in polling mode and component is mounted
+      if (!isBorrowedPolling && isMountedRef.current) {
+        setLoadingState(tabName, false);
+      }
     }
   };
 
-  // Polling for borrowed tab
+  // Optimized useEffect for borrowed tab with smart caching
   useEffect(() => {
     let pollInterval;
-    if (activeTab === 'borrowed') {
-      fetchBorrowedItems();
-      pollInterval = setInterval(fetchBorrowedItems, 3000);
-    }
-    return () => {
-      if (pollInterval) clearInterval(pollInterval);
-    };
-  }, [token, startDate, endDate]);
+    let isMounted = true;
 
-  // Fetch returned items with date filter
-  const fetchReturnedItems = async () => {
+    if (activeTab === 'borrowed') {
+      const loadData = async () => {
+        if (!isMounted || !isMountedRef.current) return;
+        
+        try {
+          // Check cache first
+          const cacheKey = `borrowed_${startDate}_${endDate}`;
+          const cached = getCachedData(cacheKey);
+          if (cached) {
+            // Use cached data, no loading state
+            setBorrowedItems(cached.items);
+          } else {
+            // Fetch fresh data
+            setIsBorrowedPolling(true);
+            await fetchBorrowedItems();
+          }
+        } catch (error) {
+          console.error('Error loading borrowed data:', error);
+        }
+      };
+
+      loadData();
+      
+      // Set up polling for background updates (silent refresh)
+      pollInterval = setInterval(async () => {
+        if (isMounted && isMountedRef.current) {
+          try {
+            await fetchBorrowedItems(true); // Force refresh for polling
+          } catch (error) {
+            console.error('Error during background refresh:', error);
+          }
+        }
+      }, 60000); // 60 seconds
+    }
+
+    // Cleanup function
+    return () => {
+      isMounted = false;
+      if (pollInterval) {
+        clearInterval(pollInterval);
+      }
+      setIsBorrowedPolling(false);
+    };
+  }, [activeTab, token, startDate, endDate]);
+
+  // Optimized fetchReturnedItems function with smart caching
+  const fetchReturnedItems = async (forceRefresh = false) => {
+    const tabName = 'returned';
+    const cacheKey = `${tabName}_${startDate}_${endDate}`;
+    
+    // Check cache first (unless force refresh)
+    if (!forceRefresh) {
+      const cached = getCachedData(cacheKey);
+      if (cached) {
+        // Use cached data and update legacy state
+        setReturnedItems(cached.items || []);
+        return cached;
+      }
+    }
+
     try {
+      // Only show loading state for initial load, not during polling
+      if (!isReturnedPolling) {
+        setLoadingState(tabName, true);
+      }
+
+      // Use AbortController to prevent memory leaks
+      const controller = new AbortController();
+      const timeoutId = setTimeout(() => controller.abort(), 15000); // 15 second timeout
+
       const queryParams = new URLSearchParams();
       if (startDate) queryParams.append('startDate', startDate);
       if (endDate) queryParams.append('endDate', endDate);
       
       const res = await axios.get(`${baseUrl}/api/concierge/returned-history?${queryParams}`, {
         headers: { Authorization: `Bearer ${token}` },
+        signal: controller.signal
       });
+
+      clearTimeout(timeoutId);
+
+      // Only update state if component is still mounted
+      if (!isMountedRef.current) return;
+
       const items = res.data.data;
       const sortedReturned = items.sort((a, b) => new Date(b.returnTime) - new Date(a.returnTime));
+      
+      // Update legacy state
       setReturnedItems(sortedReturned);
-    } catch (err) {
-      setError('Failed to fetch returned items');
+
+      // Cache the processed data
+      const processedData = {
+        items: sortedReturned,
+        timestamp: Date.now(),
+        startDate,
+        endDate
+      };
+      setCachedData(cacheKey, processedData);
+
+      return processedData;
+    } catch (error) {
+      if (error.name === 'AbortError') {
+        console.log('Request was aborted due to timeout');
+      } else {
+        console.error('Error fetching returned items:', error);
+        setError('Failed to fetch returned items');
+      }
+    } finally {
+      // Only clear loading state if we're not in polling mode and component is mounted
+      if (!isReturnedPolling && isMountedRef.current) {
+        setLoadingState(tabName, false);
+      }
     }
   };
 
-  // Polling for returned tab
+  // Optimized useEffect for returned tab with smart caching
   useEffect(() => {
     let pollInterval;
+    let isMounted = true;
+
     if (activeTab === 'returned') {
-      fetchReturnedItems();
-      pollInterval = setInterval(fetchReturnedItems, 3000);
+      const loadData = async () => {
+        if (!isMounted || !isMountedRef.current) return;
+        
+        try {
+          // Check cache first
+          const cacheKey = `returned_${startDate}_${endDate}`;
+          const cached = getCachedData(cacheKey);
+          if (cached) {
+            // Use cached data, no loading state
+            setReturnedItems(cached.items);
+          } else {
+            // Fetch fresh data
+            setIsReturnedPolling(true);
+            await fetchReturnedItems();
+          }
+        } catch (error) {
+          console.error('Error loading returned data:', error);
+        }
+      };
+
+      loadData();
+      
+      // Set up polling for background updates (silent refresh)
+      pollInterval = setInterval(async () => {
+        if (isMounted && isMountedRef.current) {
+          try {
+            await fetchReturnedItems(true); // Force refresh for polling
+          } catch (error) {
+            console.error('Error during background refresh:', error);
+          }
+        }
+      }, 60000); // 60 seconds
     }
+
+    // Cleanup function
     return () => {
-      if (pollInterval) clearInterval(pollInterval);
+      isMounted = false;
+      if (pollInterval) {
+        clearInterval(pollInterval);
+      }
+      setIsReturnedPolling(false);
     };
-  }, [activeTab, token]);
+  }, [activeTab, token, startDate, endDate]);
 
   // Filter and paginate
   const filteredBorrowedItems = borrowedItems.filter(item =>
@@ -809,6 +1119,12 @@ export default function ConciergePage() {
               <div>
                 <h1 className="text-xl font-bold text-gray-800">Concierge Dashboard</h1>
                 <p className="text-sm text-gray-600">Welcome, {user?.name || 'User'}</p>
+                {/* Cache status indicator for debugging */}
+                <p className="text-xs text-gray-400">
+                  Cache: {Object.keys(tabCache).length}/{MAX_CACHE_SIZE} tabs | 
+                  Active: {activeTab} | 
+                  Memory: {Math.round((JSON.stringify(tabCache).length / 1024) * 100) / 100}KB
+                </p>
               </div>
             </div>
             <button
@@ -982,7 +1298,14 @@ export default function ConciergePage() {
           ].map(({ id, icon: Icon, label }) => (
             <button
               key={id}
-              onClick={() => setActiveTab(id)}
+              onClick={() => {
+                // Clear cache for the previous tab to ensure fresh data when switching back
+                if (id !== activeTab) {
+                  const previousCacheKey = `${activeTab}_${startDate}_${endDate}`;
+                  clearCache(previousCacheKey);
+                }
+                setActiveTab(id);
+              }}
               className={`flex items-center space-x-2 px-4 py-2.5 rounded-xl whitespace-nowrap transition-all ${
                 activeTab === id
                   ? 'bg-purple-600 text-white shadow-md'
@@ -1007,6 +1330,12 @@ export default function ConciergePage() {
               <div>
                 <h2 className="text-2xl font-bold text-gray-800">Borrowed Items</h2>
                 <p className="text-gray-600 mt-1">Track all currently borrowed items</p>
+                {loadingStates['borrowed'] && (
+                  <div className="flex items-center space-x-2 mt-2">
+                    <div className="animate-spin rounded-full h-4 w-4 border-t-2 border-b-2 border-purple-500"></div>
+                    <span className="text-sm text-purple-600">Loading data...</span>
+                  </div>
+                )}
               </div>
               <div className="w-full sm:w-64">
                 <div className="relative">
@@ -1134,6 +1463,12 @@ export default function ConciergePage() {
               <div>
                 <h2 className="text-2xl font-bold text-gray-800">Returned Items History</h2>
                 <p className="text-gray-600 mt-1">View history of all returned items</p>
+                {loadingStates['returned'] && (
+                  <div className="flex items-center space-x-2 mt-2">
+                    <div className="animate-spin rounded-full h-4 w-4 border-t-2 border-b-2 border-purple-500"></div>
+                    <span className="text-sm text-purple-600">Loading data...</span>
+                  </div>
+                )}
               </div>
               <div className="w-full sm:w-64">
                 <div className="relative">

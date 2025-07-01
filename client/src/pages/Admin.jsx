@@ -10,7 +10,6 @@ import {
   ExclamationIcon,
   ArrowLeftIcon,
   ArrowRightIcon,
-  BellIcon,
   CurrencyDollarIcon,
   DocumentReportIcon,
   ChatAltIcon
@@ -80,6 +79,19 @@ if (typeof window !== 'undefined' && !window.Buffer) {
 export default function AdminPage() {
   const { user, logout } = useAuth();
   const navigate = useNavigate();
+  
+  // Smart caching system with memory management
+  const [tabCache, setTabCache] = useState({});
+  const [cacheExpiry, setCacheExpiry] = useState({});
+  const [cacheTimestamps, setCacheTimestamps] = useState({});
+  const [loadingStates, setLoadingStates] = useState({});
+  
+  // Cache configuration
+  const MAX_CACHE_SIZE = 5;
+  const CACHE_DURATION = 2 * 60 * 1000; // 2 minutes
+  const isMountedRef = useRef(true);
+  
+  // Legacy state variables (will be gradually replaced by cache)
   const [stats, setStats] = useState({});
   const [rewards, setRewards] = useState({ name: '', cost: '', description: '' });
   const [users, setUsers] = useState([]);
@@ -183,6 +195,90 @@ export default function AdminPage() {
   const token = user.token;
   const baseUrl = import.meta.env.VITE_API_BASE_URL;
 
+  // Cache management functions
+  const isCacheValid = (tabName) => {
+    const expiry = cacheExpiry[tabName];
+    return expiry && Date.now() < expiry;
+  };
+
+  const getCachedData = (tabName) => {
+    return isCacheValid(tabName) ? tabCache[tabName] : null;
+  };
+
+  const cleanupCache = () => {
+    const now = Date.now();
+    const validEntries = Object.entries(cacheExpiry)
+      .filter(([key, expiry]) => now < expiry)
+      .sort(([,a], [,b]) => a - b); // Sort by expiry time
+
+    // Remove oldest entries if cache is too large
+    if (validEntries.length > MAX_CACHE_SIZE) {
+      const toRemove = validEntries.slice(0, validEntries.length - MAX_CACHE_SIZE);
+      setTabCache(prev => {
+        const newCache = { ...prev };
+        toRemove.forEach(([key]) => delete newCache[key]);
+        return newCache;
+      });
+      setCacheExpiry(prev => {
+        const newExpiry = { ...prev };
+        toRemove.forEach(([key]) => delete newExpiry[key]);
+        return newExpiry;
+      });
+      setCacheTimestamps(prev => {
+        const newTimestamps = { ...prev };
+        toRemove.forEach(([key]) => delete newTimestamps[key]);
+        return newTimestamps;
+      });
+    }
+  };
+
+  const setCachedData = (tabName, data) => {
+    if (!isMountedRef.current) return; // Don't update if component is unmounted
+    
+    cleanupCache(); // Clean before adding new data
+    setTabCache(prev => ({ ...prev, [tabName]: data }));
+    setCacheExpiry(prev => ({ 
+      ...prev, 
+      [tabName]: Date.now() + CACHE_DURATION 
+    }));
+    setCacheTimestamps(prev => ({ 
+      ...prev, 
+      [tabName]: Date.now() 
+    }));
+  };
+
+  const clearCache = (tabName) => {
+    setTabCache(prev => {
+      const newCache = { ...prev };
+      delete newCache[tabName];
+      return newCache;
+    });
+    setCacheExpiry(prev => {
+      const newExpiry = { ...prev };
+      delete newExpiry[tabName];
+      return newExpiry;
+    });
+    setCacheTimestamps(prev => {
+      const newTimestamps = { ...prev };
+      delete newTimestamps[tabName];
+      return newTimestamps;
+    });
+  };
+
+  const setLoadingState = (tabName, loading) => {
+    if (!isMountedRef.current) return;
+    setLoadingStates(prev => ({ ...prev, [tabName]: loading }));
+  };
+
+  // Component cleanup on unmount
+  useEffect(() => {
+    isMountedRef.current = true;
+    
+    return () => {
+      isMountedRef.current = false;
+    };
+  }, []);
+
   // Add StatusModal component
   const StatusModal = ({ isOpen, onClose, type, message }) => {
     if (!isOpen) return null;
@@ -251,10 +347,30 @@ export default function AdminPage() {
   const showStatusMessage = (type, message) => {
     setStatusModalData({ type, message });
     setShowStatusModal(true);
+    setTimeout(() => setShowStatusModal(false), 3000);
   };
 
-  // Update fetchData to be more efficient
-  const fetchData = async (page = 1, search = '') => {
+  // Optimized fetchData function with caching and memory management
+  const fetchData = async (page = 1, search = '', forceRefresh = false) => {
+    const tabName = 'overview';
+    
+    // Check cache first (unless force refresh)
+    if (!forceRefresh) {
+      const cached = getCachedData(tabName);
+      if (cached) {
+        // Use cached data and update legacy state
+        setStats(cached.stats || {});
+        setUsers(cached.users || []);
+        setClaimedRewards(cached.claimedRewards || []);
+        setAvailableRewards(cached.availableRewards || []);
+        setTotalBorrowedItems(cached.totalBorrowedItems || 0);
+        setCurrentPage(cached.currentPage || 1);
+        setTotalPages(cached.totalPages || 1);
+        setTotalUsers(cached.totalUsers || 0);
+        return cached;
+      }
+    }
+
     try {
       // Only show loading state for initial load or user search, not during polling
       if (page === 1 && !search && !isOverviewPolling) {
@@ -263,70 +379,133 @@ export default function AdminPage() {
         setIsPageLoading(true);
       }
 
+      // Use AbortController to prevent memory leaks
+      const controller = new AbortController();
+      const timeoutId = setTimeout(() => controller.abort(), 15000); // 15 second timeout
+
       // Use Promise.allSettled instead of Promise.all to handle partial failures
       const [statsRes, usersRes, claimedRes, rewardsRes, borrowedRes] = await Promise.allSettled([
         axios.get(`${baseUrl}/api/admin/stats`, {
           headers: { Authorization: `Bearer ${token}` },
+          signal: controller.signal
         }),
         axios.get(`${baseUrl}/api/admin/users?page=${page}&limit=10&search=${search}`, {
           headers: { Authorization: `Bearer ${token}` },
+          signal: controller.signal
         }),
         axios.get(`${baseUrl}/api/admin/claimed-rewards`, {
           headers: { Authorization: `Bearer ${token}` },
+          signal: controller.signal
         }),
         axios.get(`${baseUrl}/api/rewards`, {
           headers: { Authorization: `Bearer ${token}` },
+          signal: controller.signal
         }),
         axios.get(`${baseUrl}/api/admin/borrowed-items`, {
           headers: { Authorization: `Bearer ${token}` },
+          signal: controller.signal
         })
       ]);
 
-      // Only update state if the request was successful
-      if (statsRes.status === 'fulfilled') setStats(statsRes.value.data);
-      if (usersRes.status === 'fulfilled') {
-        setUsers(usersRes.value.data.users);
-        setCurrentPage(usersRes.value.data.currentPage);
-        setTotalPages(usersRes.value.data.totalPages);
-        setTotalUsers(usersRes.value.data.totalUsers);
-      }
-      if (claimedRes.status === 'fulfilled') setClaimedRewards(claimedRes.value.data.claimedRewards || []);
-      if (rewardsRes.status === 'fulfilled') {
-        setAvailableRewards(rewardsRes.value.data);
-        setRewardsTotalPages(Math.ceil(rewardsRes.value.data.length / rewardsPerPage));
-      }
-      if (borrowedRes.status === 'fulfilled') {
-        setTotalBorrowedItems(borrowedRes.value.data.data.length);
-      }
+      clearTimeout(timeoutId);
+
+      // Only update state if component is still mounted
+      if (!isMountedRef.current) return;
+
+      // Process and store data efficiently
+      const processedData = {
+        stats: statsRes.status === 'fulfilled' ? statsRes.value.data : {},
+        users: usersRes.status === 'fulfilled' ? usersRes.value.data.users : [],
+        claimedRewards: claimedRes.status === 'fulfilled' ? (claimedRes.value.data.claimedRewards || []) : [],
+        availableRewards: rewardsRes.status === 'fulfilled' ? rewardsRes.value.data : [],
+        totalBorrowedItems: borrowedRes.status === 'fulfilled' ? borrowedRes.value.data.data.length : 0,
+        currentPage: usersRes.status === 'fulfilled' ? usersRes.value.data.currentPage : 1,
+        totalPages: usersRes.status === 'fulfilled' ? usersRes.value.data.totalPages : 1,
+        totalUsers: usersRes.status === 'fulfilled' ? usersRes.value.data.totalUsers : 0
+      };
+
+      // Update legacy state for backward compatibility
+      setStats(processedData.stats);
+      setUsers(processedData.users);
+      setClaimedRewards(processedData.claimedRewards);
+      setAvailableRewards(processedData.availableRewards);
+      setTotalBorrowedItems(processedData.totalBorrowedItems);
+      setCurrentPage(processedData.currentPage);
+      setTotalPages(processedData.totalPages);
+      setTotalUsers(processedData.totalUsers);
+
+      // Cache the processed data
+      setCachedData(tabName, processedData);
+
+      return processedData;
     } catch (error) {
-      console.error("Error fetching data:", error);
-      setError("Failed to fetch data. Please try again.");
+      if (error.name === 'AbortError') {
+        console.log('Request was aborted due to timeout');
+      } else {
+        console.error("Error fetching data:", error);
+        setError("Failed to fetch data. Please try again.");
+      }
     } finally {
-      // Only clear loading states if we're not in polling mode
-      if (!isOverviewPolling) {
+      // Only clear loading states if we're not in polling mode and component is mounted
+      if (!isOverviewPolling && isMountedRef.current) {
         setIsLoading(false);
       }
-      setIsPageLoading(false);
+      if (isMountedRef.current) {
+        setIsPageLoading(false);
+      }
     }
   };
 
-  // Update polling effect for overview tab
+  // Optimized useEffect for overview tab with smart caching
   useEffect(() => {
     let pollInterval;
-    
+    let isMounted = true;
+
     if (activeTab === 'overview') {
-      // Set polling state to true before initial fetch
-      setIsOverviewPolling(true);
-      // Initial fetch
-      fetchData();
-      // Set up polling every 30 seconds instead of 10
-      pollInterval = setInterval(() => {
-        fetchData();
-      }, 30000); // 30 seconds
+      const loadData = async () => {
+        if (!isMounted || !isMountedRef.current) return;
+        
+        try {
+          // Check cache first
+          const cached = getCachedData('overview');
+          if (cached) {
+            // Use cached data, no loading state
+            setStats(cached.stats);
+            setUsers(cached.users);
+            setClaimedRewards(cached.claimedRewards);
+            setAvailableRewards(cached.availableRewards);
+            setTotalBorrowedItems(cached.totalBorrowedItems);
+            setCurrentPage(cached.currentPage);
+            setTotalPages(cached.totalPages);
+            setTotalUsers(cached.totalUsers);
+            setIsLoading(false);
+          } else {
+            // Fetch fresh data
+            setIsOverviewPolling(true);
+            await fetchData();
+          }
+        } catch (error) {
+          console.error('Error loading overview data:', error);
+        }
+      };
+
+      loadData();
+      
+      // Set up polling for background updates (silent refresh)
+      pollInterval = setInterval(async () => {
+        if (isMounted && isMountedRef.current) {
+          try {
+            await fetchData(1, '', true); // Force refresh for polling
+          } catch (error) {
+            console.error('Error during background refresh:', error);
+          }
+        }
+      }, 120000); // 120 seconds
     }
 
-    // Cleanup interval on unmount or tab change
+    // Cleanup function
     return () => {
+      isMounted = false;
       if (pollInterval) {
         clearInterval(pollInterval);
       }
@@ -588,41 +767,101 @@ export default function AdminPage() {
     setPasswordError('');
   };
 
-  // Update borrowed items polling
+  // Update borrowed items polling with caching
   useEffect(() => {
     let pollInterval;
+    let isMounted = true;
+    
     if (activeTab === 'borrowed') {
-      fetchBorrowedItems();
-      // Increase polling interval to 10 seconds
-      pollInterval = setInterval(fetchBorrowedItems, 10000);
+      const loadBorrowedData = async () => {
+        if (!isMounted || !isMountedRef.current) return;
+        
+        try {
+          // Check cache first
+          const cached = getCachedData('borrowed');
+          if (cached) {
+            setBorrowedItems(cached.borrowedItems);
+            return;
+          }
+          
+          // Fetch fresh data
+          await fetchBorrowedItems();
+        } catch (error) {
+          console.error('Error loading borrowed data:', error);
+        }
+      };
+
+      loadBorrowedData();
+      
+      // Increase polling interval to 120 seconds
+      pollInterval = setInterval(async () => {
+        if (isMounted && isMountedRef.current) {
+          try {
+            await fetchBorrowedItems(true); // Force refresh
+          } catch (error) {
+            console.error('Error during borrowed items refresh:', error);
+          }
+        }
+      }, 120000);
     }
+    
     return () => {
+      isMounted = false;
       if (pollInterval) clearInterval(pollInterval);
     };
   }, [activeTab, token]);
 
-  // Update fetchBorrowedItems to be more efficient
-  const fetchBorrowedItems = async () => {
+  // Update fetchBorrowedItems to be more efficient with caching
+  const fetchBorrowedItems = async (forceRefresh = false) => {
+    const tabName = 'borrowed';
+    
+    // Check cache first (unless force refresh)
+    if (!forceRefresh) {
+      const cached = getCachedData(tabName);
+      if (cached) {
+        setBorrowedItems(cached.borrowedItems);
+        return cached;
+      }
+    }
+
     try {
+      const controller = new AbortController();
+      const timeoutId = setTimeout(() => controller.abort(), 10000);
+
       const queryParams = new URLSearchParams();
       if (startDate) queryParams.append('startDate', startDate);
       if (endDate) queryParams.append('endDate', endDate);
       
       const res = await axios.get(`${baseUrl}/api/admin/borrowed-items?${queryParams}`, {
         headers: { Authorization: `Bearer ${token}` },
+        signal: controller.signal
       });
       
+      clearTimeout(timeoutId);
+
+      if (!isMountedRef.current) return;
+
       // Only process and update state if we have new data
       const items = res.data.data;
       if (items && items.length > 0) {
         const sortedBorrowed = items
           .filter(item => item.status === 'borrowed')
           .sort((a, b) => new Date(b.borrowTime) - new Date(a.borrowTime));
+        
         setBorrowedItems(sortedBorrowed);
+        
+        // Cache the data
+        setCachedData(tabName, { borrowedItems: sortedBorrowed });
+        
+        return { borrowedItems: sortedBorrowed };
       }
     } catch (err) {
-      console.error('Error fetching borrowed items:', err);
-      setError('Failed to fetch borrowed items');
+      if (err.name === 'AbortError') {
+        console.log('Borrowed items request was aborted');
+      } else {
+        console.error('Error fetching borrowed items:', err);
+        setError('Failed to fetch borrowed items');
+      }
     }
   };
 
@@ -641,32 +880,92 @@ export default function AdminPage() {
     setCurrentBorrowedPage(1);
   };
 
-  // Fetch returned items with date filter
-  const fetchReturnedItems = async () => {
+  // Fetch returned items with date filter and caching
+  const fetchReturnedItems = async (forceRefresh = false) => {
+    const tabName = 'returned';
+    
+    // Check cache first (unless force refresh)
+    if (!forceRefresh) {
+      const cached = getCachedData(tabName);
+      if (cached) {
+        setReturnedItems(cached.returnedItems);
+        return cached;
+      }
+    }
+
     try {
+      const controller = new AbortController();
+      const timeoutId = setTimeout(() => controller.abort(), 10000);
+
       const queryParams = new URLSearchParams();
       if (startDate) queryParams.append('startDate', startDate);
       if (endDate) queryParams.append('endDate', endDate);
       
       const res = await axios.get(`${baseUrl}/api/admin/returned-history?${queryParams}`, {
         headers: { Authorization: `Bearer ${token}` },
+        signal: controller.signal
       });
+      
+      clearTimeout(timeoutId);
+
+      if (!isMountedRef.current) return;
+
       const items = res.data.data;
       const sortedReturned = items.sort((a, b) => new Date(b.returnTime) - new Date(a.returnTime));
       setReturnedItems(sortedReturned);
+      
+      // Cache the data
+      setCachedData(tabName, { returnedItems: sortedReturned });
+      
+      return { returnedItems: sortedReturned };
     } catch (err) {
-      setError('Failed to fetch returned items');
+      if (err.name === 'AbortError') {
+        console.log('Returned items request was aborted');
+      } else {
+        setError('Failed to fetch returned items');
+      }
     }
   };
 
-  // Polling for returned tab
+  // Polling for returned tab with caching
   useEffect(() => {
     let pollInterval;
+    let isMounted = true;
+    
     if (activeTab === 'returned') {
-      fetchReturnedItems();
-      pollInterval = setInterval(fetchReturnedItems, 3000);
+      const loadReturnedData = async () => {
+        if (!isMounted || !isMountedRef.current) return;
+        
+        try {
+          // Check cache first
+          const cached = getCachedData('returned');
+          if (cached) {
+            setReturnedItems(cached.returnedItems);
+            return;
+          }
+          
+          // Fetch fresh data
+          await fetchReturnedItems();
+        } catch (error) {
+          console.error('Error loading returned data:', error);
+        }
+      };
+
+      loadReturnedData();
+      
+      pollInterval = setInterval(async () => {
+        if (isMounted && isMountedRef.current) {
+          try {
+            await fetchReturnedItems(true); // Force refresh
+          } catch (error) {
+            console.error('Error during returned items refresh:', error);
+          }
+        }
+      }, 120000);
     }
+    
     return () => {
+      isMounted = false;
       if (pollInterval) clearInterval(pollInterval);
     };
   }, [activeTab, token]);
@@ -759,30 +1058,99 @@ export default function AdminPage() {
     }
   };
 
-  // Add new function to fetch points usage
-  const fetchPointsUsage = async (page = 1, search = '') => {
+  // Add new function to fetch points usage with caching
+  const fetchPointsUsage = async (page = 1, search = '', forceRefresh = false) => {
+    const tabName = 'points-usage';
+    
+    // Check cache first (unless force refresh)
+    if (!forceRefresh) {
+      const cached = getCachedData(tabName);
+      if (cached && cached.page === page && cached.search === search) {
+        setPointsUsage(cached.pointsUsage);
+        setPointsUsagePage(cached.currentPage);
+        setPointsUsageTotalPages(cached.totalPages);
+        return cached;
+      }
+    }
+
     try {
       setIsPointsUsageLoading(true);
+      const controller = new AbortController();
+      const timeoutId = setTimeout(() => controller.abort(), 10000);
+
       const response = await axios.get(
         `${baseUrl}/api/admin/points-usage?page=${page}&limit=10&search=${search}`,
-        { headers: { Authorization: `Bearer ${token}` } }
+        { 
+          headers: { Authorization: `Bearer ${token}` },
+          signal: controller.signal
+        }
       );
-      setPointsUsage(response.data.pointsUsage);
-      setPointsUsagePage(response.data.currentPage);
-      setPointsUsageTotalPages(response.data.totalPages);
+      
+      clearTimeout(timeoutId);
+
+      if (!isMountedRef.current) return;
+
+      const data = {
+        pointsUsage: response.data.pointsUsage,
+        currentPage: response.data.currentPage,
+        totalPages: response.data.totalPages,
+        page,
+        search
+      };
+
+      setPointsUsage(data.pointsUsage);
+      setPointsUsagePage(data.currentPage);
+      setPointsUsageTotalPages(data.totalPages);
+      
+      // Cache the data
+      setCachedData(tabName, data);
+      
+      return data;
     } catch (error) {
-      console.error('Error fetching points usage:', error);
-      setError('Failed to fetch points usage records');
+      if (error.name === 'AbortError') {
+        console.log('Points usage request was aborted');
+      } else {
+        console.error('Error fetching points usage:', error);
+        setError('Failed to fetch points usage records');
+      }
     } finally {
-      setIsPointsUsageLoading(false);
+      if (isMountedRef.current) {
+        setIsPointsUsageLoading(false);
+      }
     }
   };
 
-  // Add effect for points usage tab
+  // Add effect for points usage tab with caching
   useEffect(() => {
+    let isMounted = true;
+    
     if (activeTab === 'points-usage') {
-      fetchPointsUsage(pointsUsagePage, pointsUsageSearchTerm);
+      const loadPointsUsageData = async () => {
+        if (!isMounted || !isMountedRef.current) return;
+        
+        try {
+          // Check cache first
+          const cached = getCachedData('points-usage');
+          if (cached && cached.page === pointsUsagePage && cached.search === pointsUsageSearchTerm) {
+            setPointsUsage(cached.pointsUsage);
+            setPointsUsagePage(cached.currentPage);
+            setPointsUsageTotalPages(cached.totalPages);
+            return;
+          }
+          
+          // Fetch fresh data
+          await fetchPointsUsage(pointsUsagePage, pointsUsageSearchTerm);
+        } catch (error) {
+          console.error('Error loading points usage data:', error);
+        }
+      };
+
+      loadPointsUsageData();
     }
+    
+    return () => {
+      isMounted = false;
+    };
   }, [activeTab, pointsUsagePage, pointsUsageSearchTerm]);
 
   // Add points usage search handler
@@ -1396,24 +1764,78 @@ export default function AdminPage() {
     convertLogoToDataUrl();
   }, []);
 
-  // Add fetchFeedbackStats function
-  const fetchFeedbackStats = async () => {
+  // Add fetchFeedbackStats function with caching
+  const fetchFeedbackStats = async (forceRefresh = false) => {
+    const tabName = 'feedback';
+    
+    // Check cache first (unless force refresh)
+    if (!forceRefresh) {
+      const cached = getCachedData(tabName);
+      if (cached) {
+        setFeedbackStats(cached.feedbackStats);
+        return cached;
+      }
+    }
+
     try {
+      const controller = new AbortController();
+      const timeoutId = setTimeout(() => controller.abort(), 10000);
+
       const response = await axios.get(`${baseUrl}/api/admin/feedback-stats`, {
-        headers: { Authorization: `Bearer ${token}` }
+        headers: { Authorization: `Bearer ${token}` },
+        signal: controller.signal
       });
+      
+      clearTimeout(timeoutId);
+
+      if (!isMountedRef.current) return;
+
+      const data = { feedbackStats: response.data };
       setFeedbackStats(response.data);
+      
+      // Cache the data
+      setCachedData(tabName, data);
+      
+      return data;
     } catch (error) {
-      console.error('Error fetching feedback stats:', error);
-      setError('Failed to fetch feedback statistics');
+      if (error.name === 'AbortError') {
+        console.log('Feedback stats request was aborted');
+      } else {
+        console.error('Error fetching feedback stats:', error);
+        setError('Failed to fetch feedback statistics');
+      }
     }
   };
 
-  // Add useEffect for feedback stats
+  // Add useEffect for feedback stats with caching
   useEffect(() => {
+    let isMounted = true;
+    
     if (activeTab === 'feedback') {
-      fetchFeedbackStats();
+      const loadFeedbackData = async () => {
+        if (!isMounted || !isMountedRef.current) return;
+        
+        try {
+          // Check cache first
+          const cached = getCachedData('feedback');
+          if (cached) {
+            setFeedbackStats(cached.feedbackStats);
+            return;
+          }
+          
+          // Fetch fresh data
+          await fetchFeedbackStats();
+        } catch (error) {
+          console.error('Error loading feedback data:', error);
+        }
+      };
+
+      loadFeedbackData();
     }
+    
+    return () => {
+      isMounted = false;
+    };
   }, [activeTab]);
 
   // Process borrowed items data for graph
@@ -1505,7 +1927,7 @@ export default function AdminPage() {
   useEffect(() => {
     if (activeTab === 'overview') {
       fetchBorrowedItemsForGraph();
-      const interval = setInterval(fetchBorrowedItemsForGraph, 30000); // Update every 30 seconds
+      const interval = setInterval(fetchBorrowedItemsForGraph, 60000); // Update every 60 seconds
       return () => clearInterval(interval);
     }
   }, [activeTab, timeRange]);
@@ -1518,6 +1940,26 @@ export default function AdminPage() {
   const handleAnalyticsEndDateChange = (e) => {
     setAnalyticsEndDate(e.target.value);
   };
+
+  // Cache cleanup effect to prevent memory leaks
+  useEffect(() => {
+    const cleanup = () => {
+      // Clean up data for tabs not currently active after a delay
+      Object.keys(tabCache).forEach(tabName => {
+        if (tabName !== activeTab) {
+          // Only clear cache for tabs that haven't been accessed recently
+          const timestamp = cacheTimestamps[tabName];
+          if (timestamp && (Date.now() - timestamp) > CACHE_DURATION) {
+            clearCache(tabName);
+          }
+        }
+      });
+    };
+
+    // Cleanup after a delay to allow for quick tab switching
+    const timeoutId = setTimeout(cleanup, 30000); // 30 seconds
+    return () => clearTimeout(timeoutId);
+  }, [activeTab, tabCache, cacheTimestamps]);
 
   if (isLoading && !isOverviewPolling) {
     return (
@@ -1540,6 +1982,12 @@ export default function AdminPage() {
               <div>
                 <h1 className="text-xl font-bold text-gray-800">Admin Dashboard</h1>
                 <p className="text-sm text-gray-600">Welcome, {user?.name || 'User'}</p>
+                {/* Cache status indicator for debugging */}
+                <p className="text-xs text-gray-400">
+                  Cache: {Object.keys(tabCache).length}/{MAX_CACHE_SIZE} tabs | 
+                  Active: {activeTab} | 
+                  Memory: {Math.round((JSON.stringify(tabCache).length / 1024) * 100) / 100}KB
+                </p>
               </div>
             </div>
             <button

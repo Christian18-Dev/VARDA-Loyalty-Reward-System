@@ -89,7 +89,7 @@ export default function CashierPage() {
     let pollInterval;
     if (activeTab === 'rewards') {
       fetchClaimed();
-      pollInterval = setInterval(fetchClaimed, 3000);
+      pollInterval = setInterval(fetchClaimed, 120000);
     }
     return () => {
       if (pollInterval) clearInterval(pollInterval);
