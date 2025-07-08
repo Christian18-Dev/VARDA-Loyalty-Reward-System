@@ -302,20 +302,26 @@ export default function AdminPage() {
               <div className="sm:flex sm:items-start">
                 <div 
                   className={`mx-auto flex-shrink-0 flex items-center justify-center h-16 w-16 rounded-full sm:mx-0 sm:h-14 sm:w-14 ${
-                    type === 'success' ? 'bg-green-100' : 'bg-red-100'
+                    type === 'success' ? 'bg-green-100' : 
+                    type === 'warning' ? 'bg-yellow-100' : 'bg-red-100'
                   }`}
                 >
                   {type === 'success' ? (
                     <svg className="h-8 w-8 text-green-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                       <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M5 13l4 4L19 7" />
                     </svg>
+                  ) : type === 'warning' ? (
+                    <ExclamationIcon className="h-8 w-8 text-yellow-600" aria-hidden="true" />
                   ) : (
                     <ExclamationIcon className="h-8 w-8 text-red-600" aria-hidden="true" />
                   )}
                 </div>
                 <div className="mt-4 text-center sm:mt-0 sm:ml-6 sm:text-left flex-1">
-                  <h3 className={`text-2xl font-bold ${type === 'success' ? 'text-green-700' : 'text-red-700'}`} id="modal-headline">
-                    {type === 'success' ? 'Success!' : 'Error'}
+                  <h3 className={`text-2xl font-bold ${
+                    type === 'success' ? 'text-green-700' : 
+                    type === 'warning' ? 'text-yellow-700' : 'text-red-700'
+                  }`} id="modal-headline">
+                    {type === 'success' ? 'Success!' : type === 'warning' ? 'Warning' : 'Error'}
                   </h3>
                   <div className="mt-4">
                     <p className="text-lg text-gray-700 whitespace-pre-line font-medium leading-relaxed">
@@ -331,6 +337,8 @@ export default function AdminPage() {
                 className={`w-full inline-flex justify-center rounded-xl border border-transparent shadow-sm px-6 py-3 text-lg font-semibold text-white focus:outline-none focus:ring-2 focus:ring-offset-2 transition-colors sm:ml-3 sm:w-auto ${
                   type === 'success' 
                     ? 'bg-green-600 hover:bg-green-700 focus:ring-green-500' 
+                    : type === 'warning'
+                    ? 'bg-yellow-600 hover:bg-yellow-700 focus:ring-yellow-500'
                     : 'bg-red-600 hover:bg-red-700 focus:ring-red-500'
                 }`}
               >
@@ -1301,6 +1309,11 @@ export default function AdminPage() {
       const queryParams = new URLSearchParams();
       if (startDate) queryParams.append('startDate', startDate);
       if (endDate) queryParams.append('endDate', endDate);
+      
+      // Add limit parameter based on format
+      const limit = format === 'pdf' ? 1000 : 5000;
+      queryParams.append('limit', limit);
+      
       const endpoint = type === 'borrowed' ? 'export/borrowed-items' : 'export/returned-items';
       
       // Add timeout to the request
@@ -1310,9 +1323,34 @@ export default function AdminPage() {
       });
       
       const data = res.data.data;
+      const totalCount = res.data.totalCount;
+      const limited = res.data.limited;
 
       if (!data || data.length === 0) {
         showStatusMessage('error', 'No data found for the selected date range');
+        return;
+      }
+
+      // Show warning if data was limited
+      if (limited && totalCount) {
+        console.warn(`[Export Debug] Data was limited: showing ${data.length} out of ${totalCount} total items`);
+        showStatusMessage('warning', `Showing ${data.length} out of ${totalCount} total items. Consider using a smaller date range for complete data.`);
+      }
+
+      // Add data validation and size limits for PDF generation
+      console.log(`[Export Debug] Processing ${data.length} items for ${type} export`);
+      
+      // Limit data size for PDF generation to prevent memory issues
+      const MAX_PDF_ITEMS = 1000; // Limit to 1000 items for PDF
+      const MAX_EXCEL_ITEMS = 10000; // Limit to 10000 items for Excel
+      
+      if (format === 'pdf' && data.length > MAX_PDF_ITEMS) {
+        showStatusMessage('error', `Too many items (${data.length}) for PDF export. Please use Excel format or reduce the date range. Maximum allowed: ${MAX_PDF_ITEMS} items.`);
+        return;
+      }
+      
+      if (format === 'excel' && data.length > MAX_EXCEL_ITEMS) {
+        showStatusMessage('error', `Too many items (${data.length}) for Excel export. Please reduce the date range. Maximum allowed: ${MAX_EXCEL_ITEMS} items.`);
         return;
       }
 
@@ -1428,6 +1466,52 @@ export default function AdminPage() {
             console.warn('Logo error:', logoError);
           }
 
+          // Validate data structure before PDF generation
+          const validData = data.filter(item => {
+            return item && 
+                   item.studentIdNumber && 
+                   item.items && 
+                   Array.isArray(item.items) && 
+                   item.borrowTime &&
+                   (type !== 'returned' || item.returnTime);
+          });
+
+          if (validData.length !== data.length) {
+            console.warn(`[Export Debug] Filtered out ${data.length - validData.length} invalid items`);
+          }
+
+          if (validData.length === 0) {
+            showStatusMessage('error', 'No valid data found for PDF generation');
+            return;
+          }
+
+          // Additional validation for array length issues
+          const problematicItems = validData.filter(item => {
+            return !item.items || 
+                   !Array.isArray(item.items) || 
+                   item.items.length === 0 ||
+                   item.items.some(subItem => !subItem || !subItem.name || !subItem.quantity);
+          });
+
+          if (problematicItems.length > 0) {
+            console.warn(`[Export Debug] Found ${problematicItems.length} items with problematic data structure`);
+            console.warn('[Export Debug] Sample problematic item:', problematicItems[0]);
+          }
+
+          // Clean data to prevent circular references and ensure all values are serializable
+          const cleanData = validData.map(item => ({
+            studentIdNumber: String(item.studentIdNumber || ''),
+            items: item.items.map(subItem => ({
+              name: String(subItem.name || ''),
+              quantity: Number(subItem.quantity || 0)
+            })),
+            borrowTime: item.borrowTime ? new Date(item.borrowTime).toISOString() : '',
+            returnTime: item.returnTime ? new Date(item.returnTime).toISOString() : '',
+            status: String(item.status || '')
+          }));
+
+          console.log(`[Export Debug] Generating PDF with ${cleanData.length} valid items`);
+
           const doc = (
             <Document>
               <Page size="A4" style={styles.page}>
@@ -1463,30 +1547,33 @@ export default function AdminPage() {
                       <Text style={styles.headerCell}>Status</Text>
                     </View>
                   </View>
-                  {data.map((item, index) => (
+                  {cleanData.map((item, index) => (
                     <View key={index} style={styles.tableRow}>
                       <View style={[styles.tableCol, { width: '25%' }]}>
-                        <Text style={styles.tableCell}>{item.studentIdNumber}</Text>
+                        <Text style={styles.tableCell}>{item.studentIdNumber || 'N/A'}</Text>
                       </View>
                       <View style={[styles.tableCol, { width: '35%' }]}>
                         <Text style={styles.tableCell}>
-                          {item.items.map(i => `${i.name} (x${i.quantity})`).join('; ')}
+                          {item.items && Array.isArray(item.items) 
+                            ? item.items.map(i => `${i.name || 'Unknown'} (x${i.quantity || 0})`).join('; ')
+                            : 'No items'
+                          }
                         </Text>
                       </View>
                       <View style={[styles.tableCol, { width: '25%' }]}>
                         <Text style={styles.tableCell}>
-                          {new Date(item.borrowTime).toLocaleString()}
+                          {item.borrowTime ? new Date(item.borrowTime).toLocaleString() : 'N/A'}
                         </Text>
                       </View>
                       {type === 'returned' && (
                         <View style={[styles.tableCol, { width: '25%' }]}>
                           <Text style={styles.tableCell}>
-                            {new Date(item.returnTime).toLocaleString()}
+                            {item.returnTime ? new Date(item.returnTime).toLocaleString() : 'N/A'}
                           </Text>
                         </View>
                       )}
                       <View style={[styles.tableCol, { width: '15%' }]}>
-                        <Text style={styles.tableCell}>{item.status}</Text>
+                        <Text style={styles.tableCell}>{item.status || 'N/A'}</Text>
                       </View>
                     </View>
                   ))}
@@ -1495,7 +1582,19 @@ export default function AdminPage() {
             </Document>
           );
 
-          const blob = await pdf(doc).toBlob();
+          console.log('[Export Debug] PDF document created, generating blob...');
+          
+          // Add additional error handling for PDF generation
+          let blob;
+          try {
+            blob = await pdf(doc).toBlob();
+            console.log('[Export Debug] PDF blob generated successfully');
+          } catch (pdfError) {
+            console.error('[Export Debug] PDF blob generation failed:', pdfError);
+            throw new Error(`PDF generation failed: ${pdfError.message}`);
+          }
+          
+          console.log('[Export Debug] Creating download...');
           const url = window.URL.createObjectURL(blob);
           const a = document.createElement('a');
           a.href = url;
@@ -1504,9 +1603,23 @@ export default function AdminPage() {
           a.click();
           window.URL.revokeObjectURL(url);
           document.body.removeChild(a);
+          console.log('[Export Debug] PDF download completed');
         } catch (error) {
           console.error('Error generating PDF:', error);
-          showStatusMessage('error', 'Error generating PDF file');
+          console.error('Error details:', {
+            message: error.message,
+            stack: error.stack,
+            dataLength: data.length
+          });
+          
+          // Provide more specific error messages
+          if (error.message.includes('Invalid array length')) {
+            showStatusMessage('error', 'PDF generation failed due to data size. Please try Excel format or reduce the date range.');
+          } else if (error.message.includes('PDF generation failed')) {
+            showStatusMessage('error', `PDF generation failed: ${error.message}`);
+          } else {
+            showStatusMessage('error', `Error generating PDF file: ${error.message}`);
+          }
         }
       }
     } catch (error) {
@@ -1523,27 +1636,26 @@ export default function AdminPage() {
         return;
       }
 
-      if (!borrowedItemsData || Object.keys(borrowedItemsData).length === 0) {
-        showStatusMessage('error', 'No analytics data available to export');
+      // Fetch fresh data for analytics export with breakdown
+      const queryParams = new URLSearchParams();
+      if (analyticsStartDate) queryParams.append('startDate', analyticsStartDate);
+      if (analyticsEndDate) queryParams.append('endDate', analyticsEndDate);
+      
+      const res = await axios.get(`${baseUrl}/api/admin/borrowed-history?${queryParams}`, {
+        headers: { Authorization: `Bearer ${token}` },
+        timeout: 30000
+      });
+      
+      const items = res.data.data;
+      if (!items || items.length === 0) {
+        showStatusMessage('error', 'No data found for the selected date range');
         return;
       }
 
-      // Filter data based on date range
-      const filteredData = {};
-      const start = new Date(analyticsStartDate);
-      start.setHours(0, 0, 0, 0); // Set to start of day
-      const end = new Date(analyticsEndDate);
-      end.setHours(23, 59, 59, 999); // Set to end of day
+      // Process data with individual item breakdown
+      const processedData = processBorrowedItemsDataWithBreakdown(items);
 
-      Object.entries(borrowedItemsData).forEach(([date, count]) => {
-        const currentDate = new Date(date);
-        currentDate.setHours(0, 0, 0, 0); // Normalize the current date to start of day
-        if (currentDate >= start && currentDate <= end) {
-          filteredData[date] = count;
-        }
-      });
-
-      if (Object.keys(filteredData).length === 0) {
+      if (Object.keys(processedData).length === 0) {
         showStatusMessage('error', 'No data found for the selected date range');
         return;
       }
@@ -1552,10 +1664,15 @@ export default function AdminPage() {
         const workbook = new ExcelJS.Workbook();
         const worksheet = workbook.addWorksheet('Borrowed Items Analytics');
         
-        // Add headers
+        // Add headers for individual items
         worksheet.columns = [
           { header: 'Date', key: 'date', width: 20 },
-          { header: 'Borrowed Items Count', key: 'count', width: 20 }
+          { header: 'Plate', key: 'Plate', width: 15 },
+          { header: 'Bowl', key: 'Bowl', width: 15 },
+          { header: 'Glass', key: 'Glass', width: 15 },
+          { header: 'Spoon', key: 'Spoon', width: 15 },
+          { header: 'Fork', key: 'Fork', width: 15 },
+          { header: 'Saucer', key: 'Saucer', width: 15 }
         ];
 
         // Style the header row
@@ -1585,12 +1702,46 @@ export default function AdminPage() {
           };
         });
 
-        // Add data rows
-        Object.entries(filteredData).forEach(([date, count]) => {
+        // Calculate totals
+        const totals = {
+          Plate: 0,
+          Bowl: 0,
+          Glass: 0,
+          Spoon: 0,
+          Fork: 0,
+          Saucer: 0
+        };
+
+        // Add data rows and calculate totals
+        Object.entries(processedData).forEach(([date, itemCounts]) => {
           worksheet.addRow({
             date: date,
-            count: count
+            Plate: itemCounts.Plate,
+            Bowl: itemCounts.Bowl,
+            Glass: itemCounts.Glass,
+            Spoon: itemCounts.Spoon,
+            Fork: itemCounts.Fork,
+            Saucer: itemCounts.Saucer
           });
+          
+          // Add to totals
+          totals.Plate += itemCounts.Plate;
+          totals.Bowl += itemCounts.Bowl;
+          totals.Glass += itemCounts.Glass;
+          totals.Spoon += itemCounts.Spoon;
+          totals.Fork += itemCounts.Fork;
+          totals.Saucer += itemCounts.Saucer;
+        });
+
+        // Add totals row
+        const totalsRow = worksheet.addRow({
+          date: 'TOTAL',
+          Plate: totals.Plate,
+          Bowl: totals.Bowl,
+          Glass: totals.Glass,
+          Spoon: totals.Spoon,
+          Fork: totals.Fork,
+          Saucer: totals.Saucer
         });
 
         // Style data rows
@@ -1603,7 +1754,7 @@ export default function AdminPage() {
               };
               cell.alignment = {
                 vertical: 'middle',
-                horizontal: 'left'
+                horizontal: 'center'
               };
               cell.border = {
                 top: { style: 'thin', color: { argb: 'bfbfbf' } },
@@ -1613,6 +1764,30 @@ export default function AdminPage() {
               };
             });
           }
+        });
+
+        // Style the totals row
+        totalsRow.eachCell((cell) => {
+          cell.font = { 
+            bold: true,
+            size: 11,
+            name: 'Helvetica-Bold'
+          };
+          cell.fill = {
+            type: 'pattern',
+            pattern: 'solid',
+            fgColor: { argb: 'e6e6e6' }
+          };
+          cell.alignment = {
+            vertical: 'middle',
+            horizontal: 'center'
+          };
+          cell.border = {
+            top: { style: 'thin', color: { argb: 'bfbfbf' } },
+            left: { style: 'thin', color: { argb: 'bfbfbf' } },
+            bottom: { style: 'thin', color: { argb: 'bfbfbf' } },
+            right: { style: 'thin', color: { argb: 'bfbfbf' } }
+          };
         });
 
         // Generate and download the Excel file
@@ -1644,23 +1819,100 @@ export default function AdminPage() {
               </View>
               <View style={styles.table}>
                 <View style={styles.tableRow}>
-                  <View style={[styles.tableCol, { width: '50%' }]}>
+                  <View style={[styles.tableCol, { width: '20%' }]}>
                     <Text style={styles.headerCell}>Date</Text>
                   </View>
-                  <View style={[styles.tableCol, { width: '50%' }]}>
-                    <Text style={styles.headerCell}>Borrowed Items Count</Text>
+                  <View style={[styles.tableCol, { width: '13%' }]}>
+                    <Text style={styles.headerCell}>Plate</Text>
+                  </View>
+                  <View style={[styles.tableCol, { width: '13%' }]}>
+                    <Text style={styles.headerCell}>Bowl</Text>
+                  </View>
+                  <View style={[styles.tableCol, { width: '13%' }]}>
+                    <Text style={styles.headerCell}>Glass</Text>
+                  </View>
+                  <View style={[styles.tableCol, { width: '13%' }]}>
+                    <Text style={styles.headerCell}>Spoon</Text>
+                  </View>
+                  <View style={[styles.tableCol, { width: '13%' }]}>
+                    <Text style={styles.headerCell}>Fork</Text>
+                  </View>
+                  <View style={[styles.tableCol, { width: '15%' }]}>
+                    <Text style={styles.headerCell}>Saucer</Text>
                   </View>
                 </View>
-                {Object.entries(filteredData).map(([date, count], index) => (
+                {Object.entries(processedData).map(([date, itemCounts], index) => (
                   <View key={index} style={styles.tableRow}>
-                    <View style={[styles.tableCol, { width: '50%' }]}>
+                    <View style={[styles.tableCol, { width: '20%' }]}>
                       <Text style={styles.tableCell}>{date}</Text>
                     </View>
-                    <View style={[styles.tableCol, { width: '50%' }]}>
-                      <Text style={styles.tableCell}>{count}</Text>
+                    <View style={[styles.tableCol, { width: '13%' }]}>
+                      <Text style={styles.tableCell}>{itemCounts.Plate}</Text>
+                    </View>
+                    <View style={[styles.tableCol, { width: '13%' }]}>
+                      <Text style={styles.tableCell}>{itemCounts.Bowl}</Text>
+                    </View>
+                    <View style={[styles.tableCol, { width: '13%' }]}>
+                      <Text style={styles.tableCell}>{itemCounts.Glass}</Text>
+                    </View>
+                    <View style={[styles.tableCol, { width: '13%' }]}>
+                      <Text style={styles.tableCell}>{itemCounts.Spoon}</Text>
+                    </View>
+                    <View style={[styles.tableCol, { width: '13%' }]}>
+                      <Text style={styles.tableCell}>{itemCounts.Fork}</Text>
+                    </View>
+                    <View style={[styles.tableCol, { width: '15%' }]}>
+                      <Text style={styles.tableCell}>{itemCounts.Saucer}</Text>
                     </View>
                   </View>
                 ))}
+                
+                {/* Totals Row */}
+                {(() => {
+                  const totals = {
+                    Plate: 0,
+                    Bowl: 0,
+                    Glass: 0,
+                    Spoon: 0,
+                    Fork: 0,
+                    Saucer: 0
+                  };
+                  
+                  Object.values(processedData).forEach(itemCounts => {
+                    totals.Plate += itemCounts.Plate;
+                    totals.Bowl += itemCounts.Bowl;
+                    totals.Glass += itemCounts.Glass;
+                    totals.Spoon += itemCounts.Spoon;
+                    totals.Fork += itemCounts.Fork;
+                    totals.Saucer += itemCounts.Saucer;
+                  });
+                  
+                  return (
+                    <View style={[styles.tableRow, { backgroundColor: '#f3f4f6' }]}>
+                      <View style={[styles.tableCol, { width: '20%' }]}>
+                        <Text style={[styles.tableCell, { fontWeight: 'bold' }]}>TOTAL</Text>
+                      </View>
+                      <View style={[styles.tableCol, { width: '13%' }]}>
+                        <Text style={[styles.tableCell, { fontWeight: 'bold' }]}>{totals.Plate}</Text>
+                      </View>
+                      <View style={[styles.tableCol, { width: '13%' }]}>
+                        <Text style={[styles.tableCell, { fontWeight: 'bold' }]}>{totals.Bowl}</Text>
+                      </View>
+                      <View style={[styles.tableCol, { width: '13%' }]}>
+                        <Text style={[styles.tableCell, { fontWeight: 'bold' }]}>{totals.Glass}</Text>
+                      </View>
+                      <View style={[styles.tableCol, { width: '13%' }]}>
+                        <Text style={[styles.tableCell, { fontWeight: 'bold' }]}>{totals.Spoon}</Text>
+                      </View>
+                      <View style={[styles.tableCol, { width: '13%' }]}>
+                        <Text style={[styles.tableCell, { fontWeight: 'bold' }]}>{totals.Fork}</Text>
+                      </View>
+                      <View style={[styles.tableCol, { width: '15%' }]}>
+                        <Text style={[styles.tableCell, { fontWeight: 'bold' }]}>{totals.Saucer}</Text>
+                      </View>
+                    </View>
+                  );
+                })()}
               </View>
             </Page>
           </Document>
@@ -1843,6 +2095,24 @@ export default function AdminPage() {
     const now = new Date();
     const data = {};
     
+    // Define the breakdown for sets
+    const setBreakdowns = {
+      'Basic Set': [
+        { name: 'Plate', quantity: 1 },
+        { name: 'Spoon', quantity: 1 },
+        { name: 'Fork', quantity: 1 }
+        // Note: Tray is not in the individual items list, so we'll skip it
+      ],
+      'Complete Set': [
+        { name: 'Plate', quantity: 1 },
+        { name: 'Bowl', quantity: 1 },
+        { name: 'Spoon', quantity: 1 },
+        { name: 'Fork', quantity: 1 },
+        { name: 'Glass', quantity: 1 }
+        // Note: Tray is not in the individual items list, so we'll skip it
+      ]
+    };
+    
     items.forEach(item => {
       const borrowDate = new Date(item.borrowTime);
       let key;
@@ -1854,8 +2124,8 @@ export default function AdminPage() {
           hour12: true
         });
       } else if (timeRange === 'day') {
-        // Group by day
-        key = borrowDate.toLocaleDateString();
+        // Group by day - use consistent date format
+        key = borrowDate.toISOString().split('T')[0];
       } else {
         // Group by month
         key = `${borrowDate.getFullYear()}-${borrowDate.getMonth() + 1}`;
@@ -1864,9 +2134,115 @@ export default function AdminPage() {
       if (!data[key]) {
         data[key] = 0;
       }
-      // Sum up the quantities of all items in this borrow record
-      const totalQuantity = item.items.reduce((sum, currentItem) => sum + currentItem.quantity, 0);
-      data[key] += totalQuantity;
+      
+      // Process each item in the borrow record with breakdown
+      item.items.forEach(borrowedItem => {
+        if (setBreakdowns[borrowedItem.name]) {
+          // This is a set, break it down into individual items
+          setBreakdowns[borrowedItem.name].forEach(breakdownItem => {
+            data[key] += breakdownItem.quantity * borrowedItem.quantity;
+          });
+        } else {
+          // This is an individual item
+          data[key] += borrowedItem.quantity;
+        }
+      });
+    });
+    
+    // Sort the data chronologically
+    const sortedData = {};
+    Object.keys(data)
+      .sort((a, b) => {
+        if (timeRange === 'hour') {
+          // Convert 12-hour format to 24-hour for sorting
+          const getHour = (timeStr) => {
+            const [time, period] = timeStr.split(' ');
+            const hour = parseInt(time);
+            return period === 'PM' && hour !== 12 ? hour + 12 : 
+                   period === 'AM' && hour === 12 ? 0 : hour;
+          };
+          // Sort in ascending order (earlier hours on left)
+          return getHour(a) - getHour(b);
+        } else if (timeRange === 'day') {
+          return new Date(a) - new Date(b);
+        } else {
+          const [yearA, monthA] = a.split('-').map(Number);
+          const [yearB, monthB] = b.split('-').map(Number);
+          return yearA === yearB ? monthA - monthB : yearA - yearB;
+        }
+      })
+      .forEach(key => {
+        sortedData[key] = data[key];
+      });
+    
+    return sortedData;
+  };
+
+  // New function to process borrowed items data with individual item breakdown
+  const processBorrowedItemsDataWithBreakdown = (items) => {
+    const data = {};
+    
+    // Define the breakdown for sets
+    const setBreakdowns = {
+      'Basic Set': [
+        { name: 'Plate', quantity: 1 },
+        { name: 'Spoon', quantity: 1 },
+        { name: 'Fork', quantity: 1 }
+        // Note: Tray is not in the individual items list, so we'll skip it
+      ],
+      'Complete Set': [
+        { name: 'Plate', quantity: 1 },
+        { name: 'Bowl', quantity: 1 },
+        { name: 'Spoon', quantity: 1 },
+        { name: 'Fork', quantity: 1 },
+        { name: 'Glass', quantity: 1 }
+        // Note: Tray is not in the individual items list, so we'll skip it
+      ]
+    };
+    
+    items.forEach(item => {
+      const borrowDate = new Date(item.borrowTime);
+      let key;
+      
+      if (timeRange === 'hour') {
+        // Group by hour, showing only time in 12-hour format
+        key = borrowDate.toLocaleString('en-US', {
+          hour: 'numeric',
+          hour12: true
+        });
+      } else if (timeRange === 'day') {
+        // Group by day - use consistent date format
+        key = borrowDate.toISOString().split('T')[0];
+      } else {
+        // Group by month
+        key = `${borrowDate.getFullYear()}-${borrowDate.getMonth() + 1}`;
+      }
+      
+      if (!data[key]) {
+        data[key] = {
+          'Plate': 0,
+          'Bowl': 0,
+          'Glass': 0,
+          'Spoon': 0,
+          'Fork': 0,
+          'Saucer': 0
+        };
+      }
+      
+      // Process each item in the borrow record
+      item.items.forEach(borrowedItem => {
+        if (setBreakdowns[borrowedItem.name]) {
+          // This is a set, break it down into individual items
+          setBreakdowns[borrowedItem.name].forEach(breakdownItem => {
+            data[key][breakdownItem.name] += breakdownItem.quantity * borrowedItem.quantity;
+          });
+        } else {
+          // This is an individual item
+          if (data[key].hasOwnProperty(borrowedItem.name)) {
+            data[key][borrowedItem.name] += borrowedItem.quantity;
+          }
+        }
+      });
     });
     
     // Sort the data chronologically
@@ -1908,15 +2284,41 @@ export default function AdminPage() {
         const today = new Date();
         const startOfDay = new Date(today.getFullYear(), today.getMonth(), today.getDate());
         const endOfDay = new Date(today.getFullYear(), today.getMonth(), today.getDate(), 23, 59, 59);
-        queryParams.append('startDate', startOfDay.toISOString());
-        queryParams.append('endDate', endOfDay.toISOString());
+        queryParams.append('startDate', startOfDay.toISOString().split('T')[0]);
+        queryParams.append('endDate', endOfDay.toISOString().split('T')[0]);
+      } else if (timeRange === 'day') {
+        // For daily view, fetch last 30 days by default, or use analytics date range if available
+        if (analyticsStartDate && analyticsEndDate) {
+          queryParams.append('startDate', analyticsStartDate);
+          queryParams.append('endDate', analyticsEndDate);
+        } else {
+          const thirtyDaysAgo = new Date();
+          thirtyDaysAgo.setDate(thirtyDaysAgo.getDate() - 30);
+          const today = new Date();
+          queryParams.append('startDate', thirtyDaysAgo.toISOString().split('T')[0]);
+          queryParams.append('endDate', today.toISOString().split('T')[0]);
+        }
+      } else if (timeRange === 'month') {
+        // For monthly view, fetch last 12 months by default, or use analytics date range if available
+        if (analyticsStartDate && analyticsEndDate) {
+          queryParams.append('startDate', analyticsStartDate);
+          queryParams.append('endDate', analyticsEndDate);
+        } else {
+          const twelveMonthsAgo = new Date();
+          twelveMonthsAgo.setMonth(twelveMonthsAgo.getMonth() - 12);
+          const today = new Date();
+          queryParams.append('startDate', twelveMonthsAgo.toISOString().split('T')[0]);
+          queryParams.append('endDate', today.toISOString().split('T')[0]);
+        }
       }
       
       const res = await axios.get(`${baseUrl}/api/admin/borrowed-history?${queryParams}`, {
         headers: { Authorization: `Bearer ${token}` },
       });
       const items = res.data.data;
+      
       const processedData = processBorrowedItemsData(items);
+      
       setBorrowedItemsData(processedData);
     } catch (err) {
       console.error('Error fetching borrowed items for graph:', err);
@@ -1930,7 +2332,7 @@ export default function AdminPage() {
       const interval = setInterval(fetchBorrowedItemsForGraph, 60000); // Update every 60 seconds
       return () => clearInterval(interval);
     }
-  }, [activeTab, timeRange]);
+  }, [activeTab, timeRange, analyticsStartDate, analyticsEndDate]);
 
   // Add new handlers for analytics date changes
   const handleAnalyticsStartDateChange = (e) => {
@@ -1940,6 +2342,17 @@ export default function AdminPage() {
   const handleAnalyticsEndDateChange = (e) => {
     setAnalyticsEndDate(e.target.value);
   };
+
+  // Auto-sync graph when both analytics dates are set
+  useEffect(() => {
+    if (analyticsStartDate && analyticsEndDate && activeTab === 'overview') {
+      // Small delay to ensure state is updated
+      const timer = setTimeout(() => {
+        fetchBorrowedItemsForGraph();
+      }, 100);
+      return () => clearTimeout(timer);
+    }
+  }, [analyticsStartDate, analyticsEndDate, activeTab]);
 
   // Cache cleanup effect to prevent memory leaks
   useEffect(() => {
@@ -2495,7 +2908,18 @@ export default function AdminPage() {
             {/* Borrowed Items Graph */}
             <div className="bg-white rounded-xl border border-gray-200 p-6">
               <div className="flex justify-between items-center mb-6">
-                <h3 className="text-lg font-semibold text-gray-800">Borrow Graph</h3>
+                <div>
+                  <h3 className="text-lg font-semibold text-gray-800">Borrow Graph</h3>
+                  {analyticsStartDate && analyticsEndDate ? (
+                    <p className="text-sm text-green-600 mt-1">
+                      ✓ Showing data from {new Date(analyticsStartDate).toLocaleDateString()} to {new Date(analyticsEndDate).toLocaleDateString()}
+                    </p>
+                  ) : (
+                    <p className="text-sm text-gray-500 mt-1">
+                      Showing default range ({timeRange === 'hour' ? 'today' : timeRange === 'day' ? 'last 30 days' : 'last 12 months'})
+                    </p>
+                  )}
+                </div>
                 <div className="flex space-x-2">
                   <button
                     onClick={() => setTimeRange('hour')}
@@ -2556,7 +2980,13 @@ export default function AdminPage() {
                       y: {
                         beginAtZero: true,
                         ticks: {
-                          stepSize: 1,
+                          maxTicksLimit: 10,
+                          callback: function(value, index, values) {
+                            // Calculate appropriate step size based on data range
+                            const maxValue = Math.max(...Object.values(borrowedItemsData));
+                            const stepSize = Math.max(1, Math.ceil(maxValue / 10));
+                            return value % stepSize === 0 ? value : '';
+                          },
                         },
                       },
                     },
@@ -3451,7 +3881,7 @@ export default function AdminPage() {
                   </svg>
                   <h3 className="text-lg font-semibold text-gray-800">Analytics</h3>
                 </div>
-                <p className="text-gray-600 mb-4">Export the borrowed data from the Overview tab.</p>
+                <p className="text-gray-600 mb-4">Export the borrowed data from the Overview tab. Use "Sync Graph" to update the borrow graph with the selected date range.</p>
                 
                 {/* Date Range Inputs */}
                 <div className="grid grid-cols-2 gap-4 mb-4">
@@ -3475,7 +3905,7 @@ export default function AdminPage() {
                   </div>
                 </div>
 
-                <div className="grid grid-cols-2 gap-4">
+                <div className="grid grid-cols-3 gap-4">
                   <button
                     onClick={() => handleExportAnalytics('excel')}
                     className="w-full px-4 py-3 bg-purple-600 text-white rounded-xl hover:bg-purple-700 flex items-center justify-center space-x-2 transition-all transform hover:scale-105"
@@ -3493,6 +3923,22 @@ export default function AdminPage() {
                       <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M7 21h10a2 2 0 002-2V9.414a1 1 0 00-.293-.707l-5.414-5.414A1 1 0 0012.586 3H7a2 2 0 00-2 2v14a2 2 0 002 2z" />
                     </svg>
                     <span>PDF</span>
+                  </button>
+                  <button
+                    onClick={() => {
+                      if (analyticsStartDate && analyticsEndDate) {
+                        fetchBorrowedItemsForGraph();
+                        showStatusMessage('success', 'Graph updated with selected date range');
+                      } else {
+                        showStatusMessage('error', 'Please select both start and end dates first');
+                      }
+                    }}
+                    className="w-full px-4 py-3 bg-green-600 text-white rounded-xl hover:bg-green-700 flex items-center justify-center space-x-2 transition-all transform hover:scale-105"
+                  >
+                    <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15" />
+                    </svg>
+                    <span>Sync Graph</span>
                   </button>
                 </div>
               </div>

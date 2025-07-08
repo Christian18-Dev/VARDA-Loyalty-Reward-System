@@ -247,14 +247,36 @@ export const getBorrowedItemHistory = async (req, res) => {
     let query = {};
 
     if (startDate && endDate) {
+      // Create UTC dates to avoid timezone issues
+      const start = new Date(startDate + 'T00:00:00.000Z');
+      const end = new Date(endDate + 'T23:59:59.999Z');
+
+      // Validate dates before using toISOString()
+      if (isNaN(start.getTime()) || isNaN(end.getTime())) {
+        return res.status(400).json({
+          success: false,
+          message: 'Invalid date format provided'
+        });
+      }
+
+      console.log('Query date range:', {
+        start: start.toISOString(),
+        end: end.toISOString()
+      });
+
       query.borrowTime = {
-        $gte: new Date(startDate),
-        $lte: new Date(endDate)
+        $gte: start,
+        $lte: end
       };
     }
 
     const history = await BorrowedItemHistory.find(query)
       .sort({ borrowTime: -1 });
+    
+    console.log('Found items:', history.length);
+    if (history.length > 0) {
+      console.log('Sample item borrow time:', history[0].borrowTime);
+    }
     
     res.status(200).json({
       success: true,
@@ -275,15 +297,37 @@ export const getReturnedItemHistory = async (req, res) => {
     let query = {};
 
     if (startDate && endDate) {
+      // Create UTC dates to avoid timezone issues
+      const start = new Date(startDate + 'T00:00:00.000Z');
+      const end = new Date(endDate + 'T23:59:59.999Z');
+
+      // Validate dates before using toISOString()
+      if (isNaN(start.getTime()) || isNaN(end.getTime())) {
+        return res.status(400).json({
+          success: false,
+          message: 'Invalid date format provided'
+        });
+      }
+
+      console.log('Query date range:', {
+        start: start.toISOString(),
+        end: end.toISOString()
+      });
+
       query.returnTime = {
-        $gte: new Date(startDate),
-        $lte: new Date(endDate)
+        $gte: start,
+        $lte: end
       };
     }
 
     const history = await ReturnedItemHistory.find(query)
       .sort({ returnTime: -1 })
       .limit(1000);
+    
+    console.log('Found items:', history.length);
+    if (history.length > 0) {
+      console.log('Sample item return time:', history[0].returnTime);
+    }
     
     res.status(200).json({
       success: true,
