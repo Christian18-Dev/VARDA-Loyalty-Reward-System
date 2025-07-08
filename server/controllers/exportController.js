@@ -21,11 +21,6 @@ export const exportBorrowedItems = async (req, res) => {
         });
       }
 
-      console.log('Query date range:', {
-        start: start.toISOString(),
-        end: end.toISOString()
-      });
-
       query.borrowTime = {
         $gte: start,
         $lte: end
@@ -59,11 +54,6 @@ export const exportBorrowedItems = async (req, res) => {
                returnedItem.items[0].name === borrowedItem.items[0].name;
       });
     });
-
-    console.log('Found items:', activeBorrowedItems.length);
-    if (activeBorrowedItems.length > 0) {
-      console.log('Sample item borrow time:', activeBorrowedItems[0].borrowTime);
-    }
 
     // Get total count for information
     const totalCount = await BorrowedItemHistory.countDocuments(query);
@@ -107,11 +97,6 @@ export const exportReturnedItems = async (req, res) => {
         });
       }
 
-      console.log('Query date range:', {
-        start: start.toISOString(),
-        end: end.toISOString()
-      });
-
       query.returnTime = {
         $gte: start,
         $lte: end
@@ -125,11 +110,6 @@ export const exportReturnedItems = async (req, res) => {
       .sort({ returnTime: -1 })
       .limit(parsedLimit)
       .lean(); // Use lean() for better performance
-
-    console.log('Found items:', returnedItems.length);
-    if (returnedItems.length > 0) {
-      console.log('Sample item return time:', returnedItems[0].returnTime);
-    }
 
     // Get total count for information
     const totalCount = await ReturnedItemHistory.countDocuments(query);
