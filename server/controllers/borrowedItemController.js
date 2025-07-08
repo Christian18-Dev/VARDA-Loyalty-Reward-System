@@ -259,11 +259,6 @@ export const getBorrowedItemHistory = async (req, res) => {
         });
       }
 
-      console.log('Query date range:', {
-        start: start.toISOString(),
-        end: end.toISOString()
-      });
-
       query.borrowTime = {
         $gte: start,
         $lte: end
@@ -272,11 +267,6 @@ export const getBorrowedItemHistory = async (req, res) => {
 
     const history = await BorrowedItemHistory.find(query)
       .sort({ borrowTime: -1 });
-    
-    console.log('Found items:', history.length);
-    if (history.length > 0) {
-      console.log('Sample item borrow time:', history[0].borrowTime);
-    }
     
     res.status(200).json({
       success: true,
@@ -309,11 +299,6 @@ export const getReturnedItemHistory = async (req, res) => {
         });
       }
 
-      console.log('Query date range:', {
-        start: start.toISOString(),
-        end: end.toISOString()
-      });
-
       query.returnTime = {
         $gte: start,
         $lte: end
@@ -323,11 +308,6 @@ export const getReturnedItemHistory = async (req, res) => {
     const history = await ReturnedItemHistory.find(query)
       .sort({ returnTime: -1 })
       .limit(1000);
-    
-    console.log('Found items:', history.length);
-    if (history.length > 0) {
-      console.log('Sample item return time:', history[0].returnTime);
-    }
     
     res.status(200).json({
       success: true,
