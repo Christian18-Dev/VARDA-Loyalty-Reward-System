@@ -79,7 +79,10 @@ export const createBorrowedItem = async (req, res) => {
     });
 
     await borrowedItem.save();
-    console.log('Created borrowed item record for student:', user.idNumber, 'with orderId:', orderId);
+    
+    // Format items for logging
+    const itemsList = items.map(item => `${item.name} (x${item.quantity})`).join(', ');
+    console.log('Created borrowed item record for student:', user.idNumber, 'with orderId:', orderId, 'Items:', itemsList);
 
     // Clear cache after new borrow
     clearCache();
