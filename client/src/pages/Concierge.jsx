@@ -688,7 +688,7 @@ export default function ConciergePage() {
                   <Text style={styles.tableCell}>{item.items.map(i => `${i.name} (x${i.quantity})`).join('; ')}</Text>
                 </View>
                 <View style={[styles.tableCol, { width: columnWidths.borrowTime }]}>
-                  <Text style={styles.tableCell}>{new Date(item.borrowTime).toLocaleString()}</Text>
+                  <Text style={styles.tableCell}>{new Date(item.borrowTime).toLocaleString('en-US', { timeZone: 'Asia/Manila' })}</Text>
                 </View>
                 {type === 'returned' && (
                   <View style={[styles.tableCol, { width: columnWidths.returnTime }]}>
@@ -856,8 +856,8 @@ export default function ConciergePage() {
               studentId: item.studentIdNumber,
               orderId: item.orderId || 'N/A',
               items: item.items.map(i => `${i.name} (x${i.quantity})`).join('; '),
-              borrowTime: new Date(item.borrowTime).toLocaleString(),
-              returnTime: type === 'returned' ? new Date(item.returnTime).toLocaleString() : undefined
+              borrowTime: new Date(item.borrowTime).toLocaleString('en-US', { timeZone: 'Asia/Manila' }),
+                              returnTime: type === 'returned' ? new Date(item.returnTime).toLocaleString('en-US', { timeZone: 'Asia/Manila' }) : undefined
             };
             
             const row = worksheet.addRow(rowData);
@@ -1393,7 +1393,7 @@ export default function ConciergePage() {
                         ))}
                       </td>
                       <td className="px-4 sm:px-6 py-4 whitespace-nowrap text-sm text-gray-500">
-                        {new Date(item.borrowTime).toLocaleString()}
+                        {new Date(item.borrowTime).toLocaleString('en-US', { timeZone: 'Asia/Manila' })}
                       </td>
                       <td className="px-4 sm:px-6 py-4 whitespace-nowrap text-sm text-gray-500">
                         <span className={`px-2 inline-flex text-xs leading-5 font-semibold rounded-full bg-yellow-100 text-yellow-800`}>
@@ -1526,10 +1526,10 @@ export default function ConciergePage() {
                         ))}
                       </td>
                       <td className="px-4 sm:px-6 py-4 whitespace-nowrap text-sm text-gray-500">
-                        {new Date(item.borrowTime).toLocaleString()}
+                        {new Date(item.borrowTime).toLocaleString('en-US', { timeZone: 'Asia/Manila' })}
                       </td>
                       <td className="px-4 sm:px-6 py-4 whitespace-nowrap text-sm text-gray-500">
-                        {new Date(item.returnTime).toLocaleString()}
+                        {new Date(item.returnTime).toLocaleString('en-US', { timeZone: 'Asia/Manila' })}
                       </td>
                       <td className="px-4 sm:px-6 py-4 whitespace-nowrap text-sm text-gray-500">
                         <span className="px-2 inline-flex text-xs leading-5 font-semibold rounded-full bg-green-100 text-green-800">

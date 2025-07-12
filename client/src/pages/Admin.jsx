@@ -1221,13 +1221,14 @@ export default function AdminPage() {
       );
     }
 
-    // Format date for display
+    // Format date for display (Philippine Time)
     const formatDate = (dateString) => {
       const date = new Date(dateString);
       return date.toLocaleDateString('en-US', { 
         year: 'numeric', 
         month: 'long', 
-        day: 'numeric' 
+        day: 'numeric',
+        timeZone: 'Asia/Manila'
       });
     };
 
@@ -1283,11 +1284,11 @@ export default function AdminPage() {
                   <Text style={styles.tableCell}>{item.items.map(i => `${i.name} (x${i.quantity})`).join('; ')}</Text>
                 </View>
                 <View style={[styles.tableCol, { width: columnWidths.borrowTime }]}>
-                  <Text style={styles.tableCell}>{new Date(item.borrowTime).toLocaleString()}</Text>
+                  <Text style={styles.tableCell}>{new Date(item.borrowTime).toLocaleString('en-US', { timeZone: 'Asia/Manila' })}</Text>
                 </View>
                 {type === 'returned' && (
                   <View style={[styles.tableCol, { width: columnWidths.returnTime }]}>
-                    <Text style={styles.tableCell}>{new Date(item.returnTime).toLocaleString()}</Text>
+                    <Text style={styles.tableCell}>{new Date(item.returnTime).toLocaleString('en-US', { timeZone: 'Asia/Manila' })}</Text>
                   </View>
                 )}
               </View>
@@ -1410,8 +1411,8 @@ export default function AdminPage() {
               studentId: item.studentIdNumber,
               orderId: item.orderId || 'N/A',
               items: item.items.map(i => `${i.name} (x${i.quantity})`).join('; '),
-              borrowTime: new Date(item.borrowTime).toLocaleString(),
-              returnTime: type === 'returned' ? new Date(item.returnTime).toLocaleString() : undefined
+              borrowTime: new Date(item.borrowTime).toLocaleString('en-US', { timeZone: 'Asia/Manila' }),
+              returnTime: type === 'returned' ? new Date(item.returnTime).toLocaleString('en-US', { timeZone: 'Asia/Manila' }) : undefined
             });
           });
 
@@ -1562,7 +1563,7 @@ export default function AdminPage() {
                       </View>
                       <View style={[styles.tableCol, { width: '25%' }]}>
                         <Text style={styles.tableCell}>
-                          {item.borrowTime ? new Date(item.borrowTime).toLocaleString() : 'N/A'}
+                          {item.borrowTime ? new Date(item.borrowTime).toLocaleString('en-US', { timeZone: 'Asia/Manila' }) : 'N/A'}
                         </Text>
                       </View>
                       {type === 'returned' && (
@@ -1814,7 +1815,7 @@ export default function AdminPage() {
                 )}
                 <Text style={styles.title}>Borrowed Items Analytics</Text>
                 <Text style={styles.subtitle}>
-                  {`From ${new Date(analyticsStartDate).toLocaleDateString()} to ${new Date(analyticsEndDate).toLocaleDateString()}`}
+                  {`From ${new Date(analyticsStartDate).toLocaleDateString('en-US', { timeZone: 'Asia/Manila' })} to ${new Date(analyticsEndDate).toLocaleDateString('en-US', { timeZone: 'Asia/Manila' })}`}
                 </Text>
               </View>
               <View style={styles.table}>
@@ -2118,17 +2119,19 @@ export default function AdminPage() {
       let key;
       
       if (timeRange === 'hour') {
-        // Group by hour, showing only time in 12-hour format
+        // Group by hour, showing only time in 12-hour format (Philippine Time)
         key = borrowDate.toLocaleString('en-US', {
           hour: 'numeric',
-          hour12: true
+          hour12: true,
+          timeZone: 'Asia/Manila'
         });
       } else if (timeRange === 'day') {
-        // Group by day - use consistent date format
-        key = borrowDate.toISOString().split('T')[0];
+        // Group by day - use Philippine Time date format
+        key = borrowDate.toLocaleDateString('en-CA', { timeZone: 'Asia/Manila' });
       } else {
-        // Group by month
-        key = `${borrowDate.getFullYear()}-${borrowDate.getMonth() + 1}`;
+        // Group by month (Philippine Time)
+        const phDate = new Date(borrowDate.toLocaleString('en-US', { timeZone: 'Asia/Manila' }));
+        key = `${phDate.getFullYear()}-${phDate.getMonth() + 1}`;
       }
       
       if (!data[key]) {
@@ -2205,17 +2208,19 @@ export default function AdminPage() {
       let key;
       
       if (timeRange === 'hour') {
-        // Group by hour, showing only time in 12-hour format
+        // Group by hour, showing only time in 12-hour format (Philippine Time)
         key = borrowDate.toLocaleString('en-US', {
           hour: 'numeric',
-          hour12: true
+          hour12: true,
+          timeZone: 'Asia/Manila'
         });
       } else if (timeRange === 'day') {
-        // Group by day - use consistent date format
-        key = borrowDate.toISOString().split('T')[0];
+        // Group by day - use Philippine Time date format
+        key = borrowDate.toLocaleDateString('en-CA', { timeZone: 'Asia/Manila' });
       } else {
-        // Group by month
-        key = `${borrowDate.getFullYear()}-${borrowDate.getMonth() + 1}`;
+        // Group by month (Philippine Time)
+        const phDate = new Date(borrowDate.toLocaleString('en-US', { timeZone: 'Asia/Manila' }));
+        key = `${phDate.getFullYear()}-${phDate.getMonth() + 1}`;
       }
       
       if (!data[key]) {
@@ -2912,7 +2917,7 @@ export default function AdminPage() {
                   <h3 className="text-lg font-semibold text-gray-800">Borrow Graph</h3>
                   {analyticsStartDate && analyticsEndDate ? (
                     <p className="text-sm text-green-600 mt-1">
-                      ✓ Showing data from {new Date(analyticsStartDate).toLocaleDateString()} to {new Date(analyticsEndDate).toLocaleDateString()}
+                      ✓ Showing data from {new Date(analyticsStartDate).toLocaleDateString('en-US', { timeZone: 'Asia/Manila' })} to {new Date(analyticsEndDate).toLocaleDateString('en-US', { timeZone: 'Asia/Manila' })}
                     </p>
                   ) : (
                     <p className="text-sm text-gray-500 mt-1">
@@ -3443,7 +3448,7 @@ export default function AdminPage() {
                         ))}
                       </td>
                       <td className="px-4 sm:px-6 py-4 whitespace-nowrap text-sm text-gray-500">
-                        {new Date(item.borrowTime).toLocaleString()}
+                        {new Date(item.borrowTime).toLocaleString('en-US', { timeZone: 'Asia/Manila' })}
                       </td>
                       <td className="px-4 sm:px-6 py-4 whitespace-nowrap text-sm text-gray-500">
                         <span className={`px-2 inline-flex text-xs leading-5 font-semibold rounded-full bg-yellow-100 text-yellow-800`}>
@@ -3565,10 +3570,10 @@ export default function AdminPage() {
                         ))}
                       </td>
                       <td className="px-4 sm:px-6 py-4 whitespace-nowrap text-sm text-gray-500">
-                        {new Date(item.borrowTime).toLocaleString()}
+                        {new Date(item.borrowTime).toLocaleString('en-US', { timeZone: 'Asia/Manila' })}
                       </td>
                       <td className="px-4 sm:px-6 py-4 whitespace-nowrap text-sm text-gray-500">
-                        {new Date(item.returnTime).toLocaleString()}
+                        {new Date(item.returnTime).toLocaleString('en-US', { timeZone: 'Asia/Manila' })}
                       </td>
                       <td className="px-4 sm:px-6 py-4 whitespace-nowrap text-sm text-gray-500">
                         <span className="px-2 inline-flex text-xs leading-5 font-semibold rounded-full bg-green-100 text-green-800">

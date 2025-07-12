@@ -622,7 +622,7 @@ export default function StudentPage() {
                       <div className="flex items-center space-x-4">
                         <div>
                           <h4 className="font-medium text-gray-200">{item.items.map(i => i.name).join(', ')}</h4>
-                          <p className="text-sm text-gray-400">Borrowed on: {new Date(item.borrowTime).toLocaleString()}</p>
+                          <p className="text-sm text-gray-400">Borrowed on: {new Date(item.borrowTime).toLocaleString('en-US', { timeZone: 'Asia/Manila' })}</p>
                         </div>
                       </div>
                       <button

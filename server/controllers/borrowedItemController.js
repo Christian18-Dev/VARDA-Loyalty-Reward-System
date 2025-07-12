@@ -250,9 +250,9 @@ export const getBorrowedItemHistory = async (req, res) => {
     let query = {};
 
     if (startDate && endDate) {
-      // Create UTC dates to avoid timezone issues
-      const start = new Date(startDate + 'T00:00:00.000Z');
-      const end = new Date(endDate + 'T23:59:59.999Z');
+      // Create Philippine Time dates (UTC+8)
+      const start = new Date(startDate + 'T00:00:00+08:00');
+      const end = new Date(endDate + 'T23:59:59+08:00');
 
       // Validate dates before using toISOString()
       if (isNaN(start.getTime()) || isNaN(end.getTime())) {
@@ -290,9 +290,9 @@ export const getReturnedItemHistory = async (req, res) => {
     let query = {};
 
     if (startDate && endDate) {
-      // Create UTC dates to avoid timezone issues
-      const start = new Date(startDate + 'T00:00:00.000Z');
-      const end = new Date(endDate + 'T23:59:59.999Z');
+      // Create Philippine Time dates (UTC+8)
+      const start = new Date(startDate + 'T00:00:00+08:00');
+      const end = new Date(endDate + 'T23:59:59+08:00');
 
       // Validate dates before using toISOString()
       if (isNaN(start.getTime()) || isNaN(end.getTime())) {
