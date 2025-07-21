@@ -361,23 +361,9 @@ export default function AdminPage() {
   // Optimized fetchData function with caching and memory management
   const fetchData = async (page = 1, search = '', forceRefresh = false) => {
     const tabName = 'overview';
-    
-    // Check cache first (unless force refresh)
-    if (!forceRefresh) {
-      const cached = getCachedData(tabName);
-      if (cached) {
-        // Use cached data and update legacy state
-        setStats(cached.stats || {});
-        setUsers(cached.users || []);
-        setClaimedRewards(cached.claimedRewards || []);
-        setAvailableRewards(cached.availableRewards || []);
-        setTotalBorrowedItems(cached.totalBorrowedItems || 0);
-        setCurrentPage(cached.currentPage || 1);
-        setTotalPages(cached.totalPages || 1);
-        setTotalUsers(cached.totalUsers || 0);
-        return cached;
-      }
-    }
+
+    // --- REMOVE CACHING FOR USERS ---
+    // Always fetch fresh user data for each page/search
 
     try {
       // Only show loading state for initial load or user search, not during polling
@@ -386,6 +372,9 @@ export default function AdminPage() {
       } else if (search) {
         setIsPageLoading(true);
       }
+
+      // Debug log
+      console.log('[fetchData] Fetching users for page:', page, 'search:', search);
 
       // Use AbortController to prevent memory leaks
       const controller = new AbortController();
@@ -427,10 +416,17 @@ export default function AdminPage() {
         claimedRewards: claimedRes.status === 'fulfilled' ? (claimedRes.value.data.claimedRewards || []) : [],
         availableRewards: rewardsRes.status === 'fulfilled' ? rewardsRes.value.data : [],
         totalBorrowedItems: borrowedRes.status === 'fulfilled' ? borrowedRes.value.data.data.length : 0,
-        currentPage: usersRes.status === 'fulfilled' ? usersRes.value.data.currentPage : 1,
+        // currentPage: usersRes.status === 'fulfilled' ? usersRes.value.data.currentPage : 1, // Do not set currentPage from API
         totalPages: usersRes.status === 'fulfilled' ? usersRes.value.data.totalPages : 1,
         totalUsers: usersRes.status === 'fulfilled' ? usersRes.value.data.totalUsers : 0
       };
+
+      // Debug log API response for users
+      if (usersRes.status === 'fulfilled') {
+        console.log('[fetchData] API users response:', usersRes.value.data);
+      } else {
+        console.log('[fetchData] API users response error:', usersRes.reason);
+      }
 
       // Update legacy state for backward compatibility
       setStats(processedData.stats);
@@ -438,12 +434,12 @@ export default function AdminPage() {
       setClaimedRewards(processedData.claimedRewards);
       setAvailableRewards(processedData.availableRewards);
       setTotalBorrowedItems(processedData.totalBorrowedItems);
-      setCurrentPage(processedData.currentPage);
+      // setCurrentPage(processedData.currentPage); // Do not set currentPage from API
       setTotalPages(processedData.totalPages);
       setTotalUsers(processedData.totalUsers);
 
-      // Cache the processed data
-      setCachedData(tabName, processedData);
+      // Do not cache users list for paginated data
+      // setCachedData(tabName, processedData);
 
       return processedData;
     } catch (error) {
@@ -451,7 +447,7 @@ export default function AdminPage() {
         console.log('Request was aborted due to timeout');
       } else {
         console.error("Error fetching data:", error);
-        setError("Failed to fetch data. Please try again.");
+        // setError("Failed to fetch data. Please try again."); // Remove this line to prevent popup
       }
     } finally {
       // Only clear loading states if we're not in polling mode and component is mounted
@@ -536,14 +532,21 @@ export default function AdminPage() {
   // Add page change handler
   const handlePageChange = (newPage) => {
     setCurrentPage(newPage);
-    fetchData(newPage, searchTerm);
   };
 
   // Add search input handler
   const handleSearch = (e) => {
     setSearchTerm(e.target.value);
-    setCurrentPage(1);
+    setCurrentPage(1); // Always reset to first page on new search
   };
+
+  // Debounced effect for pagination and search
+  useEffect(() => {
+    const timer = setTimeout(() => {
+      fetchData(currentPage, searchTerm);
+    }, 500);
+    return () => clearTimeout(timer);
+  }, [searchTerm, currentPage]);
 
   const handleCreateReward = async () => {
     if (!rewards.name.trim() || !rewards.cost || !rewards.description.trim()) {
@@ -868,7 +871,7 @@ export default function AdminPage() {
         console.log('Borrowed items request was aborted');
       } else {
         console.error('Error fetching borrowed items:', err);
-        setError('Failed to fetch borrowed items');
+        // setError('Failed to fetch borrowed items'); // Remove this line to prevent popup
       }
     }
   };
@@ -2559,7 +2562,7 @@ export default function AdminPage() {
         )}
       </AnimatePresence>
 
-      {/* Logout Confirmation Modal */}
+      {/* Success Modal */}
       <AnimatePresence>
         {showLogoutModal && (
           <div className="fixed inset-0 z-[100] overflow-y-auto">

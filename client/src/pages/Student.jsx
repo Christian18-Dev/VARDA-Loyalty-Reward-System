@@ -105,6 +105,8 @@ export default function StudentPage() {
   const [showFeedbackForm, setShowFeedbackForm] = useState(false);
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [isReturning, setIsReturning] = useState(false);
+  const [showReviewModal, setShowReviewModal] = useState(false);
+  const [reviewItems, setReviewItems] = useState([]);
 
   const baseUrl = import.meta.env.VITE_API_BASE_URL;
   const token = user.token;
@@ -608,34 +610,43 @@ export default function StudentPage() {
               <motion.div 
                 initial={{ opacity: 0, y: 20 }}
                 animate={{ opacity: 1, y: 0 }}
-                className="mt-8 bg-[#1e293b] p-6 rounded-2xl shadow-lg border border-gray-700/50"
+                className="mt-8"
               >
-                <h3 className="text-xl font-semibold text-gray-200 mb-4">Your Borrowed Items</h3>
-                <div className="space-y-4">
-                  {borrowedItems.map((item) => (
-                    <motion.div 
-                      key={item._id}
-                      initial={{ opacity: 0, y: 20 }}
-                      animate={{ opacity: 1, y: 0 }}
-                      className="flex items-center justify-between p-4 bg-gray-800/50 rounded-xl"
-                    >
-                      <div className="flex items-center space-x-4">
-                        <div>
-                          <h4 className="font-medium text-gray-200">{item.items.map(i => i.name).join(', ')}</h4>
-                          <p className="text-sm text-gray-400">Borrowed on: {new Date(item.borrowTime).toLocaleString('en-US', { timeZone: 'Asia/Manila' })}</p>
-                        </div>
-                      </div>
-                      <button
-                        onClick={() => handleReturn(item)}
-                        disabled={isReturning}
-                        className={`px-4 py-2 bg-green-600 text-white rounded-lg hover:bg-green-700 transition-colors ${
-                          isReturning ? 'opacity-50 cursor-not-allowed' : ''
-                        }`}
+                {/* Reminder Banner */}
+                <div className="mb-4 p-4 rounded-xl bg-gradient-to-r from-blue-700 via-purple-700 to-blue-800 shadow-md border border-blue-600/40 flex items-center">
+                  <svg xmlns="http://www.w3.org/2000/svg" className="h-6 w-6 text-blue-300 mr-3 flex-shrink-0" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M13 16h-1v-4h-1m1-4h.01M12 20a8 8 0 100-16 8 8 0 000 16z" />
+                  </svg>
+                  <span className="text-blue-100 font-medium text-base">Reminder: Please Click the Return Button once you are done using the items.</span>
+                </div>
+                <div className="bg-[#1e293b] p-6 rounded-2xl shadow-lg border border-gray-700/50">
+                  <h3 className="text-xl font-semibold text-gray-200 mb-4">Your Borrowed Items</h3>
+                  <div className="space-y-4">
+                    {borrowedItems.map((item) => (
+                      <motion.div 
+                        key={item._id}
+                        initial={{ opacity: 0, y: 20 }}
+                        animate={{ opacity: 1, y: 0 }}
+                        className="flex items-center justify-between p-4 bg-gray-800/50 rounded-xl"
                       >
-                        {isReturning ? 'Processing...' : 'Return'}
-                      </button>
-                    </motion.div>
-                  ))}
+                        <div className="flex items-center space-x-4">
+                          <div>
+                            <h4 className="font-medium text-gray-200">{item.items.map(i => i.name).join(', ')}</h4>
+                            <p className="text-sm text-gray-400">Borrowed on: {new Date(item.borrowTime).toLocaleString('en-US', { timeZone: 'Asia/Manila' })}</p>
+                          </div>
+                        </div>
+                        <button
+                          onClick={() => handleReturn(item)}
+                          disabled={isReturning}
+                          className={`px-4 py-2 bg-green-600 text-white rounded-lg hover:bg-green-700 transition-colors ${
+                            isReturning ? 'opacity-50 cursor-not-allowed' : ''
+                          }`}
+                        >
+                          {isReturning ? 'Processing...' : 'Return'}
+                        </button>
+                      </motion.div>
+                    ))}
+                  </div>
                 </div>
               </motion.div>
             )}
@@ -928,7 +939,11 @@ export default function StudentPage() {
                       )}
                       
                       <button
-                        onClick={handleConfirmOrder}
+                        onClick={() => {
+                          const itemsToBorrow = availableItems.filter(item => item.cartQuantity > 0);
+                          setReviewItems(itemsToBorrow);
+                          setShowReviewModal(true);
+                        }}
                         disabled={!availableItems.some(item => item.cartQuantity > 0) || isSubmitting}
                         className={`w-full py-4 rounded-xl font-bold transition-all ${
                           availableItems.some(item => item.cartQuantity > 0) && !isSubmitting
@@ -1076,6 +1091,9 @@ export default function StudentPage() {
                   if (modalType === 'return') {
                     setShowFeedbackForm(true);
                   }
+                  if (modalType === 'borrow') {
+                    setCurrentPage('home');
+                  }
                   setModalItems([]); // Clear modal items
                   setModalTime(''); // Clear modal time
                 }}
@@ -1152,6 +1170,43 @@ export default function StudentPage() {
           onSubmit={handleFeedbackSubmit}
           onClose={() => setShowFeedbackForm(false)}
         />
+      )}
+
+      {showReviewModal && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 backdrop-blur-sm">
+          <motion.div
+            initial={{ scale: 0.9, opacity: 0 }}
+            animate={{ scale: 1, opacity: 1 }}
+            className="bg-[#1e293b] rounded-2xl p-6 max-w-sm w-full shadow-xl border-2 border-blue-700/50"
+          >
+            <div className="text-center space-y-4">
+              <h3 className="text-xl font-bold text-blue-300">Review & Confirm</h3>
+              <p className="text-gray-300">You are about to borrow the following items:</p>
+              <ul className="text-gray-200 mt-2 space-y-1">
+                {reviewItems.map((item, idx) => (
+                  <li key={idx}>• {item.name} (x{item.cartQuantity})</li>
+                ))}
+              </ul>
+              <div className="flex gap-4 mt-6">
+                <button
+                  onClick={() => setShowReviewModal(false)}
+                  className="flex-1 py-2 rounded-xl font-bold bg-gray-700 text-gray-200 hover:bg-gray-600 transition-all"
+                >
+                  Cancel
+                </button>
+                <button
+                  onClick={async () => {
+                    setShowReviewModal(false);
+                    await handleConfirmOrder();
+                  }}
+                  className="flex-1 py-2 rounded-xl font-bold bg-blue-600 text-white hover:bg-blue-700 transition-all"
+                >
+                  Confirm
+                </button>
+              </div>
+            </div>
+          </motion.div>
+        </div>
       )}
     </div>
   );
