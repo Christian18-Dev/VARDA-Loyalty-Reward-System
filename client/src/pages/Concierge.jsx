@@ -311,30 +311,33 @@ export default function ConciergePage() {
     return true;
   };
 
-  // Optimized fetchBorrowedItems function with smart caching
-  const fetchBorrowedItems = async (forceRefresh = false) => {
+  // Enhanced fetchBorrowedItems with retry logic and better error handling
+  const fetchBorrowedItems = async (forceRefresh = false, retryCount = 0) => {
     const tabName = 'borrowed';
     const cacheKey = `${tabName}_${startDate}_${endDate}`;
+    const maxRetries = 3;
+    const retryDelay = 1000 * Math.pow(2, retryCount); // Exponential backoff
     
     // Check cache first (unless force refresh)
-    if (!forceRefresh) {
+    if (!forceRefresh && retryCount === 0) {
       const cached = getCachedData(cacheKey);
       if (cached) {
-        // Use cached data and update legacy state
         setBorrowedItems(cached.items || []);
+        setError(''); // Clear any previous errors
         return cached;
       }
     }
 
     try {
-      // Only show loading state for initial load, not during polling
-      if (!isBorrowedPolling) {
+      // Only show loading state for initial load, not during polling or retries
+      if (!isBorrowedPolling && retryCount === 0) {
         setLoadingState(tabName, true);
+        setError(''); // Clear previous errors
       }
 
-      // Use AbortController to prevent memory leaks
+      // Use AbortController with longer timeout
       const controller = new AbortController();
-      const timeoutId = setTimeout(() => controller.abort(), 15000); // 15 second timeout
+      const timeoutId = setTimeout(() => controller.abort(), 30000); // Increased to 30 seconds
 
       const queryParams = new URLSearchParams();
       if (startDate) queryParams.append('startDate', startDate);
@@ -342,7 +345,8 @@ export default function ConciergePage() {
       
       const res = await axios.get(`${baseUrl}/api/concierge/borrowed-items?${queryParams}`, {
         headers: { Authorization: `Bearer ${token}` },
-        signal: controller.signal
+        signal: controller.signal,
+        timeout: 25000 // Axios timeout as backup
       });
 
       clearTimeout(timeoutId);
@@ -350,11 +354,17 @@ export default function ConciergePage() {
       // Only update state if component is still mounted
       if (!isMountedRef.current) return;
 
+      // Validate response data
+      if (!res.data || !Array.isArray(res.data.data)) {
+        throw new Error('Invalid response format from server');
+      }
+
       const items = res.data.data;
       const sortedBorrowed = items.sort((a, b) => new Date(b.borrowTime) - new Date(a.borrowTime));
       
       // Update legacy state
       setBorrowedItems(sortedBorrowed);
+      setError(''); // Clear any previous errors
 
       // Cache the processed data
       const processedData = {
@@ -367,15 +377,41 @@ export default function ConciergePage() {
 
       return processedData;
     } catch (error) {
+      console.error(`Error fetching borrowed items (attempt ${retryCount + 1}):`, error);
+      
+      // Handle different error types
       if (error.name === 'AbortError') {
         console.log('Request was aborted due to timeout');
+      } else if (error.code === 'ECONNABORTED' || error.message.includes('timeout')) {
+        console.log('Request timed out');
+      } else if (error.response?.status === 401) {
+        setError('Session expired. Please login again.');
+        // Don't retry on auth errors
+        return;
+      }
+      
+      // Retry logic with exponential backoff
+      if (retryCount < maxRetries && isMountedRef.current) {
+        console.log(`Retrying in ${retryDelay}ms... (attempt ${retryCount + 1}/${maxRetries})`);
+        await new Promise(resolve => setTimeout(resolve, retryDelay));
+        
+        // Only retry if component is still mounted and on the same tab
+        if (isMountedRef.current && activeTab === 'borrowed') {
+          return fetchBorrowedItems(forceRefresh, retryCount + 1);
+        }
       } else {
-        console.error('Error fetching borrowed items:', error);
-        setError('Failed to fetch borrowed items');
+        // Final failure after all retries
+        const errorMessage = error.response?.status === 500 
+          ? 'Server error. Please try again later.'
+          : error.message.includes('Network Error')
+          ? 'Network connection error. Please check your internet connection.'
+          : 'Failed to fetch borrowed items. Please try refreshing the page.';
+        
+        setError(errorMessage);
       }
     } finally {
       // Only clear loading state if we're not in polling mode and component is mounted
-      if (!isBorrowedPolling && isMountedRef.current) {
+      if (!isBorrowedPolling && isMountedRef.current && retryCount === 0) {
         setLoadingState(tabName, false);
       }
     }
@@ -431,30 +467,33 @@ export default function ConciergePage() {
     };
   }, [activeTab, token, startDate, endDate]);
 
-  // Optimized fetchReturnedItems function with smart caching
-  const fetchReturnedItems = async (forceRefresh = false) => {
+  // Enhanced fetchReturnedItems with retry logic and better error handling
+  const fetchReturnedItems = async (forceRefresh = false, retryCount = 0) => {
     const tabName = 'returned';
     const cacheKey = `${tabName}_${startDate}_${endDate}`;
+    const maxRetries = 3;
+    const retryDelay = 1000 * Math.pow(2, retryCount); // Exponential backoff
     
     // Check cache first (unless force refresh)
-    if (!forceRefresh) {
+    if (!forceRefresh && retryCount === 0) {
       const cached = getCachedData(cacheKey);
       if (cached) {
-        // Use cached data and update legacy state
         setReturnedItems(cached.items || []);
+        setError(''); // Clear any previous errors
         return cached;
       }
     }
 
     try {
-      // Only show loading state for initial load, not during polling
-      if (!isReturnedPolling) {
+      // Only show loading state for initial load, not during polling or retries
+      if (!isReturnedPolling && retryCount === 0) {
         setLoadingState(tabName, true);
+        setError(''); // Clear previous errors
       }
 
-      // Use AbortController to prevent memory leaks
+      // Use AbortController with longer timeout
       const controller = new AbortController();
-      const timeoutId = setTimeout(() => controller.abort(), 15000); // 15 second timeout
+      const timeoutId = setTimeout(() => controller.abort(), 30000); // Increased to 30 seconds
 
       const queryParams = new URLSearchParams();
       if (startDate) queryParams.append('startDate', startDate);
@@ -462,7 +501,8 @@ export default function ConciergePage() {
       
       const res = await axios.get(`${baseUrl}/api/concierge/returned-history?${queryParams}`, {
         headers: { Authorization: `Bearer ${token}` },
-        signal: controller.signal
+        signal: controller.signal,
+        timeout: 25000 // Axios timeout as backup
       });
 
       clearTimeout(timeoutId);
@@ -470,11 +510,17 @@ export default function ConciergePage() {
       // Only update state if component is still mounted
       if (!isMountedRef.current) return;
 
+      // Validate response data
+      if (!res.data || !Array.isArray(res.data.data)) {
+        throw new Error('Invalid response format from server');
+      }
+
       const items = res.data.data;
       const sortedReturned = items.sort((a, b) => new Date(b.returnTime) - new Date(a.returnTime));
       
       // Update legacy state
       setReturnedItems(sortedReturned);
+      setError(''); // Clear any previous errors
 
       // Cache the processed data
       const processedData = {
@@ -487,15 +533,41 @@ export default function ConciergePage() {
 
       return processedData;
     } catch (error) {
+      console.error(`Error fetching returned items (attempt ${retryCount + 1}):`, error);
+      
+      // Handle different error types
       if (error.name === 'AbortError') {
         console.log('Request was aborted due to timeout');
+      } else if (error.code === 'ECONNABORTED' || error.message.includes('timeout')) {
+        console.log('Request timed out');
+      } else if (error.response?.status === 401) {
+        setError('Session expired. Please login again.');
+        // Don't retry on auth errors
+        return;
+      }
+      
+      // Retry logic with exponential backoff
+      if (retryCount < maxRetries && isMountedRef.current) {
+        console.log(`Retrying in ${retryDelay}ms... (attempt ${retryCount + 1}/${maxRetries})`);
+        await new Promise(resolve => setTimeout(resolve, retryDelay));
+        
+        // Only retry if component is still mounted and on the same tab
+        if (isMountedRef.current && activeTab === 'returned') {
+          return fetchReturnedItems(forceRefresh, retryCount + 1);
+        }
       } else {
-        console.error('Error fetching returned items:', error);
-        setError('Failed to fetch returned items');
+        // Final failure after all retries
+        const errorMessage = error.response?.status === 500 
+          ? 'Server error. Please try again later.'
+          : error.message.includes('Network Error')
+          ? 'Network connection error. Please check your internet connection.'
+          : 'Failed to fetch returned items. Please try refreshing the page.';
+        
+        setError(errorMessage);
       }
     } finally {
       // Only clear loading state if we're not in polling mode and component is mounted
-      if (!isReturnedPolling && isMountedRef.current) {
+      if (!isReturnedPolling && isMountedRef.current && retryCount === 0) {
         setLoadingState(tabName, false);
       }
     }
@@ -1299,12 +1371,14 @@ export default function ConciergePage() {
             <button
               key={id}
               onClick={() => {
-                // Clear cache for the previous tab to ensure fresh data when switching back
                 if (id !== activeTab) {
-                  const previousCacheKey = `${activeTab}_${startDate}_${endDate}`;
-                  clearCache(previousCacheKey);
+                  // Clear any existing errors when switching tabs
+                  setError('');
+                  
+                  // Don't clear cache immediately to allow for quick tab switching
+                  // Cache will be cleared by the cleanup effect if needed
+                  setActiveTab(id);
                 }
-                setActiveTab(id);
               }}
               className={`flex items-center space-x-2 px-4 py-2.5 rounded-xl whitespace-nowrap transition-all ${
                 activeTab === id

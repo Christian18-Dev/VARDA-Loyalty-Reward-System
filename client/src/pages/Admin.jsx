@@ -822,22 +822,32 @@ export default function AdminPage() {
     };
   }, [activeTab, token]);
 
-  // Update fetchBorrowedItems to be more efficient with caching
-  const fetchBorrowedItems = async (forceRefresh = false) => {
+  // Enhanced fetchBorrowedItems with retry logic and better error handling
+  const fetchBorrowedItems = async (forceRefresh = false, retryCount = 0) => {
     const tabName = 'borrowed';
+    const maxRetries = 3;
+    const retryDelay = 1000 * Math.pow(2, retryCount); // Exponential backoff
     
     // Check cache first (unless force refresh)
-    if (!forceRefresh) {
+    if (!forceRefresh && retryCount === 0) {
       const cached = getCachedData(tabName);
       if (cached) {
         setBorrowedItems(cached.borrowedItems);
+        setError(''); // Clear any previous errors
         return cached;
       }
     }
 
     try {
+      // Only show loading state for initial load, not during retries
+      if (retryCount === 0) {
+        setLoadingState(tabName, true);
+        setError(''); // Clear previous errors
+      }
+
+      // Use AbortController with longer timeout
       const controller = new AbortController();
-      const timeoutId = setTimeout(() => controller.abort(), 10000);
+      const timeoutId = setTimeout(() => controller.abort(), 30000); // Increased to 30 seconds
 
       const queryParams = new URLSearchParams();
       if (startDate) queryParams.append('startDate', startDate);
@@ -845,33 +855,69 @@ export default function AdminPage() {
       
       const res = await axios.get(`${baseUrl}/api/admin/borrowed-items?${queryParams}`, {
         headers: { Authorization: `Bearer ${token}` },
-        signal: controller.signal
+        signal: controller.signal,
+        timeout: 25000 // Axios timeout as backup
       });
       
       clearTimeout(timeoutId);
 
       if (!isMountedRef.current) return;
 
+      // Validate response data
+      if (!res.data || !Array.isArray(res.data.data)) {
+        throw new Error('Invalid response format from server');
+      }
+
       // Only process and update state if we have new data
       const items = res.data.data;
-      if (items && items.length > 0) {
-        const sortedBorrowed = items
-          .filter(item => item.status === 'borrowed')
-          .sort((a, b) => new Date(b.borrowTime) - new Date(a.borrowTime));
-        
-        setBorrowedItems(sortedBorrowed);
-        
-        // Cache the data
-        setCachedData(tabName, { borrowedItems: sortedBorrowed });
-        
-        return { borrowedItems: sortedBorrowed };
-      }
+      const sortedBorrowed = items
+        .filter(item => item.status === 'borrowed')
+        .sort((a, b) => new Date(b.borrowTime) - new Date(a.borrowTime));
+      
+      setBorrowedItems(sortedBorrowed);
+      setError(''); // Clear any previous errors
+      
+      // Cache the data
+      setCachedData(tabName, { borrowedItems: sortedBorrowed });
+      
+      return { borrowedItems: sortedBorrowed };
     } catch (err) {
+      console.error(`Error fetching borrowed items (attempt ${retryCount + 1}):`, err);
+      
+      // Handle different error types
       if (err.name === 'AbortError') {
-        console.log('Borrowed items request was aborted');
+        console.log('Request was aborted due to timeout');
+      } else if (err.code === 'ECONNABORTED' || err.message.includes('timeout')) {
+        console.log('Request timed out');
+      } else if (err.response?.status === 401) {
+        setError('Session expired. Please login again.');
+        // Don't retry on auth errors
+        return;
+      }
+      
+      // Retry logic with exponential backoff
+      if (retryCount < maxRetries && isMountedRef.current) {
+        console.log(`Retrying in ${retryDelay}ms... (attempt ${retryCount + 1}/${maxRetries})`);
+        await new Promise(resolve => setTimeout(resolve, retryDelay));
+        
+        // Only retry if component is still mounted and on the same tab
+        if (isMountedRef.current && activeTab === 'borrowed') {
+          return fetchBorrowedItems(forceRefresh, retryCount + 1);
+        }
       } else {
-        console.error('Error fetching borrowed items:', err);
-        // setError('Failed to fetch borrowed items'); // Remove this line to prevent popup
+        // Final failure after all retries
+        const errorMessage = err.response?.status === 500 
+          ? 'Server error. Please try again later.'
+          : err.message.includes('Network Error')
+          ? 'Network connection error. Please check your internet connection.'
+          : 'Failed to fetch borrowed items. Please try refreshing the page.';
+        
+        setError(errorMessage);
+      }
+    } finally {
+      // Only clear loading state if component is mounted and this is the initial request
+      if (isMountedRef.current && retryCount === 0) {
+        setLoadingState(tabName, false);
       }
     }
   };
@@ -891,22 +937,32 @@ export default function AdminPage() {
     setCurrentBorrowedPage(1);
   };
 
-  // Fetch returned items with date filter and caching
-  const fetchReturnedItems = async (forceRefresh = false) => {
+  // Enhanced fetchReturnedItems with retry logic and better error handling
+  const fetchReturnedItems = async (forceRefresh = false, retryCount = 0) => {
     const tabName = 'returned';
+    const maxRetries = 3;
+    const retryDelay = 1000 * Math.pow(2, retryCount); // Exponential backoff
     
     // Check cache first (unless force refresh)
-    if (!forceRefresh) {
+    if (!forceRefresh && retryCount === 0) {
       const cached = getCachedData(tabName);
       if (cached) {
         setReturnedItems(cached.returnedItems);
+        setError(''); // Clear any previous errors
         return cached;
       }
     }
 
     try {
+      // Only show loading state for initial load, not during retries
+      if (retryCount === 0) {
+        setLoadingState(tabName, true);
+        setError(''); // Clear previous errors
+      }
+
+      // Use AbortController with longer timeout
       const controller = new AbortController();
-      const timeoutId = setTimeout(() => controller.abort(), 10000);
+      const timeoutId = setTimeout(() => controller.abort(), 30000); // Increased to 30 seconds
 
       const queryParams = new URLSearchParams();
       if (startDate) queryParams.append('startDate', startDate);
@@ -914,26 +970,65 @@ export default function AdminPage() {
       
       const res = await axios.get(`${baseUrl}/api/admin/returned-history?${queryParams}`, {
         headers: { Authorization: `Bearer ${token}` },
-        signal: controller.signal
+        signal: controller.signal,
+        timeout: 25000 // Axios timeout as backup
       });
       
       clearTimeout(timeoutId);
 
       if (!isMountedRef.current) return;
 
+      // Validate response data
+      if (!res.data || !Array.isArray(res.data.data)) {
+        throw new Error('Invalid response format from server');
+      }
+
       const items = res.data.data;
       const sortedReturned = items.sort((a, b) => new Date(b.returnTime) - new Date(a.returnTime));
       setReturnedItems(sortedReturned);
+      setError(''); // Clear any previous errors
       
       // Cache the data
       setCachedData(tabName, { returnedItems: sortedReturned });
       
       return { returnedItems: sortedReturned };
     } catch (err) {
+      console.error(`Error fetching returned items (attempt ${retryCount + 1}):`, err);
+      
+      // Handle different error types
       if (err.name === 'AbortError') {
-        console.log('Returned items request was aborted');
+        console.log('Request was aborted due to timeout');
+      } else if (err.code === 'ECONNABORTED' || err.message.includes('timeout')) {
+        console.log('Request timed out');
+      } else if (err.response?.status === 401) {
+        setError('Session expired. Please login again.');
+        // Don't retry on auth errors
+        return;
+      }
+      
+      // Retry logic with exponential backoff
+      if (retryCount < maxRetries && isMountedRef.current) {
+        console.log(`Retrying in ${retryDelay}ms... (attempt ${retryCount + 1}/${maxRetries})`);
+        await new Promise(resolve => setTimeout(resolve, retryDelay));
+        
+        // Only retry if component is still mounted and on the same tab
+        if (isMountedRef.current && activeTab === 'returned') {
+          return fetchReturnedItems(forceRefresh, retryCount + 1);
+        }
       } else {
-        setError('Failed to fetch returned items');
+        // Final failure after all retries
+        const errorMessage = err.response?.status === 500 
+          ? 'Server error. Please try again later.'
+          : err.message.includes('Network Error')
+          ? 'Network connection error. Please check your internet connection.'
+          : 'Failed to fetch returned items. Please try refreshing the page.';
+        
+        setError(errorMessage);
+      }
+    } finally {
+      // Only clear loading state if component is mounted and this is the initial request
+      if (isMountedRef.current && retryCount === 0) {
+        setLoadingState(tabName, false);
       }
     }
   };
@@ -2382,13 +2477,7 @@ export default function AdminPage() {
     return () => clearTimeout(timeoutId);
   }, [activeTab, tabCache, cacheTimestamps]);
 
-  if (isLoading && !isOverviewPolling) {
-    return (
-      <div className="flex justify-center items-center h-screen">
-        <div className="animate-spin rounded-full h-12 w-12 border-t-2 border-b-2 border-purple-500"></div>
-      </div>
-    );
-  }
+  // Removed full-screen loading animation - data loads in background now
 
   return (
     <div className="min-h-screen bg-gradient-to-br from-indigo-50 via-purple-50 to-pink-50">
@@ -3384,7 +3473,15 @@ export default function AdminPage() {
           >
             <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center mb-6 space-y-4 sm:space-y-0">
               <div>
-                <h2 className="text-2xl font-bold text-gray-800">Borrowed Items</h2>
+                <div className="flex items-center space-x-3">
+                  <h2 className="text-2xl font-bold text-gray-800">Borrowed Items</h2>
+                  {loadingStates.borrowed && (
+                    <div className="flex items-center space-x-2">
+                      <div className="animate-spin rounded-full h-4 w-4 border-b-2 border-purple-600"></div>
+                      <span className="text-sm text-gray-600">Loading data...</span>
+                    </div>
+                  )}
+                </div>
                 <p className="text-gray-600 mt-1">Track all currently borrowed items</p>
               </div>
               <div className="flex flex-col sm:flex-row space-y-2 sm:space-y-0 sm:space-x-2">
@@ -3514,7 +3611,15 @@ export default function AdminPage() {
           >
             <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center mb-6 space-y-4 sm:space-y-0">
               <div>
-                <h2 className="text-2xl font-bold text-gray-800">Returned Items History</h2>
+                <div className="flex items-center space-x-3">
+                  <h2 className="text-2xl font-bold text-gray-800">Returned Items History</h2>
+                  {loadingStates.returned && (
+                    <div className="flex items-center space-x-2">
+                      <div className="animate-spin rounded-full h-4 w-4 border-b-2 border-purple-600"></div>
+                      <span className="text-sm text-gray-600">Loading data...</span>
+                    </div>
+                  )}
+                </div>
                 <p className="text-gray-600 mt-1">View history of all returned items</p>
               </div>
               <div className="w-full sm:w-64">
