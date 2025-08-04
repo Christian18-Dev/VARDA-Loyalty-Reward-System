@@ -593,7 +593,8 @@ export default function StudentPage() {
                 <GiftIcon className="h-8 w-8 text-purple-400" />
                 <span className="mt-2 font-medium text-gray-200">Rewards</span>
               </motion.button>
-
+              
+              {/*}
               <motion.button
                 whileHover={{ scale: 1.05 }}
                 whileTap={{ scale: 0.95 }}
@@ -603,6 +604,7 @@ export default function StudentPage() {
                 <ShoppingBagIcon className="h-8 w-8 text-purple-400" />
                 <span className="mt-2 font-medium text-gray-200">Borrow</span>
               </motion.button>
+              */}
             </div>
 
             {/* Borrowed Items Section */}
@@ -766,6 +768,7 @@ export default function StudentPage() {
         )}
 
         {/* Borrowing Page */}
+        {/*
         {currentPage === 'borrow' && (
           <motion.div variants={itemVariants} className="space-y-6">
             <div className="text-center">
@@ -773,8 +776,7 @@ export default function StudentPage() {
               <h2 className="text-2xl font-bold text-blue-400">Borrow Items</h2>
               <p className="text-gray-400 mt-1">Select items to borrow for your needs</p>
             </div>
-
-            {/* Available Items Grid */}
+          
             <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
               {availableItems.map((item) => (
                 <motion.div 
@@ -821,7 +823,6 @@ export default function StudentPage() {
               ))}
             </div>
 
-            {/* Floating Cart Button */}
             {availableItems.some(item => item.cartQuantity > 0) && (
               <motion.button
                 initial={{ opacity: 0, y: 20 }}
@@ -838,7 +839,6 @@ export default function StudentPage() {
               </motion.button>
             )}
 
-            {/* Slide-out Cart Panel */}
             {showCart && (
               <div className="fixed inset-0 bg-black/50 backdrop-blur-sm z-50">
                 <motion.div 
@@ -966,7 +966,7 @@ export default function StudentPage() {
               </div>
             )}
           </motion.div>
-        )}
+        )} 
 
         {/* Settings Page */}
         {currentPage === 'settings' && (
@@ -1044,6 +1044,7 @@ export default function StudentPage() {
       )}
 
       {/* Success Modal */}
+      {/*
       {showSuccessModal && (
         <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 backdrop-blur-sm">
           <motion.div 
@@ -1104,7 +1105,7 @@ export default function StudentPage() {
             </div>
           </motion.div>
         </div>
-      )}
+      )} */}
 
       {/* Code Success Modal */}
       {showCodeSuccessModal && (

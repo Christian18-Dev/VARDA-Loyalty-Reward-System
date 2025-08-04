@@ -1832,15 +1832,27 @@ export default function AdminPage() {
           totals.Saucer += itemCounts.Saucer;
         });
 
-        // Add totals row
-        const totalsRow = worksheet.addRow({
-          date: 'TOTAL',
+        // Add subtotal row
+        const subtotalRow = worksheet.addRow({
+          date: 'SUBTOTAL',
           Plate: totals.Plate,
           Bowl: totals.Bowl,
           Glass: totals.Glass,
           Spoon: totals.Spoon,
           Fork: totals.Fork,
           Saucer: totals.Saucer
+        });
+        
+        // Add grand total row
+        const grandTotal = Object.values(totals).reduce((sum, value) => sum + value, 0);
+        const grandTotalRow = worksheet.addRow({
+          date: 'GRAND TOTAL',
+          Plate: grandTotal,
+          Bowl: '',
+          Glass: '',
+          Spoon: '',
+          Fork: '',
+          Saucer: ''
         });
 
         // Style data rows
@@ -1865,8 +1877,32 @@ export default function AdminPage() {
           }
         });
 
-        // Style the totals row
-        totalsRow.eachCell((cell) => {
+        // Style the subtotal row
+        subtotalRow.eachCell((cell) => {
+          cell.font = { 
+            bold: true,
+            size: 11,
+            name: 'Helvetica-Bold'
+          };
+          cell.fill = {
+            type: 'pattern',
+            pattern: 'solid',
+            fgColor: { argb: 'e6e6e6' }
+          };
+          cell.alignment = {
+            vertical: 'middle',
+            horizontal: 'center'
+          };
+          cell.border = {
+            top: { style: 'thin', color: { argb: 'bfbfbf' } },
+            left: { style: 'thin', color: { argb: 'bfbfbf' } },
+            bottom: { style: 'thin', color: { argb: 'bfbfbf' } },
+            right: { style: 'thin', color: { argb: 'bfbfbf' } }
+          };
+        });
+        
+        // Style the grand total row
+        grandTotalRow.eachCell((cell, colNumber) => {
           cell.font = { 
             bold: true,
             size: 11,
@@ -1966,7 +2002,7 @@ export default function AdminPage() {
                   </View>
                 ))}
                 
-                {/* Totals Row */}
+                {/* Subtotal and Grand Total Rows */}
                 {(() => {
                   const totals = {
                     Plate: 0,
@@ -1977,6 +2013,7 @@ export default function AdminPage() {
                     Saucer: 0
                   };
                   
+                  // Calculate subtotals
                   Object.values(processedData).forEach(itemCounts => {
                     totals.Plate += itemCounts.Plate;
                     totals.Bowl += itemCounts.Bowl;
@@ -1986,30 +2023,46 @@ export default function AdminPage() {
                     totals.Saucer += itemCounts.Saucer;
                   });
                   
+                  // Calculate grand total
+                  const grandTotal = Object.values(totals).reduce((sum, value) => sum + value, 0);
+                  
                   return (
-                    <View style={[styles.tableRow, { backgroundColor: '#f3f4f6' }]}>
-                      <View style={[styles.tableCol, { width: '20%' }]}>
-                        <Text style={[styles.tableCell, { fontWeight: 'bold' }]}>TOTAL</Text>
+                    <>
+                      {/* Subtotal Row */}
+                      <View style={[styles.tableRow, { backgroundColor: '#f3f4f6' }]}>
+                        <View style={[styles.tableCol, { width: '20%' }]}>
+                          <Text style={[styles.tableCell, { fontWeight: 'bold' }]}>SUBTOTAL</Text>
+                        </View>
+                        <View style={[styles.tableCol, { width: '13%' }]}>
+                          <Text style={[styles.tableCell, { fontWeight: 'bold' }]}>{totals.Plate}</Text>
+                        </View>
+                        <View style={[styles.tableCol, { width: '13%' }]}>
+                          <Text style={[styles.tableCell, { fontWeight: 'bold' }]}>{totals.Bowl}</Text>
+                        </View>
+                        <View style={[styles.tableCol, { width: '13%' }]}>
+                          <Text style={[styles.tableCell, { fontWeight: 'bold' }]}>{totals.Glass}</Text>
+                        </View>
+                        <View style={[styles.tableCol, { width: '13%' }]}>
+                          <Text style={[styles.tableCell, { fontWeight: 'bold' }]}>{totals.Spoon}</Text>
+                        </View>
+                        <View style={[styles.tableCol, { width: '13%' }]}>
+                          <Text style={[styles.tableCell, { fontWeight: 'bold' }]}>{totals.Fork}</Text>
+                        </View>
+                        <View style={[styles.tableCol, { width: '15%' }]}>
+                          <Text style={[styles.tableCell, { fontWeight: 'bold' }]}>{totals.Saucer}</Text>
+                        </View>
                       </View>
-                      <View style={[styles.tableCol, { width: '13%' }]}>
-                        <Text style={[styles.tableCell, { fontWeight: 'bold' }]}>{totals.Plate}</Text>
+                      
+                      {/* Grand Total Row */}
+                      <View style={[styles.tableRow, { backgroundColor: '#e2e8f0' }]}>
+                        <View style={[styles.tableCol, { width: '20%' }]}>
+                          <Text style={[styles.tableCell, { fontWeight: 'bold', fontSize: 12 }]}>GRAND TOTAL</Text>
+                        </View>
+                        <View style={[styles.tableCol, { width: '13%' }]}>
+                          <Text style={[styles.tableCell, { fontWeight: 'bold', fontSize: 12 }]}>{grandTotal}</Text>
+                        </View>
                       </View>
-                      <View style={[styles.tableCol, { width: '13%' }]}>
-                        <Text style={[styles.tableCell, { fontWeight: 'bold' }]}>{totals.Bowl}</Text>
-                      </View>
-                      <View style={[styles.tableCol, { width: '13%' }]}>
-                        <Text style={[styles.tableCell, { fontWeight: 'bold' }]}>{totals.Glass}</Text>
-                      </View>
-                      <View style={[styles.tableCol, { width: '13%' }]}>
-                        <Text style={[styles.tableCell, { fontWeight: 'bold' }]}>{totals.Spoon}</Text>
-                      </View>
-                      <View style={[styles.tableCol, { width: '13%' }]}>
-                        <Text style={[styles.tableCell, { fontWeight: 'bold' }]}>{totals.Fork}</Text>
-                      </View>
-                      <View style={[styles.tableCol, { width: '15%' }]}>
-                        <Text style={[styles.tableCell, { fontWeight: 'bold' }]}>{totals.Saucer}</Text>
-                      </View>
-                    </View>
+                    </>
                   );
                 })()}
               </View>
@@ -2209,6 +2262,10 @@ export default function AdminPage() {
         { name: 'Fork', quantity: 1 },
         { name: 'Glass', quantity: 1 }
         // Note: Tray is not in the individual items list, so we'll skip it
+      ],
+      'Spoon & Fork': [
+        { name: 'Spoon', quantity: 1 },
+        { name: 'Fork', quantity: 1 }
       ]
     };
     
@@ -2298,6 +2355,10 @@ export default function AdminPage() {
         { name: 'Fork', quantity: 1 },
         { name: 'Glass', quantity: 1 }
         // Note: Tray is not in the individual items list, so we'll skip it
+      ],
+      'Spoon & Fork': [
+        { name: 'Spoon', quantity: 1 },
+        { name: 'Fork', quantity: 1 }
       ]
     };
     

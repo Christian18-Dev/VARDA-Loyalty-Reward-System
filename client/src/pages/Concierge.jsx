@@ -26,6 +26,7 @@ import plateImage from '../assets/plate.png';
 import bowlImage from '../assets/bowl.png';
 import glassImage from '../assets/glassofwater.png';
 import saucerImage from '../assets/saucer.png';
+import spoonandforkImage from '../assets/spoonandfork.png'; 
 
 // More robust Buffer polyfill
 if (typeof window !== 'undefined' && !window.Buffer) {
@@ -92,60 +93,68 @@ export default function ConciergePage() {
     {
       id: 1,
       name: 'Basic Set',
+      description: 'SET 1: Plate, Spoon, Fork, Tray',
       image: basicSetImage,
-      description: 'Basic dining set (Plate, Spoon, Fork, Tray)',
       cartQuantity: 0,
       isSet: true
     },
     {
       id: 2,
       name: 'Complete Set',
-      image: completeSetImage,
-      description: 'Complete dining set (Plate, Bowl, Spoon, Fork, Glass, Tray)',
+      description: 'SET 2: Plate, Spoon, Fork, Glass, Bowl, Tray',
+        image: completeSetImage,
       cartQuantity: 0,
       isSet: true
     },
     { 
       id: 3, 
       name: 'Spoon', 
+      description: 'SET 3: Spoon',
       image: spoonImage,
-      description: 'Stainless steel spoon for your dining needs',
       cartQuantity: 0
     },
     { 
       id: 4, 
       name: 'Fork', 
+      description: 'SET 4: Fork',
       image: forkImage,
-      description: 'Stainless steel fork for your dining needs',
       cartQuantity: 0
     },
     { 
       id: 5, 
       name: 'Plate', 
+      description: 'SET 5: Plate',
       image: plateImage,
-      description: 'Ceramic plate',
       cartQuantity: 0
     },
     { 
       id: 6, 
       name: 'Bowl', 
+      description: 'SET 6: Bowl',
       image: bowlImage,
-      description: 'Ceramic bowl',
       cartQuantity: 0
     },
     { 
       id: 7, 
       name: 'Saucer', 
+      description: 'SET 7: Saucer',
       image: saucerImage,
-      description: 'Smaller plate',
       cartQuantity: 0
     },
     { 
       id: 8, 
       name: 'Glass', 
+      description: 'SET 8: Glass',
       image: glassImage,
-      description: 'Glass for water and beverages',
       cartQuantity: 0
+    },
+    { 
+      id: 9, 
+      name: 'Spoon & Fork', 
+      description: 'SET 9: Spoon & Fork',
+      image: spoonandforkImage,
+      cartQuantity: 0,
+      isSet: true
     },
   ]);
   const [showCart, setShowCart] = useState(false);
@@ -156,7 +165,8 @@ export default function ConciergePage() {
   const [modalType, setModalType] = useState('');
   const [showReturnSuccessModal, setShowReturnSuccessModal] = useState(false);
   const [returnedItemData, setReturnedItemData] = useState(null);
-  const itemsPerPage = 5;
+  const [showOrderSummary, setShowOrderSummary] = useState(false);
+  const itemsPerPage = 10;
 
   const baseUrl = import.meta.env.VITE_API_BASE_URL;
   const token = user.token;
@@ -311,33 +321,30 @@ export default function ConciergePage() {
     return true;
   };
 
-  // Enhanced fetchBorrowedItems with retry logic and better error handling
-  const fetchBorrowedItems = async (forceRefresh = false, retryCount = 0) => {
+  // Optimized fetchBorrowedItems function with smart caching
+  const fetchBorrowedItems = async (forceRefresh = false) => {
     const tabName = 'borrowed';
     const cacheKey = `${tabName}_${startDate}_${endDate}`;
-    const maxRetries = 3;
-    const retryDelay = 1000 * Math.pow(2, retryCount); // Exponential backoff
     
     // Check cache first (unless force refresh)
-    if (!forceRefresh && retryCount === 0) {
+    if (!forceRefresh) {
       const cached = getCachedData(cacheKey);
       if (cached) {
+        // Use cached data and update legacy state
         setBorrowedItems(cached.items || []);
-        setError(''); // Clear any previous errors
         return cached;
       }
     }
 
     try {
-      // Only show loading state for initial load, not during polling or retries
-      if (!isBorrowedPolling && retryCount === 0) {
+      // Only show loading state for initial load, not during polling
+      if (!isBorrowedPolling) {
         setLoadingState(tabName, true);
-        setError(''); // Clear previous errors
       }
 
-      // Use AbortController with longer timeout
+      // Use AbortController to prevent memory leaks
       const controller = new AbortController();
-      const timeoutId = setTimeout(() => controller.abort(), 30000); // Increased to 30 seconds
+      const timeoutId = setTimeout(() => controller.abort(), 15000); // 15 second timeout
 
       const queryParams = new URLSearchParams();
       if (startDate) queryParams.append('startDate', startDate);
@@ -345,8 +352,7 @@ export default function ConciergePage() {
       
       const res = await axios.get(`${baseUrl}/api/concierge/borrowed-items?${queryParams}`, {
         headers: { Authorization: `Bearer ${token}` },
-        signal: controller.signal,
-        timeout: 25000 // Axios timeout as backup
+        signal: controller.signal
       });
 
       clearTimeout(timeoutId);
@@ -354,17 +360,11 @@ export default function ConciergePage() {
       // Only update state if component is still mounted
       if (!isMountedRef.current) return;
 
-      // Validate response data
-      if (!res.data || !Array.isArray(res.data.data)) {
-        throw new Error('Invalid response format from server');
-      }
-
       const items = res.data.data;
       const sortedBorrowed = items.sort((a, b) => new Date(b.borrowTime) - new Date(a.borrowTime));
       
       // Update legacy state
       setBorrowedItems(sortedBorrowed);
-      setError(''); // Clear any previous errors
 
       // Cache the processed data
       const processedData = {
@@ -377,41 +377,15 @@ export default function ConciergePage() {
 
       return processedData;
     } catch (error) {
-      console.error(`Error fetching borrowed items (attempt ${retryCount + 1}):`, error);
-      
-      // Handle different error types
       if (error.name === 'AbortError') {
         console.log('Request was aborted due to timeout');
-      } else if (error.code === 'ECONNABORTED' || error.message.includes('timeout')) {
-        console.log('Request timed out');
-      } else if (error.response?.status === 401) {
-        setError('Session expired. Please login again.');
-        // Don't retry on auth errors
-        return;
-      }
-      
-      // Retry logic with exponential backoff
-      if (retryCount < maxRetries && isMountedRef.current) {
-        console.log(`Retrying in ${retryDelay}ms... (attempt ${retryCount + 1}/${maxRetries})`);
-        await new Promise(resolve => setTimeout(resolve, retryDelay));
-        
-        // Only retry if component is still mounted and on the same tab
-        if (isMountedRef.current && activeTab === 'borrowed') {
-          return fetchBorrowedItems(forceRefresh, retryCount + 1);
-        }
       } else {
-        // Final failure after all retries
-        const errorMessage = error.response?.status === 500 
-          ? 'Server error. Please try again later.'
-          : error.message.includes('Network Error')
-          ? 'Network connection error. Please check your internet connection.'
-          : 'Failed to fetch borrowed items. Please try refreshing the page.';
-        
-        setError(errorMessage);
+        console.error('Error fetching borrowed items:', error);
+        setError('Failed to fetch borrowed items');
       }
     } finally {
       // Only clear loading state if we're not in polling mode and component is mounted
-      if (!isBorrowedPolling && isMountedRef.current && retryCount === 0) {
+      if (!isBorrowedPolling && isMountedRef.current) {
         setLoadingState(tabName, false);
       }
     }
@@ -467,33 +441,30 @@ export default function ConciergePage() {
     };
   }, [activeTab, token, startDate, endDate]);
 
-  // Enhanced fetchReturnedItems with retry logic and better error handling
-  const fetchReturnedItems = async (forceRefresh = false, retryCount = 0) => {
+  // Optimized fetchReturnedItems function with smart caching
+  const fetchReturnedItems = async (forceRefresh = false) => {
     const tabName = 'returned';
     const cacheKey = `${tabName}_${startDate}_${endDate}`;
-    const maxRetries = 3;
-    const retryDelay = 1000 * Math.pow(2, retryCount); // Exponential backoff
     
     // Check cache first (unless force refresh)
-    if (!forceRefresh && retryCount === 0) {
+    if (!forceRefresh) {
       const cached = getCachedData(cacheKey);
       if (cached) {
+        // Use cached data and update legacy state
         setReturnedItems(cached.items || []);
-        setError(''); // Clear any previous errors
         return cached;
       }
     }
 
     try {
-      // Only show loading state for initial load, not during polling or retries
-      if (!isReturnedPolling && retryCount === 0) {
+      // Only show loading state for initial load, not during polling
+      if (!isReturnedPolling) {
         setLoadingState(tabName, true);
-        setError(''); // Clear previous errors
       }
 
-      // Use AbortController with longer timeout
+      // Use AbortController to prevent memory leaks
       const controller = new AbortController();
-      const timeoutId = setTimeout(() => controller.abort(), 30000); // Increased to 30 seconds
+      const timeoutId = setTimeout(() => controller.abort(), 15000); // 15 second timeout
 
       const queryParams = new URLSearchParams();
       if (startDate) queryParams.append('startDate', startDate);
@@ -501,8 +472,7 @@ export default function ConciergePage() {
       
       const res = await axios.get(`${baseUrl}/api/concierge/returned-history?${queryParams}`, {
         headers: { Authorization: `Bearer ${token}` },
-        signal: controller.signal,
-        timeout: 25000 // Axios timeout as backup
+        signal: controller.signal
       });
 
       clearTimeout(timeoutId);
@@ -510,17 +480,11 @@ export default function ConciergePage() {
       // Only update state if component is still mounted
       if (!isMountedRef.current) return;
 
-      // Validate response data
-      if (!res.data || !Array.isArray(res.data.data)) {
-        throw new Error('Invalid response format from server');
-      }
-
       const items = res.data.data;
       const sortedReturned = items.sort((a, b) => new Date(b.returnTime) - new Date(a.returnTime));
       
       // Update legacy state
       setReturnedItems(sortedReturned);
-      setError(''); // Clear any previous errors
 
       // Cache the processed data
       const processedData = {
@@ -533,41 +497,15 @@ export default function ConciergePage() {
 
       return processedData;
     } catch (error) {
-      console.error(`Error fetching returned items (attempt ${retryCount + 1}):`, error);
-      
-      // Handle different error types
       if (error.name === 'AbortError') {
         console.log('Request was aborted due to timeout');
-      } else if (error.code === 'ECONNABORTED' || error.message.includes('timeout')) {
-        console.log('Request timed out');
-      } else if (error.response?.status === 401) {
-        setError('Session expired. Please login again.');
-        // Don't retry on auth errors
-        return;
-      }
-      
-      // Retry logic with exponential backoff
-      if (retryCount < maxRetries && isMountedRef.current) {
-        console.log(`Retrying in ${retryDelay}ms... (attempt ${retryCount + 1}/${maxRetries})`);
-        await new Promise(resolve => setTimeout(resolve, retryDelay));
-        
-        // Only retry if component is still mounted and on the same tab
-        if (isMountedRef.current && activeTab === 'returned') {
-          return fetchReturnedItems(forceRefresh, retryCount + 1);
-        }
       } else {
-        // Final failure after all retries
-        const errorMessage = error.response?.status === 500 
-          ? 'Server error. Please try again later.'
-          : error.message.includes('Network Error')
-          ? 'Network connection error. Please check your internet connection.'
-          : 'Failed to fetch returned items. Please try refreshing the page.';
-        
-        setError(errorMessage);
+        console.error('Error fetching returned items:', error);
+        setError('Failed to fetch returned items');
       }
     } finally {
       // Only clear loading state if we're not in polling mode and component is mounted
-      if (!isReturnedPolling && isMountedRef.current && retryCount === 0) {
+      if (!isReturnedPolling && isMountedRef.current) {
         setLoadingState(tabName, false);
       }
     }
@@ -637,7 +575,7 @@ export default function ConciergePage() {
   const filteredReturnedItems = returnedItems.filter(item =>
     item?.studentIdNumber?.toLowerCase().includes(returnedSearchTerm.toLowerCase())
   );
-  const itemsPerPageReturned = 5;
+  const itemsPerPageReturned = itemsPerPage;
   const totalReturnedPages = Math.ceil(filteredReturnedItems.length / itemsPerPageReturned);
   const paginatedReturnedItems = filteredReturnedItems.slice(
     (currentReturnedPage - 1) * itemsPerPageReturned,
@@ -1125,17 +1063,25 @@ export default function ConciergePage() {
     }
   };
 
-  // Handle borrow confirmation
+  // Show order summary and confirm borrow
+  const handleShowOrderSummary = () => {
+    const itemsToBorrow = availableItems.filter(item => item.cartQuantity > 0);
+    
+    if (itemsToBorrow.length === 0) {
+      setError('Please add items to borrow before confirming.');
+      return;
+    }
+    
+    setModalItems(itemsToBorrow);
+    setModalTime(new Date().toLocaleString());
+    setShowOrderSummary(true);
+  };
+
+  // Handle actual borrow confirmation
   const handleConfirmOrder = async () => {
     if (isSubmitting) return;
     
     const itemsToBorrow = availableItems.filter(item => item.cartQuantity > 0);
-    
-    if (itemsToBorrow.length === 0) {
-      setError('Your cart is empty. Please add items before confirming your borrow.');
-      return;
-    }
-
     const timestamp = new Date().toISOString();
     const orderDetails = {
       studentId: user._id,
@@ -1158,13 +1104,12 @@ export default function ConciergePage() {
         }
       );
 
-      setModalItems(itemsToBorrow);
-      setModalTime(new Date().toLocaleString());
       setModalType('borrow');
       setSuccess('Borrow Complete!');
       setShowSuccessModal(true);
-      setShowCart(false);
+      setShowOrderSummary(false);
 
+      // Reset quantities
       setAvailableItems(prevItems => 
         prevItems.map(item => ({ ...item, cartQuantity: 0 }))
       );
@@ -1288,77 +1233,97 @@ export default function ConciergePage() {
       {/* Return Success Modal */}
       <AnimatePresence>
         {showReturnSuccessModal && (
-          <div className="fixed inset-0 z-[100] overflow-y-auto">
-            <div className="flex items-center justify-center min-h-screen px-4 pt-4 pb-20 text-center sm:block sm:p-0">
-              <motion.div
-                initial={{ opacity: 0 }}
-                animate={{ opacity: 1 }}
-                exit={{ opacity: 0 }}
-                className="fixed inset-0 backdrop-blur-sm bg-white/30 transition-opacity"
-                aria-hidden="true"
-                onClick={() => setShowReturnSuccessModal(false)}
-              />
-              <span className="hidden sm:inline-block sm:align-middle sm:h-screen" aria-hidden="true">&#8203;</span>
-              <motion.div
-                initial={{ opacity: 0, scale: 0.95 }}
-                animate={{ opacity: 1, scale: 1 }}
-                exit={{ opacity: 0, scale: 0.95 }}
-                className="relative inline-block align-bottom bg-white rounded-2xl text-left overflow-hidden shadow-xl transform transition-all sm:my-8 sm:align-middle sm:max-w-lg sm:w-full"
-                role="dialog"
-                aria-modal="true"
-                aria-labelledby="modal-headline"
-              >
-                <div className="bg-white px-6 pt-6 pb-4 sm:p-6">
-                  <div className="sm:flex sm:items-start">
-                    <div className="mx-auto flex-shrink-0 flex items-center justify-center h-16 w-16 rounded-full bg-green-100 sm:mx-0 sm:h-12 sm:w-12">
-                      <svg className="h-8 w-8 text-green-600 sm:h-6 sm:w-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M5 13l4 4L19 7" />
-                      </svg>
-                    </div>
-                    <div className="mt-3 text-center sm:mt-0 sm:ml-4 sm:text-left">
-                      <h3 className="text-lg leading-6 font-medium text-gray-900" id="modal-headline">
-                        Return Successful! ✅
-                      </h3>
-                      <div className="mt-4 space-y-3">
-                        <div className="bg-green-50 p-4 rounded-lg border border-green-200">
-                          <p className="text-sm text-green-800 font-medium">
-                            Item has been successfully returned
-                          </p>
-                        </div>
-                        {returnedItemData && (
-                          <div className="bg-gray-50 p-4 rounded-lg border border-gray-200">
-                            <div className="space-y-2 text-sm text-gray-700">
-                              <p><span className="font-medium">Student ID:</span> {returnedItemData.studentIdNumber}</p>
-                              <p><span className="font-medium">Return Time:</span> {returnedItemData.returnTime.toLocaleString()}</p>
-                              <p><span className="font-medium">Items Returned:</span></p>
-                              <ul className="ml-4 space-y-1">
-                                {returnedItemData.items.map((item, index) => (
-                                  <li key={index} className="text-gray-600">
-                                    • {item.name} (x{item.quantity})
-                                  </li>
-                                ))}
-                              </ul>
-                            </div>
-                          </div>
-                        )}
-                      </div>
-                    </div>
-                  </div>
+          <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 backdrop-blur-sm">
+            <motion.div 
+              initial={{ scale: 0.9, opacity: 0 }}
+              animate={{ scale: 1, opacity: 1 }}
+              className="bg-[#1e293b] rounded-2xl p-6 max-w-sm w-full shadow-xl border-2 border-gray-700/50"
+            >
+              <div className="text-center space-y-4">
+                <div className="w-16 h-16 bg-green-900/50 rounded-full flex items-center justify-center mx-auto">
+                  <svg xmlns="http://www.w3.org/2000/svg" className="h-8 w-8 text-green-400" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M5 13l4 4L19 7" />
+                  </svg>
                 </div>
-                <div className="bg-gray-50 px-6 py-4 sm:px-6 sm:flex sm:flex-row-reverse">
-                  <button
-                    type="button"
-                    onClick={() => setShowReturnSuccessModal(false)}
-                    className="w-full inline-flex justify-center rounded-xl border border-transparent shadow-sm px-4 py-3 bg-green-600 text-base font-medium text-white hover:bg-green-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-green-500 sm:ml-3 sm:w-auto sm:text-sm transition-colors"
-                  >
-                    Great! 👍
-                  </button>
+                <h3 className="text-xl font-bold text-gray-200">
+                  Return Complete!
+                </h3>
+                <div className="bg-gray-800/50 p-4 rounded-xl">
+                  {returnedItemData && (
+                    <>
+                      <p className="text-gray-300 mb-2">
+                        <span className="font-bold text-gray-200">ID Number:</span> {returnedItemData.studentIdNumber}
+                      </p>
+                      <p className="text-gray-300 mb-2">
+                        <span className="font-bold text-gray-200">Return Time:</span> {returnedItemData.returnTime.toLocaleString()}
+                      </p>
+                      <p className="text-gray-300">
+                        <span className="font-bold text-gray-200">Returned Items:</span>
+                      </p>
+                      <ul className="text-gray-300 mt-2 space-y-1">
+                        {returnedItemData.items.map((item, index) => (
+                          <li key={index}>• {item.name} (x{item.quantity})</li>
+                        ))}
+                      </ul>
+                    </>
+                  )}
                 </div>
-              </motion.div>
-            </div>
+                <button 
+                  onClick={() => setShowReturnSuccessModal(false)}
+                  className="w-full py-3 bg-blue-600 text-white rounded-xl font-bold hover:bg-blue-700 transition-all"
+                >
+                  OK
+                </button>
+              </div>
+            </motion.div>
           </div>
         )}
       </AnimatePresence>
+      {/* Order Summary Modal */}
+      {showOrderSummary && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 backdrop-blur-sm">
+          <motion.div 
+            initial={{ scale: 0.9, opacity: 0 }}
+            animate={{ scale: 1, opacity: 1 }}
+            className="bg-white rounded-2xl p-6 max-w-md w-full mx-4 shadow-xl"
+          >
+            <h3 className="text-xl font-bold text-gray-800 mb-4">Order Summary</h3>
+            <div className="space-y-4 mb-6">
+              {modalItems.map((item, index) => (
+                <div key={index} className="flex justify-between items-center">
+                  <span className="text-gray-700">{item.name} (x{item.cartQuantity})</span>
+                  <span className="font-medium">{item.cartQuantity} {item.cartQuantity > 1 ? 'items' : 'item'}</span>
+                </div>
+              ))}
+              <div className="border-t border-gray-200 pt-4 mt-4">
+                <div className="flex justify-between font-semibold text-gray-800">
+                  <span>Total Items:</span>
+                  <span>{modalItems.reduce((total, item) => total + item.cartQuantity, 0)} items</span>
+                </div>
+              </div>
+            </div>
+            <div className="flex justify-end space-x-3">
+              <button
+                onClick={() => setShowOrderSummary(false)}
+                className="px-4 py-2 border border-gray-300 rounded-lg text-gray-700 hover:bg-gray-50"
+              >
+                Cancel
+              </button>
+              <button
+                onClick={handleConfirmOrder}
+                disabled={isSubmitting}
+                className={`px-6 py-2 rounded-lg text-white ${
+                  isSubmitting
+                    ? 'bg-purple-400 cursor-not-allowed'
+                    : 'bg-purple-600 hover:bg-purple-700'
+                }`}
+              >
+                {isSubmitting ? 'Processing...' : 'Confirm Borrow'}
+              </button>
+            </div>
+          </motion.div>
+        </div>
+      )}
       {/* Tab Navigation */}
       <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-4 bg-white fixed top-[72px] left-0 right-0 z-[90] shadow-sm">
         <div className="flex space-x-2 overflow-x-auto pb-2 scrollbar-hide">
@@ -1371,14 +1336,12 @@ export default function ConciergePage() {
             <button
               key={id}
               onClick={() => {
+                // Clear cache for the previous tab to ensure fresh data when switching back
                 if (id !== activeTab) {
-                  // Clear any existing errors when switching tabs
-                  setError('');
-                  
-                  // Don't clear cache immediately to allow for quick tab switching
-                  // Cache will be cleared by the cleanup effect if needed
-                  setActiveTab(id);
+                  const previousCacheKey = `${activeTab}_${startDate}_${endDate}`;
+                  clearCache(previousCacheKey);
                 }
+                setActiveTab(id);
               }}
               className={`flex items-center space-x-2 px-4 py-2.5 rounded-xl whitespace-nowrap transition-all ${
                 activeTab === id
@@ -1754,68 +1717,77 @@ export default function ConciergePage() {
           <motion.div
             initial={{ opacity: 0, y: 20 }}
             animate={{ opacity: 1, y: 0 }}
-            className="space-y-6"
+            className="space-y-6 pb-24"
           >
             <div className="text-center">
-              <h2 className="text-2xl font-bold text-gray-800">Borrow Items</h2>
-              <p className="text-gray-600 mt-1">Select items to borrow for your needs</p>
+              <h2 className="text-3xl font-bold text-gray-800">Borrow Items</h2>
+              <p className="text-gray-600 mt-2 text-lg">Select items to borrow for your needs</p>
             </div>
 
             {/* Available Items Grid */}
-            <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+            <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-6 px-2">
               {availableItems.map((item) => (
                 <motion.div 
                   key={item.id}
                   whileHover={{ scale: 1.02 }}
-                  className={`bg-white rounded-xl shadow-md overflow-hidden border border-gray-200 ${
-                    item.isSet ? 'md:col-span-2' : ''
-                  }`}
+                  whileTap={{ scale: 0.98 }}
+                  className="bg-white rounded-2xl shadow-lg overflow-hidden border-2 border-gray-100 hover:border-purple-200 transition-all"
                 >
-                  <div className="p-4">
-                    <div className="flex items-start space-x-4">
-                      <div className="flex-shrink-0">
-                        <img 
-                          src={item.image} 
-                          alt={item.name}
-                          className="w-16 h-16 object-contain"
-                        />
-                      </div>
-                      <div className="flex-1">
-                        <h3 className="font-medium text-gray-900">{item.name}</h3>
-                        <p className="text-sm text-gray-500 mt-1">{item.description}</p>
-                        <div className="mt-3 flex items-center space-x-2">
-                          <button
-                            onClick={() => {
-                              setAvailableItems(prevItems =>
-                                prevItems.map(i =>
-                                  i.id === item.id
-                                    ? { ...i, cartQuantity: Math.max(0, i.cartQuantity - 1) }
-                                    : i
-                                )
-                              );
-                            }}
-                            className="p-1 rounded-full hover:bg-gray-100"
-                          >
-                            <MinusIcon className="w-5 h-5 text-gray-500" />
-                          </button>
-                          <span className="w-8 text-center font-medium text-gray-700">
-                            {item.cartQuantity}
-                          </span>
-                          <button
-                            onClick={() => {
-                              setAvailableItems(prevItems =>
-                                prevItems.map(i =>
-                                  i.id === item.id
-                                    ? { ...i, cartQuantity: i.cartQuantity + 1 }
-                                    : i
-                                )
-                              );
-                            }}
-                            className="p-1 rounded-full hover:bg-gray-100"
-                          >
-                            <PlusIcon className="w-5 h-5 text-gray-500" />
-                          </button>
+                  <div className="p-5 h-full flex flex-col">
+                    <div className="flex-1">
+                      <div className="flex items-start space-x-4">
+                        <div className="flex-shrink-0 bg-gray-50 p-3 rounded-xl">
+                          <img 
+                            src={item.image} 
+                            alt={item.name}
+                            className="w-16 h-16 sm:w-20 sm:h-20 object-contain"
+                          />
                         </div>
+                        <div className="min-w-0">
+                          <h3 className="text-lg sm:text-xl font-semibold text-gray-900 truncate">{item.name}</h3>
+                          {item.description && (
+                            <p className="text-gray-600 font-bold mt-1 text-s">{item.description}</p>
+                          )}
+                        </div>
+                      </div>
+                    </div>
+                    <div className="mt-4 flex items-center justify-between">
+                      <div className="flex items-center space-x-3 bg-gray-50 rounded-full px-2 py-1">
+                        <button
+                          onClick={(e) => {
+                            e.stopPropagation();
+                            setAvailableItems(prevItems =>
+                              prevItems.map(i =>
+                                i.id === item.id
+                                  ? { ...i, cartQuantity: Math.max(0, i.cartQuantity - 1) }
+                                  : i
+                              )
+                            );
+                          }}
+                          className="p-2 rounded-full hover:bg-gray-200 active:bg-gray-300 transition-colors"
+                          aria-label={`Decrease ${item.name} quantity`}
+                        >
+                          <MinusIcon className="w-5 h-5 sm:w-6 sm:h-6 text-gray-600" />
+                        </button>
+                        <span className="w-8 text-center text-base sm:text-lg font-bold text-gray-800">
+                          {item.cartQuantity}
+                        </span>
+                        <button
+                          onClick={(e) => {
+                            e.stopPropagation();
+                            setAvailableItems(prevItems =>
+                              prevItems.map(i =>
+                                i.id === item.id
+                                  ? { ...i, cartQuantity: i.cartQuantity + 1 }
+                                  : i
+                              )
+                            );
+                          }}
+                          className="p-2 rounded-full hover:bg-gray-200 active:bg-gray-300 transition-colors"
+                          aria-label={`Increase ${item.name} quantity`}
+                        >
+                          <PlusIcon className="w-5 h-5 sm:w-6 sm:h-6 text-gray-600" />
+                        </button>
                       </div>
                     </div>
                   </div>
@@ -1823,27 +1795,33 @@ export default function ConciergePage() {
               ))}
             </div>
 
-            {/* Cart Summary */}
+            {/* Floating Action Button for Mobile */}
             {availableItems.some(item => item.cartQuantity > 0) && (
-              <div className="fixed bottom-0 left-0 right-0 bg-white border-t border-gray-200 p-4">
-                <div className="max-w-7xl mx-auto flex justify-between items-center">
-                  <div className="flex items-center space-x-4">
-                    <span className="text-gray-600">
-                      {availableItems.filter(item => item.cartQuantity > 0).length} items selected
-                    </span>
-                  </div>
-                  <button
-                    onClick={handleConfirmOrder}
-                    disabled={isSubmitting}
-                    className={`px-6 py-2 rounded-lg font-medium text-white ${
-                      isSubmitting
-                        ? 'bg-purple-400 cursor-not-allowed'
-                        : 'bg-purple-600 hover:bg-purple-700'
-                    }`}
-                  >
-                    {isSubmitting ? 'Processing...' : 'Confirm Borrow'}
-                  </button>
-                </div>
+              <div className="fixed bottom-4 left-1/2 transform -translate-x-1/2 w-full max-w-md px-4 z-10">
+                <motion.button
+                  onClick={handleShowOrderSummary}
+                  disabled={isSubmitting}
+                  whileTap={{ scale: 0.98 }}
+                  className={`w-full py-4 px-6 rounded-2xl font-bold text-lg shadow-lg transform transition-all ${
+                    isSubmitting
+                      ? 'bg-purple-400 cursor-not-allowed'
+                      : 'bg-gradient-to-r from-purple-600 to-indigo-600 hover:from-purple-700 hover:to-indigo-700 active:scale-95'
+                  } text-white`}
+                >
+                  {isSubmitting ? (
+                    <div className="flex items-center justify-center space-x-2">
+                      <div className="w-5 h-5 border-2 border-white border-t-transparent rounded-full animate-spin"></div>
+                      <span>Processing...</span>
+                    </div>
+                  ) : (
+                    <div className="flex items-center justify-between">
+                      <span>Confirm Borrow</span>
+                      <span className="bg-white/20 px-3 py-1 rounded-full text-sm">
+                        {availableItems.reduce((total, item) => total + item.cartQuantity, 0)} items
+                      </span>
+                    </div>
+                  )}
+                </motion.button>
               </div>
             )}
           </motion.div>
@@ -1852,68 +1830,67 @@ export default function ConciergePage() {
 
       {/* Success Modal */}
       {showSuccessModal && (
-        <div className="fixed inset-0 z-50 overflow-y-auto">
-          <div className="flex items-center justify-center min-h-screen px-4 pt-4 pb-20 text-center sm:block sm:p-0">
-            <div 
-              className="fixed inset-0 transition-opacity" 
-              aria-hidden="true"
-              onClick={() => {
-                setShowSuccessModal(false);
-                setModalItems([]);
-                setModalTime('');
-              }}
-            >
-              <div className="absolute inset-0"></div>
-            </div>
-            <span className="hidden sm:inline-block sm:align-middle sm:h-screen" aria-hidden="true">&#8203;</span>
-            <div className="inline-block align-bottom bg-white rounded-lg text-left overflow-hidden shadow-xl transform transition-all sm:my-8 sm:align-middle sm:max-w-lg sm:w-full">
-              <div className="bg-white px-4 pt-5 pb-4 sm:p-6 sm:pb-4">
-                <div className="sm:flex sm:items-start">
-                  <div className="mx-auto flex-shrink-0 flex items-center justify-center h-12 w-12 rounded-full bg-green-100 sm:mx-0 sm:h-10 sm:w-10">
-                    <CheckIcon className="h-6 w-6 text-green-600" />
-                  </div>
-                  <div className="mt-3 text-center sm:mt-0 sm:ml-4 sm:text-left">
-                    <h3 className="text-lg leading-6 font-medium text-gray-900">
-                      {success}
-                    </h3>
-                    <div className="mt-4 bg-gray-50 p-4 rounded-lg">
-                      <p className="text-gray-700">
-                        <span className="font-medium">ID Number:</span> {user.idNumber}
-                      </p>
-                      <p className="text-gray-700 mt-2">
-                        <span className="font-medium">Time:</span> {modalTime}
-                      </p>
-                      <p className="text-gray-700 mt-2">
-                        <span className="font-medium">Items:</span>
-                      </p>
-                      <ul className="mt-1 space-y-1">
-                        {modalItems.map((item, index) => (
-                          <li key={index} className="text-gray-600">
-                            • {item.name} (x{item.quantity || item.cartQuantity})
-                          </li>
-                        ))}
-                      </ul>
-                    </div>
-                  </div>
-                </div>
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 backdrop-blur-sm">
+          <motion.div 
+            initial={{ scale: 0.9, opacity: 0 }}
+            animate={{ scale: 1, opacity: 1 }}
+            className="bg-[#1e293b] rounded-2xl p-6 max-w-sm w-full shadow-xl border-2 border-gray-700/50"
+          >
+            <div className="text-center space-y-4">
+              <div className="w-16 h-16 bg-green-900/50 rounded-full flex items-center justify-center mx-auto">
+                <svg xmlns="http://www.w3.org/2000/svg" className="h-8 w-8 text-green-400" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M5 13l4 4L19 7" />
+                </svg>
               </div>
-              <div className="bg-gray-50 px-4 py-3 sm:px-6 sm:flex sm:flex-row-reverse">
-                <button
-                  type="button"
-                  onClick={() => {
-                    setShowSuccessModal(false);
-                    setModalItems([]);
-                    setModalTime('');
-                  }}
-                  className="w-full inline-flex justify-center rounded-md border border-transparent shadow-sm px-4 py-2 bg-purple-600 text-base font-medium text-white hover:bg-purple-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-purple-500 sm:ml-3 sm:w-auto sm:text-sm"
-                >
-                  OK
-                </button>
+              <h3 className="text-xl font-bold text-gray-200">
+                {modalType === 'borrow' ? 'Borrow Complete!' : 'Return Complete!'}
+              </h3>
+              <div className="bg-gray-800/50 p-4 rounded-xl">
+                <p className="text-gray-300 mb-2">
+                  <span className="font-bold text-gray-200">ID Number:</span> {user.idNumber}
+                </p>
+                <p className="text-gray-300 mb-2">
+                  <span className="font-bold text-gray-200">
+                    {modalType === 'borrow' ? 'Borrow Time:' : 'Return Time:'}
+                  </span> {modalTime}
+                </p>
+                <p className="text-gray-300">
+                  <span className="font-bold text-gray-200">
+                    {modalType === 'borrow' ? 'Borrowed Items:' : 'Returned Items:'}
+                  </span>
+                </p>
+                <ul className="text-gray-300 mt-2 space-y-1">
+                  {modalItems.map((item, index) => (
+                    <li key={index}>• {item.name} (x{item.quantity || item.cartQuantity})</li>
+                  ))}
+                </ul>
               </div>
+              <button 
+                onClick={() => {
+                  setShowSuccessModal(false);
+                  if (modalType === 'return') {
+                    setShowFeedbackForm(true);
+                  }
+                  if (modalType === 'borrow') {
+                    // Reset the cart quantities to zero
+                    setAvailableItems(prevItems => 
+                      prevItems.map(item => ({
+                        ...item,
+                        cartQuantity: 0
+                      }))
+                    );
+                  }
+                  setModalItems([]); // Clear modal items
+                  setModalTime(''); // Clear modal time
+                }}
+                className="w-full py-3 bg-blue-600 text-white rounded-xl font-bold hover:bg-blue-700 transition-all"
+              >
+                OK
+              </button>
             </div>
-          </div>
+          </motion.div>
         </div>
-      )}
+      )} 
     </div>
   );
 } 
