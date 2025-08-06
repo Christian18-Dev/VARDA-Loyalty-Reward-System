@@ -149,7 +149,6 @@ export default function CashierPage() {
       '      2GONZ LOYALTY REWARD\n' +
       '    -------------------------\n\n' +
       `    Code: ${generatedCode}\n` +
-      '    Valid: 24 HOURS\n' +
       `    ${new Date().toLocaleString()}\n\n` +
       '    HOW TO REDEEM:\n' +
       '    1. Visit: www.2gonz.com\n' +
@@ -328,7 +327,6 @@ export default function CashierPage() {
         '      2GONZ LOYALTY REWARD\n' +
         '    -------------------------\n\n' +
         `    Code: ${generatedCode}\n` +
-        '    Valid: 24 HOURS\n' +
         `    ${new Date().toLocaleString()}\n\n` +
         '    HOW TO REDEEM:\n' +
         '    1. Visit: www.2gonz.com\n' +

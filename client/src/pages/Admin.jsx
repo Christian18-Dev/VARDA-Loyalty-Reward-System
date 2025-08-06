@@ -198,6 +198,13 @@ export default function AdminPage() {
   const [feedbackComments, setFeedbackComments] = useState([]);
   const [isExportingFeedback, setIsExportingFeedback] = useState(false);
 
+  // Redemption history state
+  const [redemptionHistory, setRedemptionHistory] = useState([]);
+  const [redemptionPage, setRedemptionPage] = useState(1);
+  const [redemptionTotalPages, setRedemptionTotalPages] = useState(1);
+  const [redemptionSearchTerm, setRedemptionSearchTerm] = useState('');
+  const [isRedemptionLoading, setIsRedemptionLoading] = useState(false);
+
   const token = user.token;
   const baseUrl = import.meta.env.VITE_API_BASE_URL;
 
@@ -1232,6 +1239,68 @@ export default function AdminPage() {
     }
   };
 
+  // Add new function to fetch redemption history with caching
+  const fetchRedemptionHistory = async (page = 1, search = '', forceRefresh = false) => {
+    const tabName = 'redemption-history';
+    
+    // Check cache first (unless force refresh)
+    if (!forceRefresh) {
+      const cached = getCachedData(tabName);
+      if (cached && cached.page === page && cached.search === search) {
+        setRedemptionHistory(cached.redemptionHistory);
+        setRedemptionPage(cached.currentPage);
+        setRedemptionTotalPages(cached.totalPages);
+        return cached;
+      }
+    }
+
+    try {
+      setIsRedemptionLoading(true);
+      const controller = new AbortController();
+      const timeoutId = setTimeout(() => controller.abort(), 10000);
+
+      const response = await axios.get(
+        `${baseUrl}/api/admin/redemption-history?page=${page}&limit=10&search=${search}`,
+        { 
+          headers: { Authorization: `Bearer ${token}` },
+          signal: controller.signal
+        }
+      );
+      
+      clearTimeout(timeoutId);
+
+      if (!isMountedRef.current) return;
+
+      const data = {
+        redemptionHistory: response.data.redemptionHistory,
+        currentPage: response.data.currentPage,
+        totalPages: response.data.totalPages,
+        page,
+        search
+      };
+
+      setRedemptionHistory(data.redemptionHistory);
+      setRedemptionPage(data.currentPage);
+      setRedemptionTotalPages(data.totalPages);
+      
+      // Cache the data
+      setCachedData(tabName, data);
+      
+      return data;
+    } catch (error) {
+      if (error.name === 'AbortError') {
+        console.log('Redemption history request was aborted');
+      } else {
+        console.error('Error fetching redemption history:', error);
+        setError('Failed to fetch redemption history records');
+      }
+    } finally {
+      if (isMountedRef.current) {
+        setIsRedemptionLoading(false);
+      }
+    }
+  };
+
   // Add effect for points usage tab with caching
   useEffect(() => {
     let isMounted = true;
@@ -1274,6 +1343,50 @@ export default function AdminPage() {
   // Add points usage page change handler
   const handlePointsUsagePageChange = (newPage) => {
     setPointsUsagePage(newPage);
+  };
+
+  // Add effect for redemption history tab with caching
+  useEffect(() => {
+    let isMounted = true;
+    
+    if (activeTab === 'redemption-history') {
+      const loadRedemptionHistoryData = async () => {
+        if (!isMounted || !isMountedRef.current) return;
+        
+        try {
+          // Check cache first
+          const cached = getCachedData('redemption-history');
+          if (cached && cached.page === redemptionPage && cached.search === redemptionSearchTerm) {
+            setRedemptionHistory(cached.redemptionHistory);
+            setRedemptionPage(cached.currentPage);
+            setRedemptionTotalPages(cached.totalPages);
+            return;
+          }
+          
+          // Fetch fresh data
+          await fetchRedemptionHistory(redemptionPage, redemptionSearchTerm);
+        } catch (error) {
+          console.error('Error loading redemption history data:', error);
+        }
+      };
+
+      loadRedemptionHistoryData();
+    }
+    
+    return () => {
+      isMounted = false;
+    };
+  }, [activeTab, redemptionPage, redemptionSearchTerm]);
+
+  // Add redemption history search handler
+  const handleRedemptionHistorySearch = (e) => {
+    setRedemptionSearchTerm(e.target.value);
+    setRedemptionPage(1);
+  };
+
+  // Add redemption history page change handler
+  const handleRedemptionHistoryPageChange = (newPage) => {
+    setRedemptionPage(newPage);
   };
 
   // PDF styles and component
@@ -3165,6 +3278,7 @@ export default function AdminPage() {
             { id: 'borrowed', icon: ArrowLeftIcon, label: 'Borrowed' },
             { id: 'returned', icon: ArrowRightIcon, label: 'Returned' },
             { id: 'points-usage', icon: CurrencyDollarIcon, label: 'Points Usage' },
+            { id: 'redemption-history', icon: CurrencyDollarIcon, label: 'Redemption History' },
             { id: 'reports', icon: DocumentReportIcon, label: 'Reports' },
             { id: 'feedback', icon: ChatAltIcon, label: 'Feedback' }
           ].map(({ id, icon: Icon, label }) => (
@@ -4386,6 +4500,133 @@ export default function AdminPage() {
                 </div>
               ))}
             </div>
+          </motion.div>
+        )}
+
+        {/* Redemption History Tab */}
+        {activeTab === 'redemption-history' && (
+          <motion.div
+            initial={{ opacity: 0, y: 20 }}
+            animate={{ opacity: 1, y: 0 }}
+            className="bg-white rounded-2xl shadow-lg p-4 sm:p-6"
+          >
+            <div className="flex items-center space-x-3 mb-6">
+              <div className="p-2 bg-purple-100 rounded-lg">
+                <CurrencyDollarIcon className="w-6 h-6 text-purple-600" />
+              </div>
+              <div>
+                <h2 className="text-2xl font-bold text-gray-800">Redemption History</h2>
+                <p className="text-gray-600 mt-1">View history of code redemptions by students</p>
+              </div>
+            </div>
+
+            {/* Search Bar */}
+            <div className="mb-6">
+              <div className="relative">
+                <input
+                  type="text"
+                  placeholder="Search by ID Number or Code..."
+                  value={redemptionSearchTerm}
+                  onChange={handleRedemptionHistorySearch}
+                  className="w-full pl-10 pr-4 py-2 border border-gray-300 rounded-xl focus:ring-2 focus:ring-purple-500 focus:border-transparent"
+                />
+                <svg className="absolute left-3 top-2.5 w-5 h-5 text-gray-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z" />
+                </svg>
+              </div>
+            </div>
+
+            <div className="overflow-x-auto">
+              {isRedemptionLoading ? (
+                <div className="flex justify-center items-center py-12">
+                  <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-purple-600"></div>
+                  <span className="ml-2 text-gray-600">Loading redemption history...</span>
+                </div>
+              ) : (
+                <>
+                  <table className="min-w-full divide-y divide-gray-200">
+                    <thead className="bg-gray-50">
+                      <tr>
+                        <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                          ID Number
+                        </th>
+                        <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                          Code Claimed
+                        </th>
+                        <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                          Date & Time
+                        </th>
+                      </tr>
+                    </thead>
+                    <tbody className="bg-white divide-y divide-gray-200">
+                      {redemptionHistory.map((redemption, index) => (
+                        <tr key={index} className="hover:bg-gray-50">
+                          <td className="px-6 py-4 whitespace-nowrap text-sm font-medium text-gray-900">
+                            {redemption.redeemedBy}
+                          </td>
+                          <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500">
+                            <span className="px-2 py-1 text-xs font-semibold rounded-full bg-purple-100 text-purple-800">
+                              {redemption.code}
+                            </span>
+                          </td>
+                          <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500">
+                            {new Date(redemption.redeemedAt).toLocaleString('en-US', {
+                              timeZone: 'Asia/Manila',
+                              year: 'numeric',
+                              month: 'short',
+                              day: 'numeric',
+                              hour: '2-digit',
+                              minute: '2-digit',
+                              second: '2-digit'
+                            })}
+                          </td>
+                        </tr>
+                      ))}
+                    </tbody>
+                  </table>
+                  {redemptionHistory.length === 0 && (
+                    <div className="text-center py-12">
+                      <p className="text-gray-500">No redemption history found.</p>
+                    </div>
+                  )}
+                </>
+              )}
+            </div>
+
+            {/* Pagination */}
+            {redemptionTotalPages > 1 && (
+              <div className="flex justify-center items-center mt-6 space-x-4">
+                <button
+                  onClick={() => handleRedemptionHistoryPageChange(Math.max(1, redemptionPage - 1))}
+                  disabled={redemptionPage === 1 || isRedemptionLoading}
+                  className={`p-2 rounded-lg transition-colors ${
+                    redemptionPage === 1 || isRedemptionLoading
+                      ? 'text-gray-400 cursor-not-allowed'
+                      : 'text-gray-700 hover:bg-gray-100'
+                  }`}
+                >
+                  <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M15 19l-7-7 7-7" />
+                  </svg>
+                </button>
+                <span className="text-gray-700 font-medium">
+                  Page {redemptionPage} of {redemptionTotalPages}
+                </span>
+                <button
+                  onClick={() => handleRedemptionHistoryPageChange(Math.min(redemptionTotalPages, redemptionPage + 1))}
+                  disabled={redemptionPage === redemptionTotalPages || isRedemptionLoading}
+                  className={`p-2 rounded-lg transition-colors ${
+                    redemptionPage === redemptionTotalPages || isRedemptionLoading
+                      ? 'text-gray-400 cursor-not-allowed'
+                      : 'text-gray-700 hover:bg-gray-100'
+                  }`}
+                >
+                  <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M9 5l7 7-7 7" />
+                  </svg>
+                </button>
+              </div>
+            )}
           </motion.div>
         )}
       </div>

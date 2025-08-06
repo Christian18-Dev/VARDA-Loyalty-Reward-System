@@ -28,8 +28,10 @@ export const claimCode = async (req, res) => {
     req.user.points += pointsToAward;
     await req.user.save();
 
-    // Mark code as inactive
+    // Mark code as inactive and store redemption info
     foundCode.status = 'inactive';
+    foundCode.redeemedBy = req.user.idNumber;
+    foundCode.redeemedAt = new Date();
     await foundCode.save();
 
     res.status(200).json({ 
@@ -59,8 +61,9 @@ export const claimReward = async (req, res) => {
       return res.status(400).json({ message: 'Not enough points' });
     }
 
-    // Deduct points and save user
+    // Deduct points and increment pointsUsed
     req.user.points -= reward.cost;
+    req.user.pointsUsed += reward.cost;
     await req.user.save();
 
     // Record the claim

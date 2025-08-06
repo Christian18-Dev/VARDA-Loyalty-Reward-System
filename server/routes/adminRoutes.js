@@ -1,6 +1,6 @@
 import express from 'express';
 import { protect, admin } from '../middleware/authMiddleware.js';
-import { getStats, createReward, getUsers, getClaimedRewards, updateUserRole, updateUserPassword, getAllPointsUsage } from '../controllers/adminController.js';
+import { getStats, createReward, getUsers, getClaimedRewards, updateUserRole, updateUserPassword, getAllPointsUsage, getRedemptionHistory, validateBorrowGraphData } from '../controllers/adminController.js';
 import { getBorrowedItems, getBorrowedItemHistory, getReturnedItemHistory, deleteReturnedItem } from '../controllers/borrowedItemController.js';
 import { exportBorrowedItems, exportReturnedItems } from '../controllers/exportController.js';
 import { getFeedbackStats, getFeedbackComments } from '../controllers/feedbackController.js';
@@ -26,6 +26,9 @@ router.get('/export/returned-items', protect, admin, exportReturnedItems);
 
 // Points usage route
 router.get('/points-usage', protect, admin, getAllPointsUsage);
+
+// Redemption history route
+router.get('/redemption-history', protect, admin, getRedemptionHistory);
 
 // Get feedback statistics
 router.get('/feedback-stats', protect, admin, getFeedbackStats);

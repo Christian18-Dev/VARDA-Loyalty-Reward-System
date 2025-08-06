@@ -103,6 +103,8 @@ export default function StudentPage() {
   const [showSuccessModal, setShowSuccessModal] = useState(false);
   const [showCodeSuccessModal, setShowCodeSuccessModal] = useState(false);
   const [codeSuccessMessage, setCodeSuccessMessage] = useState('');
+  const [showCodeErrorModal, setShowCodeErrorModal] = useState(false);
+  const [codeErrorMessage, setCodeErrorMessage] = useState('');
   const [message, setMessage] = useState({ type: '', text: '' });
   const [error, setError] = useState('');
   const [currentReturnItem, setCurrentReturnItem] = useState(null);
@@ -346,7 +348,7 @@ export default function StudentPage() {
     if (isLoading) return; // Prevent multiple submissions
     
     if (!code.trim()) {
-      setErrorMessage('Please enter a code');
+      setShowCodeErrorModal(true);
       return;
     }
 
@@ -362,6 +364,9 @@ export default function StudentPage() {
       setErrorMessage('');
       setCodeSuccessMessage(`Code claimed successfully! You earned 1 point!`);
       setPoints(response.data.newPoints);
+      
+      // Clear the input field on success
+      setCode('');
     
       // Show success modal first
       setShowCodeSuccessModal(true);
@@ -369,11 +374,17 @@ export default function StudentPage() {
       confetti({ particleCount: 100, spread: 70, origin: { y: 0.6 } });
     } catch (error) {
       console.error('Error submitting code:', error);
+      let errorMsg = 'An unexpected error occurred. Please try again.';
+      
       if (error.response && error.response.status === 400) {
-        setErrorMessage(error.response.data.message || 'Code is invalid or already used.');
-      } else {
-        setErrorMessage('An unexpected error occurred. Please try again.');
+        errorMsg = error.response.data.message || 'Code is invalid or already used.';
       }
+      
+      // Show error popup and clear input field
+      setCodeErrorMessage(errorMsg);
+      setShowCodeErrorModal(true);
+      setCode(''); // Clear the input field
+      setErrorMessage(''); // Clear any existing error message
     } finally {
       setIsLoading(false);
     }
@@ -1193,6 +1204,95 @@ export default function StudentPage() {
               >
                 OK
               </button>
+            </div>
+          </motion.div>
+        </div>
+      )}
+
+      {/* Code Error Modal */}
+      {showCodeErrorModal && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 backdrop-blur-sm">
+          <motion.div 
+            initial={{ scale: 0.8, opacity: 0, y: 20 }}
+            animate={{ scale: 1, opacity: 1, y: 0 }}
+            exit={{ scale: 0.8, opacity: 0, y: 20 }}
+            transition={{ type: "spring", damping: 25, stiffness: 300 }}
+            className="bg-gradient-to-br from-slate-800 to-slate-900 rounded-3xl p-8 max-w-sm w-full mx-4 shadow-2xl border border-red-500/30 relative overflow-hidden"
+          >
+            {/* Animated background gradient */}
+            <div className="absolute inset-0 bg-gradient-to-r from-red-500/10 via-orange-500/10 to-red-500/10 animate-pulse"></div>
+            
+            <div className="relative z-10 text-center space-y-6">
+              {/* Enhanced icon with animation */}
+              <motion.div 
+                initial={{ scale: 0, rotate: -180 }}
+                animate={{ scale: 1, rotate: 0 }}
+                transition={{ delay: 0.2, type: "spring", damping: 15 }}
+                className="w-20 h-20 bg-gradient-to-br from-red-500/20 to-orange-500/20 rounded-full flex items-center justify-center mx-auto border-2 border-red-400/30 shadow-lg"
+              >
+                <motion.div
+                  animate={{ rotate: [0, -10, 10, -10, 0] }}
+                  transition={{ duration: 0.5, delay: 0.5 }}
+                >
+                  <svg xmlns="http://www.w3.org/2000/svg" className="h-10 w-10 text-red-400" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 8v4m0 4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z" />
+                  </svg>
+                </motion.div>
+              </motion.div>
+              
+              {/* Enhanced title */}
+              <motion.div
+                initial={{ opacity: 0, y: 10 }}
+                animate={{ opacity: 1, y: 0 }}
+                transition={{ delay: 0.3 }}
+              >
+                <h3 className="text-2xl font-bold bg-gradient-to-r from-red-400 to-orange-400 bg-clip-text text-transparent">
+                  Oops! Code Not Found
+                </h3>
+                <div className="w-16 h-1 bg-gradient-to-r from-red-500 to-orange-500 rounded-full mx-auto mt-2"></div>
+              </motion.div>
+              
+              {/* Enhanced message */}
+              <motion.div
+                initial={{ opacity: 0, y: 10 }}
+                animate={{ opacity: 1, y: 0 }}
+                transition={{ delay: 0.4 }}
+                className="bg-slate-800/50 p-4 rounded-2xl border border-slate-700/50"
+              >
+                <p className="text-gray-300 text-base leading-relaxed">
+                  {codeErrorMessage.includes('invalid') || codeErrorMessage.includes('used') || codeErrorMessage.includes('not found') ? 
+                    "The code you entered doesn't seem to be valid. Please double-check and try again!" : 
+                    codeErrorMessage
+                  }
+                </p>
+                <div className="flex items-center justify-center mt-3 text-xs text-gray-400">
+                  <svg xmlns="http://www.w3.org/2000/svg" className="h-4 w-4 mr-1" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M13 16h-1v-4h-1m1-4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z" />
+                  </svg>
+                  Enter the correct code
+                </div>
+              </motion.div>
+              
+              {/* Enhanced button */}
+              <motion.button 
+                initial={{ opacity: 0, y: 10 }}
+                animate={{ opacity: 1, y: 0 }}
+                transition={{ delay: 0.5 }}
+                whileHover={{ scale: 1.05, boxShadow: "0 10px 25px rgba(239, 68, 68, 0.3)" }}
+                whileTap={{ scale: 0.95 }}
+                onClick={() => {
+                  setShowCodeErrorModal(false);
+                  setCodeErrorMessage('');
+                }}
+                className="w-full py-4 bg-gradient-to-r from-red-500 to-orange-500 text-white rounded-2xl font-bold text-lg shadow-lg hover:from-red-600 hover:to-orange-600 transition-all duration-300 border border-red-400/30"
+              >
+                <span className="flex items-center justify-center">
+                  <svg xmlns="http://www.w3.org/2000/svg" className="h-5 w-5 mr-2" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15" />
+                  </svg>
+                  Try Again
+                </span>
+              </motion.button>
             </div>
           </motion.div>
         </div>
