@@ -3,7 +3,7 @@ import { protect, admin } from '../middleware/authMiddleware.js';
 import { getStats, createReward, getUsers, getClaimedRewards, updateUserRole, updateUserPassword, getAllPointsUsage } from '../controllers/adminController.js';
 import { getBorrowedItems, getBorrowedItemHistory, getReturnedItemHistory, deleteReturnedItem } from '../controllers/borrowedItemController.js';
 import { exportBorrowedItems, exportReturnedItems } from '../controllers/exportController.js';
-import { getFeedbackStats } from '../controllers/feedbackController.js';
+import { getFeedbackStats, getFeedbackComments } from '../controllers/feedbackController.js';
 
 const router = express.Router();
 
@@ -29,5 +29,8 @@ router.get('/points-usage', protect, admin, getAllPointsUsage);
 
 // Get feedback statistics
 router.get('/feedback-stats', protect, admin, getFeedbackStats);
+
+// Get feedback comments with date range filtering
+router.get('/feedback-comments', protect, admin, getFeedbackComments);
 
 export default router;

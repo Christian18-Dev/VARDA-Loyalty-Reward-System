@@ -23,8 +23,8 @@ export const claimCode = async (req, res) => {
       return res.status(400).json({ message: 'Code already used' });
     }
 
-    // Award points to the user (assuming 10 points per code, you can adjust this)
-    const pointsToAward = 10;
+    // Award 1 point per code redemption
+    const pointsToAward = 1;
     req.user.points += pointsToAward;
     await req.user.save();
 

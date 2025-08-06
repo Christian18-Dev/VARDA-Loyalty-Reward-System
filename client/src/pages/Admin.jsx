@@ -192,6 +192,12 @@ export default function AdminPage() {
   const [analyticsStartDate, setAnalyticsStartDate] = useState('');
   const [analyticsEndDate, setAnalyticsEndDate] = useState('');
 
+  // Feedback export state
+  const [feedbackStartDate, setFeedbackStartDate] = useState('');
+  const [feedbackEndDate, setFeedbackEndDate] = useState('');
+  const [feedbackComments, setFeedbackComments] = useState([]);
+  const [isExportingFeedback, setIsExportingFeedback] = useState(false);
+
   const token = user.token;
   const baseUrl = import.meta.env.VITE_API_BASE_URL;
 
@@ -2083,6 +2089,159 @@ export default function AdminPage() {
     } catch (error) {
       console.error('Error exporting analytics:', error);
       showStatusMessage('error', 'Error exporting analytics data');
+    }
+  };
+
+  // Fetch feedback comments with date range
+  const fetchFeedbackComments = async (startDate, endDate) => {
+    try {
+      setIsExportingFeedback(true);
+      const response = await axios.get(`${baseUrl}/api/admin/feedback-comments`, {
+        headers: { Authorization: `Bearer ${token}` },
+        params: {
+          startDate: startDate,
+          endDate: endDate
+        }
+      });
+      
+      if (response.data && response.data.feedbackComments) {
+        setFeedbackComments(response.data.feedbackComments);
+        return response.data.feedbackComments;
+      }
+      return [];
+    } catch (error) {
+      console.error('Error fetching feedback comments:', error);
+      showStatusMessage('error', 'Failed to fetch feedback comments');
+      return [];
+    } finally {
+      setIsExportingFeedback(false);
+    }
+  };
+
+  // Export feedback comments to Excel
+  const handleExportFeedbackComments = async () => {
+    if (!feedbackStartDate || !feedbackEndDate) {
+      showStatusMessage('error', 'Please select both start and end dates');
+      return;
+    }
+
+    try {
+      setIsExportingFeedback(true);
+      
+      // Fetch feedback comments for the selected date range
+      const comments = await fetchFeedbackComments(feedbackStartDate, feedbackEndDate);
+      
+      if (!comments || comments.length === 0) {
+        showStatusMessage('error', 'No feedback comments found for the selected date range');
+        return;
+      }
+
+      // Create a new workbook
+      const workbook = new ExcelJS.Workbook();
+      const worksheet = workbook.addWorksheet('Feedback Comments');
+
+      // Set up the header row
+      const headerRow = worksheet.addRow([
+        'Date',
+        'Comments'
+      ]);
+
+      // Style the header row
+      headerRow.eachCell((cell) => {
+        cell.font = { bold: true, color: { argb: 'FFFFFF' } };
+        cell.fill = {
+          type: 'pattern',
+          pattern: 'solid',
+          fgColor: { argb: '4F46E5' }
+        };
+        cell.border = {
+          top: { style: 'thin' },
+          left: { style: 'thin' },
+          bottom: { style: 'thin' },
+          right: { style: 'thin' }
+        };
+        cell.alignment = { horizontal: 'center', vertical: 'middle' };
+      });
+
+      // Add data rows
+      comments.forEach((comment) => {
+        const row = worksheet.addRow([
+          new Date(comment.createdAt).toLocaleDateString(),
+          comment.comments || 'No comments'
+        ]);
+
+        // Style data rows
+        row.eachCell((cell, colNumber) => {
+          cell.border = {
+            top: { style: 'thin' },
+            left: { style: 'thin' },
+            bottom: { style: 'thin' },
+            right: { style: 'thin' }
+          };
+          
+          // Align cells
+          if (colNumber === 1) {
+            cell.alignment = { horizontal: 'center', vertical: 'middle' }; // Center date
+          } else {
+            cell.alignment = { vertical: 'middle', wrapText: true }; // Wrap text for comments
+          }
+        });
+      });
+
+      // Add summary statistics row
+      const summaryRowIndex = worksheet.rowCount + 2;
+      const summaryRow = worksheet.addRow([
+        'TOTAL COMMENTS:',
+        comments.length
+      ]);
+
+      // Style summary row
+      summaryRow.eachCell((cell) => {
+        cell.font = { bold: true };
+        cell.fill = {
+          type: 'pattern',
+          pattern: 'solid',
+          fgColor: { argb: 'F3F4F6' }
+        };
+        cell.border = {
+          top: { style: 'thin' },
+          left: { style: 'thin' },
+          bottom: { style: 'thin' },
+          right: { style: 'thin' }
+        };
+        cell.alignment = { horizontal: 'center', vertical: 'middle' };
+      });
+
+      // Auto-fit columns
+      worksheet.columns.forEach((column) => {
+        let maxLength = 0;
+        column.eachCell({ includeEmpty: true }, (cell) => {
+          const columnLength = cell.value ? cell.value.toString().length : 10;
+          if (columnLength > maxLength) {
+            maxLength = columnLength;
+          }
+        });
+        column.width = Math.min(maxLength + 2, 50); // Cap at 50 characters
+      });
+
+      // Generate and download the file
+      const buffer = await workbook.xlsx.writeBuffer();
+      const blob = new Blob([buffer], { type: 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet' });
+      const url = window.URL.createObjectURL(blob);
+      const a = document.createElement('a');
+      a.href = url;
+      a.download = `feedback-comments-${feedbackStartDate}-to-${feedbackEndDate}.xlsx`;
+      document.body.appendChild(a);
+      a.click();
+      window.URL.revokeObjectURL(url);
+      document.body.removeChild(a);
+
+      showStatusMessage('success', `Successfully exported ${comments.length} feedback comments to Excel`);
+    } catch (error) {
+      console.error('Error exporting feedback comments:', error);
+      showStatusMessage('error', 'Failed to export feedback comments');
+    } finally {
+      setIsExportingFeedback(false);
     }
   };
 
@@ -4127,13 +4286,62 @@ export default function AdminPage() {
             animate={{ opacity: 1, y: 0 }}
             className="bg-white rounded-2xl shadow-lg p-4 sm:p-6"
           >
-            <div className="flex items-center space-x-3 mb-6">
-              <div className="p-2 bg-purple-100 rounded-lg">
-                <ChatAltIcon className="w-6 h-6 text-purple-600" />
+            <div className="flex items-center justify-between mb-6">
+              <div className="flex items-center space-x-3">
+                <div className="p-2 bg-purple-100 rounded-lg">
+                  <ChatAltIcon className="w-6 h-6 text-purple-600" />
+                </div>
+                <div>
+                  <h2 className="text-2xl font-bold text-gray-800">Feedback Statistics</h2>
+                  <p className="text-gray-600 mt-1">Overall ratings from customer feedback</p>
+                </div>
               </div>
-              <div>
-                <h2 className="text-2xl font-bold text-gray-800">Feedback Statistics</h2>
-                <p className="text-gray-600 mt-1">Overall ratings from customer feedback</p>
+              
+              {/* Export Feedback Comments Section */}
+              <div className="bg-gray-50 p-4 rounded-xl border border-gray-200">
+                <h3 className="text-sm font-semibold text-gray-700 mb-3">Export Feedback Comments</h3>
+                <div className="flex flex-col sm:flex-row gap-3">
+                  <div className="flex flex-col">
+                    <label className="text-xs text-gray-600 mb-1">Start Date</label>
+                    <input
+                      type="date"
+                      value={feedbackStartDate}
+                      onChange={(e) => setFeedbackStartDate(e.target.value)}
+                      className="px-3 py-2 border border-gray-300 rounded-lg text-sm focus:ring-2 focus:ring-purple-500 focus:border-transparent"
+                    />
+                  </div>
+                  <div className="flex flex-col">
+                    <label className="text-xs text-gray-600 mb-1">End Date</label>
+                    <input
+                      type="date"
+                      value={feedbackEndDate}
+                      onChange={(e) => setFeedbackEndDate(e.target.value)}
+                      className="px-3 py-2 border border-gray-300 rounded-lg text-sm focus:ring-2 focus:ring-purple-500 focus:border-transparent"
+                    />
+                  </div>
+                  <div className="flex flex-col justify-end">
+                    <button
+                      onClick={handleExportFeedbackComments}
+                      disabled={isExportingFeedback || !feedbackStartDate || !feedbackEndDate}
+                      className="px-4 py-2 bg-purple-600 text-white rounded-lg hover:bg-purple-700 disabled:bg-gray-400 disabled:cursor-not-allowed flex items-center space-x-2 text-sm font-medium transition-all transform hover:scale-105 disabled:hover:scale-100"
+                    >
+                      {isExportingFeedback ? (
+                        <>
+                          <svg className="animate-spin w-4 h-4" fill="none" viewBox="0 0 24 24">
+                            <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4"></circle>
+                            <path className="opacity-75" fill="currentColor" d="m4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path>
+                          </svg>
+                          <span>Exporting...</span>
+                        </>
+                      ) : (
+                        <>
+                          <DocumentReportIcon className="w-4 h-4" />
+                          <span>Export to Excel</span>
+                        </>
+                      )}
+                    </button>
+                  </div>
+                </div>
               </div>
             </div>
 

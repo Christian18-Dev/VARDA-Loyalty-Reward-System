@@ -1,4 +1,4 @@
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useRef } from 'react';
 import axios from 'axios';
 import { useAuth } from '../context/AuthContext';
 import { useNavigate } from 'react-router-dom';
@@ -8,7 +8,8 @@ import {
   LogoutIcon, 
   ExclamationIcon,
   ClipboardCopyIcon,
-  CheckIcon
+  CheckIcon,
+  PrinterIcon
 } from '@heroicons/react/outline';
 import { motion, AnimatePresence } from 'framer-motion';
 
@@ -25,7 +26,13 @@ export default function CashierPage() {
   const itemsPerPage = 5;
   const [showLogoutModal, setShowLogoutModal] = useState(false);
   const [isGenerating, setIsGenerating] = useState(false);
+  const [isPrinting, setIsPrinting] = useState(false);
   const [isCopied, setIsCopied] = useState(false);
+  const [printError, setPrintError] = useState('');
+  const [isBulkGenerating, setIsBulkGenerating] = useState(false);
+  const printerDevice = useRef(null);
+  const [generatedCodes, setGeneratedCodes] = useState([]);
+  const [showCodesModal, setShowCodesModal] = useState(false);
 
   const baseUrl = import.meta.env.VITE_API_BASE_URL;
   const token = user.token;
@@ -68,6 +75,136 @@ export default function CashierPage() {
       setError('Failed to copy code');
     }
   };
+
+  // Connect to Bluetooth printer
+  const connectToPrinter = async () => {
+    try {
+      // Check if Web Bluetooth is supported
+      if (!navigator.bluetooth) {
+        throw new Error('Web Bluetooth is not supported in this browser. Please use Chrome, Edge, or Opera.');
+      }
+
+      // Request Bluetooth device
+      const device = await navigator.bluetooth.requestDevice({
+        acceptAllDevices: true,
+        optionalServices: ['000018f0-0000-1000-8000-00805f9b34fb'] // Common printer service
+      });
+      
+      // Connect to the GATT server
+      const server = await device.gatt.connect();
+      
+      // Get the service
+      const service = await server.getPrimaryService('000018f0-0000-1000-8000-00805f9b34fb');
+      
+      // Get the characteristic for writing
+      const characteristic = await service.getCharacteristic('00002af1-0000-1000-8000-00805f9b34fb');
+      
+      // Store the device for later use
+      printerDevice.current = {
+        device,
+        characteristic
+      };
+      
+      return true;
+    } catch (error) {
+      console.error('Bluetooth connection error:', error);
+      setPrintError(`Printer connection failed: ${error.message}`);
+      return false;
+    }
+  };
+
+  // Print the generated code
+  const printCode = async () => {
+    if (!generatedCode) return;
+    
+    setIsPrinting(true);
+    setPrintError('');
+    
+    try {
+      // Try to connect to printer if not already connected
+      if (!printerDevice.current) {
+        const connected = await connectToPrinter();
+        if (!connected) {
+          return;
+        }
+      }
+
+      // Format the code for printing with double-strike text (bolder appearance)
+      // ESC E enables emphasis (bold) and ESC F disables it for most thermal printers
+      const startBold = '\x1B\x45\x01';  // ESC E 1
+      const endBold = '\x1B\x45\x00';    // ESC E 0
+      
+      // Alternatively, use double-strike mode for even bolder text
+      // const startBold = '\x1B\x47\x01';  // ESC G 1
+      // const endBold = '\x1B\x47\x00';    // ESC G 0
+      
+      // Or use larger font (if supported by the printer)
+      // const startBold = '\x1D\x21\x11';  // GS ! n (double height and width)
+      // const endBold = '\x1D\x21\x00';    // GS ! 0 (normal size)
+      
+      // Build the print text with the selected bold control codes
+      const printText = 
+      '\n\n' + // Reduced empty lines at top
+      '    -------------------------\n' +
+      '      2GONZ LOYALTY REWARD\n' +
+      '    -------------------------\n\n' +
+      `    Code: ${generatedCode}\n` +
+      '    Valid: 24 HOURS\n' +
+      `    ${new Date().toLocaleString()}\n\n` +
+      '    HOW TO REDEEM:\n' +
+      '    1. Visit: www.2gonz.com\n' +
+      '    2. Log in or register\n' +
+      '       if you havent\n' +
+      '    3. Go to Redeem Page\n' +
+      '    4. Enter code to earn\n' +
+      '       1 point\n' +
+      '    5. Get extra points by\n' +
+      '       giving feedback!\n\n' +
+      '           Thank you!\n' +
+      '    -------------------------\n\n\n\n'; // Extra blank lines for paper cut
+
+        
+        
+      // Apply bold to the entire content
+      const finalPrintText = startBold + printText + endBold;
+
+      // Convert text to bytes (UTF-8)
+      const encoder = new TextEncoder();
+      const data = encoder.encode(finalPrintText);
+      
+      // Send data to printer in chunks to avoid buffer overflow
+      const CHUNK_SIZE = 20; // Adjust based on your printer's MTU
+      for (let i = 0; i < data.length; i += CHUNK_SIZE) {
+        const chunk = data.slice(i, i + CHUNK_SIZE);
+        await printerDevice.current.characteristic.writeValue(chunk);
+      }
+      
+      // Add paper cut command if supported by the printer
+      // This is printer-specific and may need adjustment
+      const cutCommand = new Uint8Array([0x1B, 0x69]); // ESC i - common cut command
+      await printerDevice.current.characteristic.writeValue(cutCommand);
+      
+    } catch (error) {
+      console.error('Print error:', error);
+      setPrintError(`Print failed: ${error.message}`);
+      // Reset printer connection on error
+      if (printerDevice.current) {
+        try {
+          await printerDevice.current.device.gatt.disconnect();
+        } catch (e) {}
+        printerDevice.current = null;
+      }
+    } finally {
+      setIsPrinting(false);
+    }
+  };
+
+  // Auto-print when a new code is generated
+  useEffect(() => {
+    if (generatedCode) {
+      printCode().catch(console.error);
+    }
+  }, [generatedCode]);
 
   const fetchClaimed = async () => {
     try {
@@ -132,6 +269,113 @@ export default function CashierPage() {
 
   const handleCancelLogout = () => {
     setShowLogoutModal(false);
+  };
+
+  const handleGenerateBulkCodes = async () => {
+    try {
+      setIsBulkGenerating(true);
+      setGeneratedCodes([]);
+      
+      const codes = [];
+      for (let i = 0; i < 100; i++) {
+        const res = await axios.post(
+          `${baseUrl}/api/cashier/generate-code`,
+          {},
+          {
+            headers: { Authorization: `Bearer ${token}` },
+          }
+        );
+        codes.push(res.data.code.code);
+      }
+      
+      setGeneratedCodes(codes);
+      setSuccess('Successfully generated 100 codes!');
+    } catch (err) {
+      console.error('Error generating bulk codes:', err);
+      setError('Error generating some codes. Please try again.');
+    } finally {
+      setIsBulkGenerating(false);
+    }
+  };
+
+  const printBulkCodes = async () => {
+    if (generatedCodes.length === 0) return;
+    
+    setIsPrinting(true);
+    setPrintError('');
+    
+    try {
+      // Try to connect to printer if not already connected
+      if (!printerDevice.current) {
+        const connected = await connectToPrinter();
+        if (!connected) {
+          return;
+        }
+      }
+
+      // Format each code with the same format as single code print
+      for (const code of generatedCodes) {
+        const currentDate = new Date().toLocaleString();
+        
+        // Format the code for printing with double-strike text (bolder appearance)
+        const startBold = '\x1B\x45\x01';  // ESC E 1
+        const endBold = '\x1B\x45\x00';    // ESC E 0
+        
+        // Build the print text with the selected bold control codes
+        const printText = 
+        '\n\n' + // Reduced empty lines at top
+        '    -------------------------\n' +
+        '      2GONZ LOYALTY REWARD\n' +
+        '    -------------------------\n\n' +
+        `    Code: ${generatedCode}\n` +
+        '    Valid: 24 HOURS\n' +
+        `    ${new Date().toLocaleString()}\n\n` +
+        '    HOW TO REDEEM:\n' +
+        '    1. Visit: www.2gonz.com\n' +
+        '    2. Log in or register\n' +
+        '       if you havent\n' +
+        '    3. Go to Redeem Page\n' +
+        '    4. Enter code to earn\n' +
+        '       1 point\n' +
+        '    5. Get extra points by\n' +
+        '       giving feedback!\n\n' +
+        '           Thank you!\n' +
+        '    -------------------------\n\n\n\n'; // Extra blank lines for paper cut
+
+        // Convert to Uint8Array for printing
+        const encoder = new TextEncoder();
+        const printData = encoder.encode(printText);
+        
+        // Split the data into chunks of 500 bytes to stay under the 512-byte limit
+        const CHUNK_SIZE = 500;
+        for (let i = 0; i < printData.length; i += CHUNK_SIZE) {
+          const chunk = printData.slice(i, i + CHUNK_SIZE);
+          await printerDevice.current.characteristic.writeValue(chunk);
+          // Small delay between chunks to prevent overwhelming the printer
+          await new Promise(resolve => setTimeout(resolve, 50));
+        }
+        
+        // Add a small delay between codes to prevent overwhelming the printer
+        await new Promise(resolve => setTimeout(resolve, 500));
+      }
+      
+      // Add paper cut command if supported (ESC i) after all codes
+      const cutCommand = new Uint8Array([0x1B, 0x69]);
+      await printerDevice.current.characteristic.writeValue(cutCommand);
+      
+    } catch (error) {
+      console.error('Print error:', error);
+      setPrintError(`Print failed: ${error.message}`);
+      // Reset printer connection on error
+      if (printerDevice.current) {
+        try {
+          await printerDevice.current.device.gatt.disconnect();
+        } catch (e) {}
+        printerDevice.current = null;
+      }
+    } finally {
+      setIsPrinting(false);
+    }
   };
 
   return (
@@ -265,30 +509,97 @@ export default function CashierPage() {
                 <p className="text-gray-600 mt-2">
                   Create a unique code for students to redeem their rewards
                 </p>
-        </div>
+              </div>
 
               <div className="space-y-6">
-                <button
-                  onClick={handleGenerateCode}
-                  disabled={isGenerating}
-                  className={`w-full px-6 py-4 bg-gradient-to-r from-purple-600 to-indigo-600 hover:from-purple-700 hover:to-indigo-700 text-white rounded-xl transition-all flex items-center justify-center space-x-3 shadow-lg hover:shadow-xl disabled:opacity-70 disabled:cursor-not-allowed`}
-                >
-                  {isGenerating ? (
-                    <>
-                      <svg className="animate-spin -ml-1 mr-3 h-5 w-5 text-white" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24">
-                        <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4"></circle>
-                        <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path>
-                      </svg>
-                      <span className="text-lg font-medium">Generating Code...</span>
-                    </>
-                  ) : (
-                    <>
-                      <KeyIcon className="w-6 h-6" />
-                      <span className="text-lg font-medium">Generate New Code</span>
-                    </>
-                  )}
-                </button>
+                <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                  <button
+                    onClick={handleGenerateCode}
+                    disabled={isGenerating || isBulkGenerating}
+                    className={`px-6 py-4 bg-gradient-to-r from-purple-600 to-indigo-600 hover:from-purple-700 hover:to-indigo-700 text-white rounded-xl transition-all flex items-center justify-center space-x-3 shadow-lg hover:shadow-xl disabled:opacity-70 disabled:cursor-not-allowed`}
+                  >
+                    {isGenerating ? (
+                      <>
+                        <svg className="animate-spin -ml-1 mr-3 h-5 w-5 text-white" xmlns="http://www.w3.org/2000/svg" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                          <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4"></circle>
+                          <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path>
+                        </svg>
+                        <span className="text-lg font-medium">Generating Code...</span>
+                      </>
+                    ) : (
+                      <>
+                        <KeyIcon className="w-6 h-6" />
+                        <span className="text-lg font-medium">Generate New Code</span>
+                      </>
+                    )}
+                  </button>
+                  
+                  <button
+                    onClick={handleGenerateBulkCodes}
+                    disabled={isBulkGenerating || isGenerating}
+                    className={`px-6 py-4 bg-gradient-to-r from-green-600 to-emerald-600 hover:from-green-700 hover:to-emerald-700 text-white rounded-xl transition-all flex items-center justify-center space-x-3 shadow-lg hover:shadow-xl disabled:opacity-70 disabled:cursor-not-allowed`}
+                  >
+                    {isBulkGenerating ? (
+                      <>
+                        <svg className="animate-spin -ml-1 mr-3 h-5 w-5 text-white" xmlns="http://www.w3.org/2000/svg" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                          <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4"></circle>
+                          <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path>
+                        </svg>
+                        <span className="text-lg font-medium">Generating 100 Codes...</span>
+                      </>
+                    ) : (
+                      <>
+                        <KeyIcon className="w-6 h-6" />
+                        <span className="text-lg font-medium">Generate 50 Codes</span>
+                      </>
+                    )}
+                  </button>
+                </div>
 
+                {generatedCodes.length > 0 && (
+                  <div className="mt-6 p-6 bg-gray-50 rounded-xl border border-gray-200">
+                    <div className="flex justify-between items-center mb-4">
+                      <h3 className="text-lg font-medium text-gray-900">Generated {generatedCodes.length} Codes</h3>
+                      <div className="flex space-x-2">
+                        <button
+                          onClick={() => {
+                            const text = generatedCodes.join('\n');
+                            navigator.clipboard.writeText(text);
+                            setSuccess('All codes copied to clipboard!');
+                          }}
+                          className="px-4 py-2 text-sm bg-white border border-gray-300 rounded-lg hover:bg-gray-50"
+                        >
+                          Copy All
+                        </button>
+                        <button
+                          onClick={printBulkCodes}
+                          disabled={isPrinting}
+                          className="px-4 py-2 text-sm bg-white border border-gray-300 rounded-lg hover:bg-gray-50 flex items-center space-x-1"
+                        >
+                          {isPrinting ? (
+                            <svg className="animate-spin h-4 w-4 text-gray-500" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24">
+                              <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4"></circle>
+                              <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path>
+                            </svg>
+                          ) : (
+                            <PrinterIcon className="h-4 w-4 text-gray-500" />
+                          )}
+                          <span>Print All</span>
+                        </button>
+                      </div>
+                    </div>
+                    <div className="bg-white p-4 rounded-lg border border-gray-200 max-h-60 overflow-y-auto">
+                      <pre className="text-sm text-gray-700 font-mono">
+                        {generatedCodes.map((code, index) => (
+                          <div key={index} className="py-1 border-b border-gray-100 last:border-0">
+                            {code}
+                          </div>
+                        ))}
+                      </pre>
+                    </div>
+                  </div>
+                )}
+                
                 {generatedCode && (
                   <motion.div
                     initial={{ opacity: 0, y: 20 }}
@@ -297,17 +608,34 @@ export default function CashierPage() {
                   >
                     <div className="flex items-center justify-between mb-3">
                       <h3 className="text-lg font-medium text-green-800">Generated Code</h3>
-                      <button
-                        onClick={handleCopyCode}
-                        className="p-2 text-green-600 hover:text-green-700 hover:bg-green-100 rounded-lg transition-colors"
-                        title="Copy to clipboard"
-                      >
-                        {isCopied ? (
-                          <CheckIcon className="w-5 h-5" />
-                        ) : (
-                          <ClipboardCopyIcon className="w-5 h-5" />
-                        )}
-                      </button>
+                      <div className="flex space-x-2">
+                        <button
+                          onClick={printCode}
+                          disabled={isPrinting}
+                          className="p-2 text-blue-600 hover:text-blue-700 hover:bg-blue-100 rounded-lg transition-colors"
+                          title="Print code"
+                        >
+                          {isPrinting ? (
+                            <svg className="animate-spin h-5 w-5" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24">
+                              <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4"></circle>
+                              <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path>
+                            </svg>
+                          ) : (
+                            <PrinterIcon className="w-5 h-5" />
+                          )}
+                        </button>
+                        <button
+                          onClick={handleCopyCode}
+                          className="p-2 text-green-600 hover:text-green-700 hover:bg-green-100 rounded-lg transition-colors"
+                          title="Copy to clipboard"
+                        >
+                          {isCopied ? (
+                            <CheckIcon className="w-5 h-5" />
+                          ) : (
+                            <ClipboardCopyIcon className="w-5 h-5" />
+                          )}
+                        </button>
+                      </div>
                     </div>
                     <div className="relative">
                       <div className="font-mono text-3xl text-green-700 bg-white p-6 rounded-xl border border-green-300 text-center tracking-wider shadow-inner">
@@ -325,13 +653,15 @@ export default function CashierPage() {
                   </motion.div>
                 )}
 
-                {error && (
+                {(error || printError) && (
                   <motion.div
                     initial={{ opacity: 0, y: -10 }}
                     animate={{ opacity: 1, y: 0 }}
-                    className="mt-4 p-4 bg-red-50 text-red-700 rounded-xl border border-red-200"
+                    className={`mt-4 p-4 rounded-xl border ${
+                      printError ? 'bg-yellow-50 text-yellow-700 border-yellow-200' : 'bg-red-50 text-red-700 border-red-200'
+                    }`}
                   >
-                    {error}
+                    {printError || error}
                   </motion.div>
                 )}
               </div>
@@ -353,7 +683,9 @@ export default function CashierPage() {
                 </div>
                 <div>
                   <h2 className="text-2xl font-bold text-gray-800">Claimed Rewards</h2>
-                  <p className="text-gray-600 mt-1">View all claimed rewards by students</p>
+                  <p className="text-gray-600 mt-1">
+                    View all claimed rewards by students
+                  </p>
                 </div>
               </div>
               <div className="w-full sm:w-64">

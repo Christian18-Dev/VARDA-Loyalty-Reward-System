@@ -30,7 +30,14 @@ export default function StudentPage() {
   const [showClaimModal, setShowClaimModal] = useState(false);
   const [claimedRewardName, setClaimedRewardName] = useState('');
   const [claimTime, setClaimTime] = useState('');
+  const [verificationCode, setVerificationCode] = useState('');
+  const [verificationError, setVerificationError] = useState('');
+  const [showSuccessPopup, setShowSuccessPopup] = useState(false);
   const [showLogoutModal, setShowLogoutModal] = useState(false);
+  const [showFeedbackConfirmation, setShowFeedbackConfirmation] = useState(false);
+  const [showFeedbackSuccess, setShowFeedbackSuccess] = useState(false);
+  const [feedbackSuccessMessage, setFeedbackSuccessMessage] = useState('');
+  const [showDailyLimit, setShowDailyLimit] = useState(false);
   const [borrowedItems, setBorrowedItems] = useState([]);
   const [availableItems, setAvailableItems] = useState([
     {
@@ -353,9 +360,12 @@ export default function StudentPage() {
       );
 
       setErrorMessage('');
-      setCodeSuccessMessage(`Code claimed successfully! You earned ${response.data.pointsAwarded} points!`);
+      setCodeSuccessMessage(`Code claimed successfully! You earned 1 point!`);
       setPoints(response.data.newPoints);
+    
+      // Show success modal first
       setShowCodeSuccessModal(true);
+      
       confetti({ particleCount: 100, spread: 70, origin: { y: 0.6 } });
     } catch (error) {
       console.error('Error submitting code:', error);
@@ -374,37 +384,7 @@ export default function StudentPage() {
     navigate('/login');
   };
 
-  // Add handleFeedbackSubmit function
-  const handleFeedbackSubmit = async (feedbackData) => {
-    try {
-      setIsLoading(true);
-      const token = user.token;
-      await axios.post(
-        `${baseUrl}/api/student/feedback`,
-        feedbackData,
-        { headers: { Authorization: `Bearer ${token}` } }
-      );
-
-      const updated = await axios.get(`${baseUrl}/api/student/points`, {
-        headers: { Authorization: `Bearer ${token}` },
-      });
-
-      setPoints(updated.data.points);
-      setSuccessMessage('Feedback submitted successfully!');
-
-      confetti({ particleCount: 100, spread: 70, origin: { y: 0.6 } });
-
-      setTimeout(() => setSuccessMessage(''), 3000);
-      
-      return true; // Return true to show thank you modal
-    } catch (err) {
-      console.error('Error submitting feedback:', err);
-      setErrorMessage(err.response?.data?.message || 'Failed to submit feedback');
-      return false; // Return false to not show thank you modal
-    } finally {
-      setIsLoading(false);
-    }
-  };
+  // handleFeedbackSubmit function is now defined below with the reward claim functionality
 
   const claimReward = async (rewardId) => {
     try {
@@ -426,6 +406,52 @@ export default function StudentPage() {
       confetti({ particleCount: 150, spread: 100, origin: { y: 0.6 } });
     } catch (err) {
       setErrorMessage(err.response?.data?.message || 'Failed to claim reward');
+    } finally {
+      setIsLoading(false);
+    }
+  };
+
+  const handleFeedbackSubmit = async (feedbackData) => {
+    try {
+      setIsLoading(true);
+      const response = await axios.post(
+        `${baseUrl}/api/student/feedback`,
+        { ...feedbackData, studentId: user._id },
+        { 
+          headers: { Authorization: `Bearer ${user.token}` },
+          validateStatus: (status) => status < 500 // Don't throw for 4xx errors
+        }
+      );
+
+      if (response.status === 400 && response.data.message?.includes('already submitted feedback today')) {
+        // If daily limit reached, show the daily limit message
+        setShowFeedbackForm(false);
+        setShowDailyLimit(true);
+        return;
+      }
+      
+      if (response.status >= 200 && response.status < 300) {
+        // Update points if the response includes the new points
+        if (response.data.newPoints !== undefined) {
+          setPoints(response.data.newPoints);
+        } else {
+          // Fallback: Manually add 3 points if not provided by the server
+          setPoints(prev => prev + 3);
+        }
+        
+        // Show success message
+        setShowFeedbackForm(false);
+        setFeedbackSuccessMessage('Thank you for your feedback! You earned 3 extra points!');
+        setShowFeedbackSuccess(true);
+        
+        // Show confetti for a nice effect
+        confetti({ particleCount: 150, spread: 100, origin: { y: 0.6 } });
+      } else {
+        throw new Error(response.data.message || 'Failed to submit feedback');
+      }
+      
+    } catch (err) {
+      setErrorMessage(err.response?.data?.message || err.message || 'Failed to submit feedback');
     } finally {
       setIsLoading(false);
     }
@@ -707,7 +733,7 @@ export default function StudentPage() {
             <div className="text-center">
               <img src={twoGonzLogo} alt="2gonz Logo" className="h-16 sm:h-20 mx-auto mb-8" />
               <h2 className="text-2xl font-bold text-blue-400">Rewards Available!</h2>
-              <p className="text-gray-400 mt-1">Redeem your points for awesome rewards!</p>
+              <p className="text-gray-400 mt-1">Claim your Rewards and go to the Cashier for Assistance!</p>
             </div>
             
             <motion.div 
@@ -1018,26 +1044,56 @@ export default function StudentPage() {
             animate={{ scale: 1, opacity: 1 }}
             className="bg-[#1e293b] rounded-2xl p-6 max-w-sm w-full shadow-lg border-2 border-gray-700/50 text-center space-y-4"
           >
-            <h3 className="text-2xl font-bold text-green-400">🎉 Congrats!</h3>
+            <h3 className="text-2xl font-bold text-green-400">🎉 Reward Claimed!</h3>
             <p className="text-gray-200">
-              You've successfully claimed:
+              You've claimed:
               <br />
               <span className="font-bold text-blue-400">{claimedRewardName}</span>
             </p>
 
             <div className="text-sm text-gray-400 mt-2">
-              Claimed on: <span className="font-medium text-gray-300">{claimTime}</span>
+              Time: <span className="font-medium text-gray-300">{claimTime}</span>
             </div>
 
-            <p className="text-xs text-gray-500 mt-1">
-              Please show this screen to the cashier as proof of reward redemption.
-            </p>
+            <div className="mt-4 text-left">
+              <label className="block text-sm font-medium text-gray-300 mb-1">
+                Cashier Verification Code
+              </label>
+              <input
+                type="password"
+                value={verificationCode}
+                onChange={(e) => {
+                  setVerificationCode(e.target.value);
+                  setVerificationError('');
+                }}
+                className="w-full px-3 py-2 bg-gray-700 border border-gray-600 rounded-lg text-white text-center text-lg font-mono tracking-widest"
+                placeholder="_ _ _ _"
+                maxLength={4}
+                autoFocus
+              />
+              {verificationError && (
+                <p className="text-red-400 text-sm mt-1">{verificationError}</p>
+              )}
+              <p className="text-s text-gray-500 mt-2">
+                The cashier will input the verification code
+              </p>
+            </div>
 
             <button
-              onClick={() => setShowClaimModal(false)}
-              className="mt-4 bg-blue-600 text-white px-4 py-2 rounded-full hover:bg-blue-700 transition"
+              onClick={() => {
+                if (verificationCode === '0102') {
+                  setVerificationError('');
+                  setVerificationCode('');
+                  setShowClaimModal(false);
+                  setShowSuccessPopup(true);
+                } else {
+                  setVerificationError('Invalid verification code');
+                }
+              }}
+              className="mt-2 w-full bg-blue-600 text-white px-4 py-2 rounded-full hover:bg-blue-700 transition disabled:opacity-50"
+              disabled={verificationCode.length !== 4}
             >
-              Got it!
+              Verify & Continue
             </button>
           </motion.div>
         </div>
@@ -1131,6 +1187,116 @@ export default function StudentPage() {
                 onClick={() => {
                   setShowCodeSuccessModal(false);
                   setCodeSuccessMessage('');
+                  setShowFeedbackConfirmation(true);
+                }}
+                className="w-full py-3 bg-blue-600 text-white rounded-xl font-bold hover:bg-blue-700 transition-all"
+              >
+                OK
+              </button>
+            </div>
+          </motion.div>
+        </div>
+      )}
+
+      {/* Feedback Confirmation Dialog */}
+      {showFeedbackConfirmation && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 backdrop-blur-sm">
+          <motion.div 
+            initial={{ scale: 0.9, opacity: 0 }}
+            animate={{ scale: 1, opacity: 1 }}
+            className="bg-[#1e293b] rounded-2xl p-6 max-w-sm w-full shadow-xl border-2 border-gray-700/50"
+          >
+            <div className="text-center space-y-4">
+              <div className="w-16 h-16 bg-blue-900/50 rounded-full flex items-center justify-center mx-auto">
+                <svg xmlns="http://www.w3.org/2000/svg" className="h-8 w-8 text-blue-400" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 8v4l3 3m6-3a9 9 0 11-18 0 9 9 0 0118 0z" />
+                </svg>
+              </div>
+              <h3 className="text-xl font-bold text-gray-200">
+                Want to earn more Points?
+              </h3>
+              <p className="text-gray-300">
+                Submit a Feedback and get extra points!
+              </p>
+              <div className="flex space-x-4">
+                <button 
+                  onClick={() => {
+                    setShowFeedbackConfirmation(false);
+                  }}
+                  className="flex-1 py-2 bg-gray-600 text-white rounded-lg font-medium hover:bg-gray-700 transition-all"
+                >
+                  Cancel
+                </button>
+                <button 
+                  onClick={() => {
+                    setShowFeedbackConfirmation(false);
+                    setShowFeedbackForm(true);
+                  }}
+                  className="flex-1 py-2 bg-blue-600 text-white rounded-lg font-medium hover:bg-blue-700 transition-all"
+                >
+                  Submit Feedback
+                </button>
+              </div>
+            </div>
+          </motion.div>
+        </div>
+      )}
+
+      {/* Daily Limit Reached Modal */}
+      {showDailyLimit && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 backdrop-blur-sm">
+          <motion.div 
+            initial={{ scale: 0.9, opacity: 0 }}
+            animate={{ scale: 1, opacity: 1 }}
+            className="bg-[#1e293b] rounded-2xl p-6 max-w-sm w-full shadow-xl border-2 border-yellow-700/50"
+          >
+            <div className="text-center space-y-4">
+              <div className="w-16 h-16 bg-yellow-900/50 rounded-full flex items-center justify-center mx-auto">
+                <svg xmlns="http://www.w3.org/2000/svg" className="h-8 w-8 text-yellow-400" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-3L13.732 4c-.77-1.333-2.694-1.333-3.464 0L3.34 16c-.77 1.333.192 3 1.732 3z" />
+                </svg>
+              </div>
+              <h3 className="text-xl font-bold text-gray-200">
+                Daily Limit Reached
+              </h3>
+              <p className="text-gray-300">
+                You already submitted feedback today. Come back tomorrow and try again!
+              </p>
+              <button 
+                onClick={() => setShowDailyLimit(false)}
+                className="w-full py-3 bg-yellow-600 text-white rounded-xl font-bold hover:bg-yellow-700 transition-all"
+              >
+                OK
+              </button>
+            </div>
+          </motion.div>
+        </div>
+      )}
+
+      {/* Feedback Success Modal */}
+      {showFeedbackSuccess && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 backdrop-blur-sm">
+          <motion.div 
+            initial={{ scale: 0.9, opacity: 0 }}
+            animate={{ scale: 1, opacity: 1 }}
+            className="bg-[#1e293b] rounded-2xl p-6 max-w-sm w-full shadow-xl border-2 border-gray-700/50"
+          >
+            <div className="text-center space-y-4">
+              <div className="w-16 h-16 bg-green-900/50 rounded-full flex items-center justify-center mx-auto">
+                <svg xmlns="http://www.w3.org/2000/svg" className="h-8 w-8 text-green-400" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M5 13l4 4L19 7" />
+                </svg>
+              </div>
+              <h3 className="text-xl font-bold text-gray-200">
+                Thank You!
+              </h3>
+              <p className="text-gray-300">
+                {feedbackSuccessMessage}
+              </p>
+              <button 
+                onClick={() => {
+                  setShowFeedbackSuccess(false);
+                  setFeedbackSuccessMessage('');
                 }}
                 className="w-full py-3 bg-blue-600 text-white rounded-xl font-bold hover:bg-blue-700 transition-all"
               >
@@ -1166,12 +1332,43 @@ export default function StudentPage() {
         </div>
       )}
 
+      {showSuccessPopup && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 backdrop-blur-sm">
+          <motion.div
+            initial={{ scale: 0.8, opacity: 0 }}
+            animate={{ scale: 1, opacity: 1 }}
+            className="bg-[#1e293b] rounded-2xl p-6 max-w-sm w-full shadow-lg border-2 border-green-500/50 text-center space-y-4"
+          >
+            <div className="w-16 h-16 bg-green-500/20 rounded-full flex items-center justify-center mx-auto">
+              <svg xmlns="http://www.w3.org/2000/svg" className="h-8 w-8 text-green-400" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M5 13l4 4L19 7" />
+              </svg>
+            </div>
+            <h3 className="text-2xl font-bold text-green-400">Successfully Claimed!</h3>
+            <p className="text-gray-300">
+              Your reward has been successfully verified and claimed.
+            </p>
+            <button
+              onClick={() => {
+                setShowSuccessPopup(false);
+                setShowFeedbackForm(true);
+              }}
+              className="mt-4 bg-green-600 hover:bg-green-700 text-white px-6 py-2 rounded-full font-medium transition-colors"
+            >
+              Continue
+            </button>
+          </motion.div>
+        </div>
+      )}
+
       {showFeedbackForm && (
         <FeedbackForm
           onSubmit={handleFeedbackSubmit}
           onClose={() => setShowFeedbackForm(false)}
         />
       )}
+
+
 
       {showReviewModal && (
         <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 backdrop-blur-sm">
