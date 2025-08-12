@@ -16,6 +16,10 @@ import mongoose from 'mongoose';
 
 dotenv.config();
 const app = express();
+
+// Trust first proxy (for Render.com)
+app.set('trust proxy', 1);
+
 const PORT = process.env.PORT || 10000;
 const mongoURI = process.env.MONGO_URI;
 const isProd = process.env.NODE_ENV === "production";
