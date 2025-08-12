@@ -72,6 +72,19 @@ export const registerUser = async (req, res) => {
   }
 };
 
+// Track failed login attempts
+const failedAttempts = new Map();
+
+// Clean up old entries every hour
+setInterval(() => {
+  const now = Date.now();
+  for (const [key, value] of failedAttempts.entries()) {
+    if (now - value.timestamp > 5 * 60 * 1000) { // 5 minutes window
+      failedAttempts.delete(key);
+    }
+  }
+}, 60 * 60 * 1000); // Run every hour
+
 export const loginUser = async (req, res) => {
   const { idNumber, password } = req.body;
   
@@ -84,13 +97,46 @@ export const loginUser = async (req, res) => {
     const user = await User.findOne({ idNumber }).lean();
     
     if (!user) {
-      return res.status(400).json({ message: 'Invalid ID number or password' });
+      // Track failed attempt
+      const attempts = (failedAttempts.get(idNumber)?.attempts || 0) + 1;
+      failedAttempts.set(idNumber, { 
+        attempts, 
+        timestamp: Date.now() 
+      });
+
+      // Log only on 5th attempt
+      if (attempts >= 5) {
+        console.warn(`[SECURITY] Multiple failed login attempts for ID: ${idNumber} (${attempts} attempts)`);
+      }
+
+      return res.status(400).json({ 
+        message: 'Invalid ID number or password',
+        attemptsRemaining: Math.max(0, 5 - attempts)
+      });
     }
 
     const isMatch = await bcrypt.compare(password, user.password);
     if (!isMatch) {
-      return res.status(400).json({ message: 'Invalid ID number or password' });
+      // Track failed attempt
+      const attempts = (failedAttempts.get(idNumber)?.attempts || 0) + 1;
+      failedAttempts.set(idNumber, { 
+        attempts, 
+        timestamp: Date.now() 
+      });
+
+      // Log only on 5th attempt
+      if (attempts >= 5) {
+        console.warn(`[SECURITY] Multiple failed login attempts for ID: ${idNumber} (${attempts} attempts)`);
+      }
+
+      return res.status(400).json({ 
+        message: 'Invalid ID number or password',
+        attemptsRemaining: Math.max(0, 5 - attempts)
+      });
     }
+
+    // Clear failed attempts on successful login
+    failedAttempts.delete(idNumber);
 
     // Remove password from response
     const { password: _, ...userWithoutPassword } = user;
