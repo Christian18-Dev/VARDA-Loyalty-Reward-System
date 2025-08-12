@@ -144,42 +144,73 @@ export const submitFeedback = async (req, res) => {
 export const updateProfile = async (req, res) => {
   try {
     const { currentPassword, newPassword } = req.body;
-    const user = await User.findById(req.user._id);
 
+    // Get user with password field included
+    const user = await User.findById(req.user._id).select('+password');
     if (!user) {
       return res.status(404).json({ message: 'User not found' });
     }
 
-    // If trying to change password
-    if (newPassword) {
-      // Verify current password
-      const isMatch = await bcrypt.compare(currentPassword, user.password);
-      if (!isMatch) {
-        return res.status(400).json({ message: 'Current password is incorrect' });
-      }
-
-      // Hash new password
-      const salt = await bcrypt.genSalt(10);
-      user.password = await bcrypt.hash(newPassword, salt);
+    // Verify current password
+    const isMatch = await bcrypt.compare(currentPassword, user.password);
+    if (!isMatch) {
+      return res.status(400).json({ message: 'Current password is incorrect' });
     }
 
+    // Hash the new password
+    const salt = await bcrypt.genSalt(10);
+    user.password = await bcrypt.hash(newPassword, salt);
+    
     await user.save();
 
-    res.json({ 
-      message: 'Profile updated successfully',
-      user: {
-        _id: user._id,
-        firstName: user.firstName,
-        lastName: user.lastName,
-        idNumber: user.idNumber,
-        role: user.role
-      }
-    });
+    res.status(200).json({ message: 'Password updated successfully' });
   } catch (error) {
     console.error('Error updating profile:', error);
     res.status(500).json({ message: 'Server error' });
   }
 };
 
+export const deleteAccount = async (req, res) => {
+  try {
+    const { password } = req.body;
+    
+    // Get user with password field included
+    const user = await User.findById(req.user._id).select('+password');
+    if (!user) {
+      return res.status(404).json({ message: 'User not found' });
+    }
+    
+    // Verify password
+    const isMatch = await bcrypt.compare(password, user.password);
+    if (!isMatch) {
+      return res.status(400).json({ message: 'Incorrect password' });
+    }
 
+    // Get user ID before deletion for cleanup
+    const userId = user._id;
+    const idNumber = user.idNumber;
 
+    // Delete all user data
+    await Promise.all([
+      // Delete user's feedback
+      Feedback.deleteMany({ user: userId }),
+      
+      // Delete user's claimed rewards
+      ClaimedReward.deleteMany({ user: userId }),
+      
+      // Delete user's account
+      User.findByIdAndDelete(userId)
+    ]);
+
+    res.status(200).json({ 
+      success: true,
+      message: 'Account and all associated data have been successfully deleted.'
+    });
+  } catch (error) {
+    console.error('Error deleting account:', error);
+    res.status(500).json({ 
+      success: false,
+      message: 'Failed to delete account. Please try again.'
+    });
+  }
+};

@@ -1,5 +1,12 @@
 import express from 'express';
-import { claimCode, submitFeedback, getPoints, claimReward, updateProfile } from '../controllers/studentController.js';
+import { 
+  claimCode, 
+  submitFeedback, 
+  getPoints, 
+  claimReward, 
+  updateProfile, 
+  deleteAccount 
+} from '../controllers/studentController.js';
 import { protect, borrowAccess } from '../middleware/authMiddleware.js';
 import { getRewards } from '../controllers/rewardController.js';
 import { createBorrowedItem, getBorrowedItems, processReturnQR } from '../controllers/borrowedItemController.js';
@@ -31,6 +38,9 @@ router.post('/claim-reward/:id', protect, claimReward);
 
 // Route for updating profile
 router.put('/profile', protect, updateProfile);
+
+// Route for deleting account
+router.delete('/account', protect, deleteAccount);
 
 router.get('/rewards', protect, getRewards);
 

@@ -2,6 +2,7 @@
 process.env.NODE_OPTIONS = '--max-old-space-size=400';
 
 import express from 'express';
+import helmet from 'helmet';
 import cors from 'cors';
 import dotenv from 'dotenv';
 import authRoutes from './routes/authRoutes.js';
@@ -51,22 +52,24 @@ console.log(`🔧 Environment: ${isProd ? "🚀 Production" : "🛠 Development"
 console.log(`🔧 Using PORT: ${PORT}`);
 console.log(`🔧 Using MongoDB URI: ${mongoURI ? "✅ Loaded" : "❌ Not Found"}`);
 
-// ✅ CORS Configuration 
-const allowedOrigins = [
-  "https://christian18-dev.github.io",
-  "https://www.2gonz.com",
-  "http://www.2gonz.com",
-  "https://2gonz.com",
-  "http://localhost:5000",
-  "http://localhost:5173",
-  "http://localhost:3001"
-];
-
-app.use(cors({
-  origin: function(origin, callback) {
+// Configure CORS with specific origins and methods
+const corsOptions = {
+  origin: (origin, callback) => {
+    // Allow requests with no origin (like mobile apps, curl, Postman)
     if (!origin) return callback(null, true);
+    
+    const allowedOrigins = [
+      "https://christian18-dev.github.io",
+      "https://www.2gonz.com",
+      "http://www.2gonz.com",
+      "https://2gonz.com",
+      "http://localhost:5000",
+      "http://localhost:5173",
+      "http://localhost:3001"
+    ];
+
     if (allowedOrigins.indexOf(origin) === -1) {
-      const msg = 'The CORS policy for this site does not allow access from the specified Origin.';
+      const msg = `CORS policy: ${origin} not allowed`;
       return callback(new Error(msg), false);
     }
     return callback(null, true);
@@ -74,7 +77,47 @@ app.use(cors({
   credentials: true,
   methods: ['GET', 'POST', 'PUT', 'DELETE', 'OPTIONS'],
   allowedHeaders: ['Content-Type', 'Authorization']
+};
+
+// Apply security middleware
+app.use(helmet({
+  contentSecurityPolicy: {
+    directives: {
+      defaultSrc: ["'self'"],
+      scriptSrc: ["'self'", "'unsafe-inline'"],
+      styleSrc: ["'self'", "'unsafe-inline'"],
+      imgSrc: ["'self'", "data:", "https://*"],
+      connectSrc: ["'self'"],
+      fontSrc: ["'self'", "data:"],
+      objectSrc: ["'none'"],
+      upgradeInsecureRequests: [],
+    },
+  },
+  crossOriginEmbedderPolicy: false, // Disable for now as it may break some features
+  crossOriginOpenerPolicy: { policy: "same-origin" },
+  crossOriginResourcePolicy: { policy: "same-site" },
+  dnsPrefetchControl: { allow: false },
+  frameguard: { action: 'deny' },
+  hidePoweredBy: true,
+  hsts: {
+    maxAge: 63072000, // 2 years in seconds
+    includeSubDomains: true,
+    preload: true
+  },
+  ieNoOpen: true,
+  noSniff: true,
+  xssFilter: true,
+  referrerPolicy: { policy: 'strict-origin-when-cross-origin' }
 }));
+
+// Apply CORS after Helmet
+app.use(cors(corsOptions));
+
+// Import rate limiters from config
+import { apiLimiter, authLimiter } from './config/rateLimits.js';
+
+// Apply rate limiting to all routes
+app.use(apiLimiter);
 
 // Add request timeout
 app.use((req, res, next) => {

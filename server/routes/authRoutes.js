@@ -5,21 +5,11 @@ import { registerUser, loginUser, forgotPassword, resetPassword, verifyResetToke
 
 const router = express.Router();
 
-// Rate limiting configuration for login
-const loginLimiter = rateLimit({
-  windowMs: 5 * 60 * 1000, // 5 minutes
-  max: 5, // Limit each IP to 5 login attempts per windowMs
-  message: { 
-    success: false, 
-    message: 'Too many login attempts. Please try again in 5 minutes.' 
-  },
-  standardHeaders: true,
-  legacyHeaders: false,
-  // Add a custom handler to ensure our error format is consistent
-  handler: (req, res, next, options) => {
-    res.status(options.statusCode).json(options.message);
-  }
-});
+// Import rate limiters from config
+import { authLimiter } from '../config/rateLimits.js';
+
+// Use the authLimiter for login routes
+const loginLimiter = authLimiter;
 
 // Slow down after max attempts
 const loginSpeedLimiter = slowDown({
