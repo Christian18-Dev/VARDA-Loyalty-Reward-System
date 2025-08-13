@@ -1592,198 +1592,544 @@ function SettingsPage({ user, onBack }) {
   };
 
   return (
-    <div className="max-w-md mx-auto p-6 bg-white rounded-2xl shadow-lg mt-8 mb-24">
+    <div className="max-w-2xl mx-auto p-4 sm:p-6 bg-gradient-to-br from-gray-50 to-gray-100 min-h-screen">
+      <div className="max-w-2xl mx-auto">
       {/* Delete Confirmation Modal */}
       {showDeleteConfirm && (
-        <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50 p-4">
-          <div className="bg-white rounded-xl p-6 max-w-md w-full">
-            <div className="flex items-center justify-between mb-4">
-              <h3 className="text-lg font-semibold text-red-700">Delete Account</h3>
+        <motion.div 
+          initial={{ opacity: 0 }}
+          animate={{ opacity: 1 }}
+          exit={{ opacity: 0 }}
+          className="fixed inset-0 bg-black bg-opacity-50 backdrop-blur-sm flex items-center justify-center z-50 p-4"
+        >
+          <motion.div 
+            initial={{ scale: 0.95, y: 20, opacity: 0 }}
+            animate={{ scale: 1, y: 0, opacity: 1 }}
+            exit={{ scale: 0.95, opacity: 0 }}
+            transition={{ type: 'spring', damping: 25, stiffness: 500 }}
+            className="bg-white rounded-2xl shadow-xl max-w-md w-full overflow-hidden"
+          >
+            <div className="h-1.5 bg-gradient-to-r from-red-500 to-red-600"></div>
+            
+            <div className="p-6">
+              <div className="flex items-start">
+                <div className="flex-shrink-0 p-3 bg-red-100 rounded-xl">
+                  <svg className="h-6 w-6 text-red-600" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-3L13.732 4c-.77-1.333-2.694-1.333-3.464 0L3.34 16c-.77 1.333.192 3 1.732 3z" />
+                  </svg>
+                </div>
+                <div className="ml-4">
+                  <h3 className="text-xl font-bold text-gray-900">Delete Your Account</h3>
+                  <p className="mt-1 text-gray-600">
+                    This action is permanent and cannot be undone. All your data will be permanently removed.
+                  </p>
+                </div>
+              </div>
+
+              <div className="mt-6 space-y-1">
+                <label htmlFor="confirmPassword" className="block text-sm font-medium text-gray-700">
+                  Enter your password to confirm
+                </label>
+                <div className="relative mt-1">
+                  <input
+                    type="password"
+                    id="confirmPassword"
+                    value={currentPassword}
+                    onChange={(e) => setCurrentPassword(e.target.value)}
+                    className="block w-full px-4 py-3 pr-10 border border-gray-300 rounded-xl focus:ring-2 focus:ring-red-500 focus:border-red-500 shadow-sm transition duration-150"
+                    placeholder="Current password"
+                    required
+                    autoComplete="current-password"
+                  />
+                  <div className="absolute inset-y-0 right-0 pr-3 flex items-center pointer-events-none">
+                    <svg className="h-5 w-5 text-gray-400" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 20 20" fill="currentColor">
+                      <path fillRule="evenodd" d="M5 9V7a5 5 0 0110 0v2a2 2 0 012 2v5a2 2 0 01-2 2H5a2 2 0 01-2-2v-5a2 2 0 012-2zm8-2v2H7V7a3 3 0 016 0z" clipRule="evenodd" />
+                    </svg>
+                  </div>
+                </div>
+              </div>
+
+              {errorMsg && (
+                <motion.div 
+                  initial={{ opacity: 0, y: -10 }}
+                  animate={{ opacity: 1, y: 0 }}
+                  className="mt-4 p-3 bg-red-50 text-red-700 rounded-lg flex items-start text-sm"
+                >
+                  <svg className="h-5 w-5 mr-2 text-red-500 flex-shrink-0 mt-0.5" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 20 20" fill="currentColor">
+                    <path fillRule="evenodd" d="M10 18a8 8 0 100-16 8 8 0 000 16zM8.707 7.293a1 1 0 00-1.414 1.414L8.586 10l-1.293 1.293a1 1 0 101.414 1.414L10 11.414l1.293 1.293a1 1 0 001.414-1.414L11.414 10l1.293-1.293a1 1 0 00-1.414-1.414L10 8.586 8.707 7.293z" clipRule="evenodd" />
+                  </svg>
+                  <span>{errorMsg}</span>
+                </motion.div>
+              )}
+
+              <div className="mt-6 flex flex-col-reverse sm:flex-row sm:justify-end space-y-3 sm:space-y-0 sm:space-x-3">
+                <motion.button
+                  whileHover={{ scale: 1.02 }}
+                  whileTap={{ scale: 0.98 }}
+                  type="button"
+                  onClick={() => setShowDeleteConfirm(false)}
+                  className="px-5 py-2.5 border border-gray-300 rounded-xl text-gray-700 bg-white hover:bg-gray-50 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-gray-400 font-medium transition-all duration-200"
+                  disabled={isDeleting}
+                >
+                  Cancel
+                </motion.button>
+                <motion.button
+                  whileHover={{ scale: 1.02 }}
+                  whileTap={{ scale: 0.98 }}
+                  type="button"
+                  onClick={handleDeleteAccount}
+                  className="px-5 py-2.5 border border-transparent rounded-xl shadow-sm text-white bg-gradient-to-r from-red-500 to-red-600 hover:from-red-600 hover:to-red-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-red-500 font-medium flex items-center justify-center transition-all duration-200 disabled:opacity-70 disabled:cursor-not-allowed"
+                  disabled={isDeleting || !currentPassword}
+                >
+                  {isDeleting ? (
+                    <>
+                      <svg className="animate-spin -ml-1 mr-2 h-4 w-4 text-white" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24">
+                        <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4"></circle>
+                        <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path>
+                      </svg>
+                      Deleting...
+                    </>
+                  ) : (
+                    <>
+                      <svg className="h-5 w-5 mr-2 text-white" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 7l-.867 12.142A2 2 0 0116.138 22H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16" />
+                      </svg>
+                      Delete Account
+                    </>
+                  )}
+                </motion.button>
+              </div>
+            </div>
+            
+            <div className="bg-gray-50 px-6 py-4 border-t border-gray-100 rounded-b-2xl">
+              <p className="text-xs text-gray-500 text-center">
+                Having trouble? Contact support at support@2gonz.com
+              </p>
+            </div>
+          </motion.div>
+        </motion.div>
+      )}
+        {/* Header */}
+        <div className="flex items-center mb-8">
+          <button 
+            onClick={onBack} 
+            className="p-2 mr-4 text-purple-600 hover:bg-purple-50 rounded-full transition-colors duration-200"
+          >
+            <svg xmlns="http://www.w3.org/2000/svg" className="h-6 w-6" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 19l-7-7 7-7" />
+            </svg>
+          </button>
+          <div>
+            <h1 className="text-2xl md:text-3xl font-bold bg-gradient-to-r from-purple-600 to-indigo-600 bg-clip-text text-transparent">
+              Account Settings
+            </h1>
+            <p className="text-gray-500 text-sm">Manage your account preferences</p>
+          </div>
+        </div>
+
+        {/* Navigation Tabs - Responsive */}
+        <div className="mb-8">
+          <div className="flex flex-nowrap overflow-x-auto pb-1 -mb-px hide-scrollbar">
+            <div className="inline-flex space-x-1">
               <button 
-                onClick={() => setShowDeleteConfirm(false)}
-                className="text-gray-400 hover:text-gray-500"
-                disabled={isDeleting}
+                onClick={() => setSection('profile')} 
+                className={`px-3 sm:px-4 py-2 text-xs sm:text-sm font-medium rounded-t-lg transition-all duration-200 flex items-center space-x-1.5 whitespace-nowrap ${
+                  section === 'profile' 
+                    ? 'text-purple-700 bg-white border-t border-l border-r border-gray-200 shadow-sm' 
+                    : 'text-gray-500 hover:text-gray-700 hover:bg-gray-50'
+                }`}
               >
-                <XIcon className="h-6 w-6" />
+                <svg xmlns="http://www.w3.org/2000/svg" className="h-4 w-4 sm:h-5 sm:w-5 flex-shrink-0" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M10.325 4.317c.426-1.756 2.924-1.756 3.35 0a1.724 1.724 0 002.573 1.066c1.543-.94 3.31.826 2.37 2.37a1.724 1.724 0 001.065 2.572c1.756.426 1.756 2.924 0 3.35a1.724 1.724 0 00-1.066 2.573c.94 1.543-.826 3.31-2.37 2.37a1.724 1.724 0 00-2.572 1.065c-.426 1.756-2.924 1.756-3.35 0a1.724 1.724 0 00-2.573-1.066c-1.543.94-3.31-.826-2.37-2.37a1.724 1.724 0 00-1.065-2.572c-1.756-.426-1.756-2.924 0-3.35a1.724 1.724 0 001.066-2.573c-.94-1.543.826-3.31 2.37-2.37.996.608 2.296.07 2.572-1.065z" />
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 12a3 3 0 11-6 0 3 3 0 016 0z" />
+                </svg>
+                <span>Profile</span>
+              </button>
+              
+              <button 
+                onClick={() => setSection('about')} 
+                className={`px-3 sm:px-4 py-2 text-xs sm:text-sm font-medium rounded-t-lg transition-all duration-200 flex items-center space-x-1.5 whitespace-nowrap ${
+                  section === 'about' 
+                    ? 'text-purple-700 bg-white border-t border-l border-r border-gray-200 shadow-sm' 
+                    : 'text-gray-500 hover:text-gray-700 hover:bg-gray-50'
+                }`}
+              >
+                <svg xmlns="http://www.w3.org/2000/svg" className="h-4 w-4 sm:h-5 sm:w-5 flex-shrink-0" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M13 16h-1v-4h-1m1-4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z" />
+                </svg>
+                <span>About</span>
+              </button>
+              
+              <button 
+                onClick={() => setSection('help')} 
+                className={`px-3 sm:px-4 py-2 text-xs sm:text-sm font-medium rounded-t-lg transition-all duration-200 flex items-center space-x-1.5 whitespace-nowrap ${
+                  section === 'help' 
+                    ? 'text-purple-700 bg-white border-t border-l border-r border-gray-200 shadow-sm' 
+                    : 'text-gray-500 hover:text-gray-700 hover:bg-gray-50'
+                }`}
+              >
+                <svg xmlns="http://www.w3.org/2000/svg" className="h-4 w-4 sm:h-5 sm:w-5 flex-shrink-0" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M8.228 9c.549-1.165 2.03-2 3.772-2 2.21 0 4 1.343 4 3 0 1.4-1.278 2.575-3.006 2.907-.542.104-.994.54-.994 1.093m0 3h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z" />
+                </svg>
+                <span>Help</span>
+              </button>
+              
+              <button 
+                onClick={() => setSection('danger')} 
+                className={`px-3 sm:px-4 py-2 text-xs sm:text-sm font-medium rounded-t-lg transition-all duration-200 flex items-center space-x-1.5 whitespace-nowrap ${
+                  section === 'danger' 
+                    ? 'text-red-700 bg-white border-t border-l border-r border-gray-200 shadow-sm' 
+                    : 'text-red-500 hover:text-red-700 hover:bg-red-50'
+                }`}
+              >
+                <svg xmlns="http://www.w3.org/2000/svg" className="h-4 w-4 sm:h-5 sm:w-5 flex-shrink-0" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-3L13.732 4c-.77-1.333-2.694-1.333-3.464 0L3.34 16c-.77 1.333.192 3 1.732 3z" />
+                </svg>
+                <span>Danger Zone</span>
               </button>
             </div>
-            <p className="text-gray-700 mb-4">
-              Are you sure you want to delete your account? This action cannot be undone. All your data will be permanently removed.
-            </p>
-            <p className="text-sm text-gray-600 mb-4">
-              To confirm, please enter your current password:
-            </p>
-            <input 
-              type="password" 
-              className="w-full border-2 border-gray-200 rounded-lg p-2 text-gray-900 mb-4" 
-              value={currentPassword} 
-              onChange={e => setCurrentPassword(e.target.value)} 
-              placeholder="Enter current password"
-              disabled={isDeleting}
-              required
-            />
+          </div>
+        </div>
+        
+        {/* Add this to your global styles or in a style tag */}
+        <style jsx={"true"} global={"true"}>{`
+          .hide-scrollbar::-webkit-scrollbar {
+            display: none; /* Hide scrollbar for Chrome, Safari and Opera */
+          }
+          .hide-scrollbar {
+            -ms-overflow-style: none;  /* IE and Edge */
+            scrollbar-width: none;  /* Firefox */
+          }
+        `}</style>
+      {section === 'profile' && (
+        <motion.div 
+          initial={{ opacity: 0, y: 10 }}
+          animate={{ opacity: 1, y: 0 }}
+          transition={{ duration: 0.3 }}
+          className="bg-white rounded-xl shadow-sm border border-gray-100 p-6 mb-6"
+        >
+          <div className="mb-8">
+            <h2 className="text-lg font-semibold text-gray-900 flex items-center mb-4">
+              <svg xmlns="http://www.w3.org/2000/svg" className="h-5 w-5 mr-2 text-indigo-600" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M5.121 17.804A13.937 13.937 0 0112 16c2.5 0 4.847.655 6.879 1.804M15 10a3 3 0 11-6 0 3 3 0 016 0zm6 2a9 9 0 11-18 0 9 9 0 0118 0z" />
+              </svg>
+              Profile Information
+            </h2>
+            <motion.div 
+              className="bg-gradient-to-r from-indigo-50 to-purple-50 p-5 rounded-xl border border-indigo-100 shadow-sm"
+              initial={{ opacity: 0, y: 5 }}
+              animate={{ opacity: 1, y: 0 }}
+              transition={{ duration: 0.3, delay: 0.1 }}
+            >
+              <div className="flex items-center space-x-3">
+                <div className="flex-shrink-0">
+                  <div className="h-10 w-10 rounded-full bg-indigo-100 flex items-center justify-center">
+                    <svg xmlns="http://www.w3.org/2000/svg" className="h-5 w-5 text-indigo-600" viewBox="0 0 20 20" fill="currentColor">
+                      <path fillRule="evenodd" d="M10 9a3 3 0 100-6 3 3 0 000 6zm-7 9a7 7 0 1114 0H3z" clipRule="evenodd" />
+                    </svg>
+                  </div>
+                </div>
+                <div>
+                  <p className="text-xs font-medium text-indigo-600 uppercase tracking-wider mb-1">Student ID</p>
+                  <div className="flex items-center">
+                    <span className="text-xl font-bold text-gray-900 font-mono tracking-tight">{user.idNumber}</span>
+                  </div>
+                </div>
+              </div>
+            </motion.div>
+          </div>
+          
+          <h3 className="text-md font-semibold text-gray-900 mb-4 flex items-center">
+            <svg xmlns="http://www.w3.org/2000/svg" className="h-5 w-5 mr-2 text-purple-600" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 15v2m-6 4h12a2 2 0 002-2v-6a2 2 0 00-2-2H6a2 2 0 00-2 2v6a2 2 0 002 2zm10-10V7a4 4 0 00-8 0v4h8z" />
+            </svg>
+            Change Password
+          </h3>
+          
+          <form onSubmit={handleProfileUpdate} className="space-y-5">
+            <div className="space-y-1">
+              <label className="block text-sm font-medium text-gray-700">Current Password</label>
+              <input 
+                type="password" 
+                className="w-full px-4 py-2.5 border border-gray-200 rounded-lg focus:ring-2 focus:ring-purple-500 focus:border-transparent transition-all" 
+                value={currentPassword} 
+                onChange={e => setCurrentPassword(e.target.value)} 
+                placeholder="Enter your current password"
+                required
+              />
+            </div>
+            
+            <div className="space-y-1">
+              <label className="block text-sm font-medium text-gray-700">New Password</label>
+              <input 
+                type="password" 
+                className="w-full px-4 py-2.5 border border-gray-200 rounded-lg focus:ring-2 focus:ring-purple-500 focus:border-transparent transition-all" 
+                value={password} 
+                onChange={e => setPassword(e.target.value)} 
+                placeholder="Choose a new password"
+                required
+              />
+            </div>
+            
+            <div className="space-y-1">
+              <label className="block text-sm font-medium text-gray-700">Confirm New Password</label>
+              <input 
+                type="password" 
+                className="w-full px-4 py-2.5 border border-gray-200 rounded-lg focus:ring-2 focus:ring-purple-500 focus:border-transparent transition-all" 
+                value={confirmPassword} 
+                onChange={e => setConfirmPassword(e.target.value)} 
+                placeholder="Confirm your new password"
+                required
+              />
+            </div>
+            
+            {/* Status Messages */}
             {errorMsg && (
-              <p className="text-red-600 text-sm mb-4">{errorMsg}</p>
+              <motion.div 
+                initial={{ opacity: 0, y: -10 }}
+                animate={{ opacity: 1, y: 0 }}
+                className="p-4 bg-red-50 border-l-4 border-red-500 rounded-r-lg flex items-start space-x-3"
+              >
+                <svg xmlns="http://www.w3.org/2000/svg" className="h-5 w-5 text-red-500 flex-shrink-0 mt-0.5" viewBox="0 0 20 20" fill="currentColor">
+                  <path fillRule="evenodd" d="M18 10a8 8 0 11-16 0 8 8 0 0116 0zm-7 4a1 1 0 11-2 0 1 1 0 012 0zm-1-9a1 1 0 00-1 1v4a1 1 0 102 0V6a1 1 0 00-1-1z" clipRule="evenodd" />
+                </svg>
+                <div>
+                  <h4 className="text-sm font-medium text-red-800">Error updating password</h4>
+                  <p className="text-sm text-red-600">{errorMsg}</p>
+                </div>
+              </motion.div>
             )}
-            <div className="flex justify-end space-x-3">
-              <button
-                onClick={() => setShowDeleteConfirm(false)}
-                className="px-4 py-2 text-sm font-medium text-gray-700 bg-white border border-gray-300 rounded-md hover:bg-gray-50 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-purple-500 disabled:opacity-50"
-                disabled={isDeleting}
+            
+            {successMsg && (
+              <motion.div 
+                initial={{ opacity: 0, y: -10 }}
+                animate={{ opacity: 1, y: 0 }}
+                className="p-4 bg-green-50 border-l-4 border-green-500 rounded-r-lg flex items-start space-x-3"
               >
-                Cancel
-              </button>
-              <button
-                onClick={handleDeleteAccount}
-                className="px-4 py-2 text-sm font-medium text-white bg-red-600 border border-transparent rounded-md hover:bg-red-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-red-500 disabled:opacity-50 flex items-center"
-                disabled={!currentPassword || isDeleting}
+                <svg xmlns="http://www.w3.org/2000/svg" className="h-5 w-5 text-green-500 flex-shrink-0 mt-0.5" viewBox="0 0 20 20" fill="currentColor">
+                  <path fillRule="evenodd" d="M10 18a8 8 0 100-16 8 8 0 000 16zm3.707-9.293a1 1 0 00-1.414-1.414L9 10.586 7.707 9.293a1 1 0 00-1.414 1.414l2 2a1 1 0 001.414 0l4-4z" clipRule="evenodd" />
+                </svg>
+                <div>
+                  <h4 className="text-sm font-medium text-green-800">Password updated</h4>
+                  <p className="text-sm text-green-600">Your password has been updated successfully.</p>
+                </div>
+              </motion.div>
+            )}
+            
+            <div className="pt-2">
+              <button 
+                type="submit" 
+                disabled={isLoading} 
+                className="w-full py-3 px-4 bg-gradient-to-r from-purple-600 to-indigo-600 text-white font-medium rounded-lg hover:from-purple-700 hover:to-indigo-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-purple-500 disabled:opacity-70 transition-all flex items-center justify-center shadow-sm hover:shadow-md"
               >
-                {isDeleting ? (
+                {isLoading ? (
                   <>
                     <svg className="animate-spin -ml-1 mr-2 h-4 w-4 text-white" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24">
                       <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4"></circle>
                       <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path>
                     </svg>
-                    Deleting...
+                    Updating...
                   </>
                 ) : (
-                  'Delete Account'
+                  <>
+                    <svg xmlns="http://www.w3.org/2000/svg" className="h-5 w-5 mr-2" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 7a2 2 0 012 2m4 0a6 6 0 01-7.743 5.743L11 17H9v2H7v2H4a1 1 0 01-1-1v-2.586a1 1 0 01.293-.707l5.964-5.964A6 6 0 1121 9z" />
+                    </svg>
+                    Update Password
+                  </>
                 )}
               </button>
             </div>
-          </div>
-        </div>
-      )}
-      <div className="flex items-center mb-6">
-        <button onClick={onBack} className="mr-4 text-purple-600 hover:text-purple-800">
-          <svg xmlns="http://www.w3.org/2000/svg" className="h-6 w-6" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 19l-7-7 7-7" />
-          </svg>
-        </button>
-        <h2 className="text-2xl font-bold text-purple-800">Settings</h2>
-      </div>
-      <div className="flex space-x-2 mb-6">
-        <button onClick={() => setSection('profile')} className={`flex-1 py-2 rounded-lg font-semibold ${section === 'profile' ? 'bg-purple-100 text-purple-700' : 'bg-gray-100 text-gray-600'}`}>Profile</button>
-        <button onClick={() => setSection('about')} className={`flex-1 py-2 rounded-lg font-semibold ${section === 'about' ? 'bg-purple-100 text-purple-700' : 'bg-gray-100 text-gray-600'}`}>About</button>
-        <button onClick={() => setSection('help')} className={`flex-1 py-2 rounded-lg font-semibold ${section === 'help' ? 'bg-purple-100 text-purple-700' : 'bg-gray-100 text-gray-600'}`}>Help</button>
-        <button 
-          onClick={() => setSection('danger')} 
-          className={`flex-1 py-2 rounded-lg font-semibold ${section === 'danger' ? 'bg-red-100 text-red-700' : 'bg-red-50 text-red-600'}`}
-        >
-          Danger Zone
-        </button>
-      </div>
-      {section === 'profile' && (
-        <div className="space-y-6">
-          <form onSubmit={handleProfileUpdate} className="space-y-4">
-            <div>
-              <label className="block text-sm font-medium text-gray-700 mb-1">Current Password</label>
-              <input 
-                type="password" 
-                className="w-full border-2 border-purple-200 rounded-lg p-2 text-gray-900" 
-                value={currentPassword} 
-                onChange={e => setCurrentPassword(e.target.value)} 
-                placeholder="Enter current password"
-                required
-              />
-            </div>
-            <div>
-              <label className="block text-sm font-medium text-gray-700 mb-1">New Password</label>
-              <input 
-                type="password" 
-                className="w-full border-2 border-purple-200 rounded-lg p-2 text-gray-900" 
-                value={password} 
-                onChange={e => setPassword(e.target.value)} 
-                placeholder="Enter new password"
-                required
-              />
-            </div>
-            <div>
-              <label className="block text-sm font-medium text-gray-700 mb-1">Confirm New Password</label>
-              <input 
-                type="password" 
-                className="w-full border-2 border-purple-200 rounded-lg p-2 text-gray-900" 
-                value={confirmPassword} 
-                onChange={e => setConfirmPassword(e.target.value)} 
-                placeholder="Confirm new password"
-                required
-              />
-            </div>
-            {errorMsg && (
-              <div className="p-3 bg-red-50 border-l-4 border-red-500 rounded-lg flex items-start space-x-2">
-                <svg xmlns="http://www.w3.org/2000/svg" className="h-5 w-5 text-red-500 mt-0.5" viewBox="0 0 20 20" fill="currentColor">
-                  <path fillRule="evenodd" d="M18 10a8 8 0 11-16 0 8 8 0 0116 0zm-7 4a1 1 0 11-2 0 1 1 0 012 0zm-1-9a1 1 0 00-1 1v4a1 1 0 102 0V6a1 1 0 00-1-1z" clipRule="evenodd" />
-                </svg>
-                <span className="text-red-700 font-medium">{errorMsg}</span>
-              </div>
-            )}
-            {successMsg && (
-              <div className="p-3 bg-green-50 border-l-4 border-green-500 rounded-lg flex items-start space-x-2">
-                <svg xmlns="http://www.w3.org/2000/svg" className="h-5 w-5 text-green-500 mt-0.5" viewBox="0 0 20 20" fill="currentColor">
-                  <path fillRule="evenodd" d="M10 18a8 8 0 100-16 8 8 0 000 16zm3.707-9.293a1 1 0 00-1.414-1.414L9 10.586 7.707 9.293a1 1 0 00-1.414 1.414l2 2a1 1 0 001.414 0l4-4z" clipRule="evenodd" />
-                </svg>
-                <span className="text-green-700 font-medium">{successMsg}</span>
-              </div>
-            )}
-            <button 
-              type="submit" 
-              disabled={isLoading} 
-              className="w-full py-2 bg-purple-600 text-white rounded-lg font-bold hover:bg-purple-700 transition-all"
-            >
-              {isLoading ? 'Saving...' : 'Update Password'}
-            </button>
           </form>
-        </div>
+        </motion.div>
       )}
       {section === 'danger' && (
-        <div className="space-y-6">
-          <div className="bg-red-50 border-l-4 border-red-400 p-4 rounded-lg">
+        <motion.div 
+          initial={{ opacity: 0, y: 10 }}
+          animate={{ opacity: 1, y: 0 }}
+          transition={{ duration: 0.3 }}
+          className="space-y-6"
+        >
+          <div className="bg-gradient-to-r from-red-50 to-red-50 border-l-4 border-red-500 p-5 rounded-lg shadow-sm">
             <div className="flex">
               <div className="flex-shrink-0">
-                <svg className="h-5 w-5 text-red-400" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 20 20" fill="currentColor">
+                <svg className="h-6 w-6 text-red-500" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 20 20" fill="currentColor">
                   <path fillRule="evenodd" d="M8.257 3.099c.765-1.36 2.722-1.36 3.486 0l5.58 9.92c.75 1.334-.213 2.98-1.742 2.98H4.42c-1.53 0-2.493-1.646-1.743-2.98l5.58-9.92zM11 13a1 1 0 11-2 0 1 1 0 012 0zm-1-8a1 1 0 00-1 1v3a1 1 0 002 0V6a1 1 0 00-1-1z" clipRule="evenodd" />
                 </svg>
               </div>
               <div className="ml-3">
-                <p className="text-sm text-red-700">
-                  This is a dangerous area. Proceed with caution. Deleting your account is permanent and cannot be undone.
+                <h3 className="text-base font-medium text-red-800">Danger Zone</h3>
+                <p className="text-sm text-red-700 mt-1">
+                  This area contains sensitive account actions. Proceed with extreme caution. Changes made here are permanent and cannot be undone.
                 </p>
               </div>
             </div>
           </div>
           
-          <div className="border border-red-200 rounded-lg p-4 bg-white">
-            <h3 className="text-lg font-semibold text-gray-900 mb-2">Delete Account</h3>
-            <p className="text-sm text-gray-600 mb-4">
-              Once you delete your account, there is no going back. All your data will be permanently removed.
-            </p>
-            <button
-              onClick={() => setShowDeleteConfirm(true)}
-              className="inline-flex items-center px-4 py-2 border border-transparent text-sm font-medium rounded-md text-white bg-red-600 hover:bg-red-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-red-500"
-            >
-              <TrashIcon className="h-4 w-4 mr-2" />
-              Delete My Account
-            </button>
+          <div className="border border-red-100 rounded-xl p-6 bg-white shadow-sm relative overflow-hidden">
+            <div className="absolute top-0 right-0 w-full h-1 bg-gradient-to-r from-red-500 to-red-600"></div>
+            <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between">
+              <div className="mb-4 sm:mb-0">
+                <h3 className="text-lg font-semibold text-gray-900 flex items-center">
+                  <svg xmlns="http://www.w3.org/2000/svg" className="h-5 w-5 text-red-500 mr-2" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16" />
+                  </svg>
+                  Delete Account
+                </h3>
+                <p className="text-sm text-gray-600 mt-1">
+                  Permanently delete your account and all associated data. This action cannot be undone.
+                </p>
+              </div>
+              <button
+                onClick={() => setShowDeleteConfirm(true)}
+                className="inline-flex items-center justify-center px-5 py-2.5 border border-transparent text-sm font-medium rounded-lg text-white bg-gradient-to-r from-red-500 to-red-600 hover:from-red-600 hover:to-red-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-red-500 transition-all shadow-sm hover:shadow-md"
+              >
+                <TrashIcon className="h-4 w-4 mr-2" />
+                Delete My Account
+              </button>
+            </div>
+            
+            <div className="mt-6 pt-6 border-t border-gray-100">
+              <h4 className="text-sm font-medium text-gray-900 mb-3">Before you go...</h4>
+              <ul className="text-sm text-gray-600 space-y-2">
+                <li className="flex items-start">
+                  <svg className="h-5 w-5 text-red-400 mr-2 mt-0.5 flex-shrink-0" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-3L13.732 4c-.77-1.333-2.694-1.333-3.464 0L3.34 16c-.77 1.333.192 3 1.732 3z" />
+                  </svg>
+                  <span>All your data will be permanently removed from our servers</span>
+                </li>
+                <li className="flex items-start">
+                  <svg className="h-5 w-5 text-red-400 mr-2 mt-0.5 flex-shrink-0" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-3L13.732 4c-.77-1.333-2.694-1.333-3.464 0L3.34 16c-.77 1.333.192 3 1.732 3z" />
+                  </svg>
+                  <span>This action cannot be undone or recovered</span>
+                </li>
+                <li className="flex items-start">
+                  <svg className="h-5 w-5 text-red-400 mr-2 mt-0.5 flex-shrink-0" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-3L13.732 4c-.77-1.333-2.694-1.333-3.464 0L3.34 16c-.77 1.333.192 3 1.732 3z" />
+                  </svg>
+                  <span>You will lose access to all your rewards and points</span>
+                </li>
+              </ul>
+            </div>
           </div>
-        </div>
+        </motion.div>
       )}
       {section === 'about' && (
-        <div className="space-y-4">
-          <h3 className="text-lg font-semibold text-gray-900">About 2gonz</h3>
-          <p className="text-gray-600">
-            2gonz is a loyalty reward system designed to encourage sustainable practices
-            by rewarding students for borrowing and returning items properly.
-          </p>
-        </div>
+        <motion.div 
+          initial={{ opacity: 0, y: 10 }}
+          animate={{ opacity: 1, y: 0 }}
+          transition={{ duration: 0.3 }}
+          className="bg-white rounded-xl shadow-sm border border-gray-100 p-6"
+        >
+          <div className="flex items-center mb-6">
+            <div className="p-3 rounded-full bg-purple-50 text-purple-600 mr-4">
+              <svg xmlns="http://www.w3.org/2000/svg" className="h-6 w-6" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 21V5a2 2 0 00-2-2H7a2 2 0 00-2 2v16m14 0h2m-2 0h-5m-9 0H3m2 0h5M9 7h1m-1 4h1m4-4h1m-1 4h1m-5 10v-5a1 1 0 011-1h2a1 1 0 011 1v5m-4 0h4" />
+              </svg>
+            </div>
+            <h2 className="text-2xl font-bold bg-gradient-to-r from-purple-600 to-indigo-600 bg-clip-text text-transparent">
+              About 2GONZ
+            </h2>
+          </div>
+          
+          <div className="space-y-5">
+            <div className="p-5 bg-purple-50 rounded-xl border border-purple-100">
+              <p className="text-gray-700 leading-relaxed">
+                2GONZ is a loyalty reward system designed to promote sustainable practices among students by encouraging the borrowing and proper return of reusable items. Our mission is to reduce waste and foster a culture of sharing and responsibility.
+              </p>
+            </div>
+            
+            <div className="grid md:grid-cols-2 gap-5 mt-6">
+              <div className="p-5 bg-white border border-gray-100 rounded-xl shadow-sm hover:shadow-md transition-shadow">
+                <div className="w-12 h-12 bg-purple-100 rounded-lg flex items-center justify-center mb-4">
+                  <svg xmlns="http://www.w3.org/2000/svg" className="h-6 w-6 text-purple-600" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z" />
+                  </svg>
+                </div>
+                <h3 className="font-semibold text-gray-900 mb-2">Our Mission</h3>
+                <p className="text-sm text-gray-600">To create a sustainable campus environment by reducing single-use items and promoting responsible consumption.</p>
+              </div>
+              
+              <div className="p-5 bg-white border border-gray-100 rounded-xl shadow-sm hover:shadow-md transition-shadow">
+                <div className="w-12 h-12 bg-purple-100 rounded-lg flex items-center justify-center mb-4">
+                  <svg xmlns="http://www.w3.org/2000/svg" className="h-6 w-6 text-purple-600" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M13 10V3L4 14h7v7l9-11h-7z" />
+                  </svg>
+                </div>
+                <h3 className="font-semibold text-gray-900 mb-2">How It Works</h3>
+                <p className="text-sm text-gray-600">Earn points by borrowing and returning items. Redeem points for exciting rewards.</p>
+              </div>
+            </div>
+          </div>
+        </motion.div>
       )}
+      
       {section === 'help' && (
-        <div className="space-y-4">
-          <h3 className="text-lg font-semibold text-gray-900">Need Help?</h3>
-          <p className="text-gray-600">
-            If you need assistance, please head towards the cashier for assistance.
-          </p>
-        </div>
+        <motion.div 
+          initial={{ opacity: 0, y: 10 }}
+          animate={{ opacity: 1, y: 0 }}
+          transition={{ duration: 0.3 }}
+          className="bg-white rounded-xl shadow-sm border border-gray-100 p-6"
+        >
+          <div className="flex items-center mb-6">
+            <div className="p-3 rounded-full bg-indigo-50 text-indigo-600 mr-4">
+              <svg xmlns="http://www.w3.org/2000/svg" className="h-6 w-6" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M8.228 9c.549-1.165 2.03-2 3.772-2 2.21 0 4 1.343 4 3 0 1.4-1.278 2.575-3.006 2.907-.542.104-.994.54-.994 1.093m0 3h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z" />
+              </svg>
+            </div>
+            <h2 className="text-2xl font-bold bg-gradient-to-r from-indigo-600 to-purple-600 bg-clip-text text-transparent">
+              Help & Support
+            </h2>
+          </div>
+          
+          <div className="space-y-6">
+            <div className="p-5 bg-indigo-50 rounded-xl border border-indigo-100">
+              <h3 className="font-semibold text-indigo-900 mb-3">Need Assistance?</h3>
+              <p className="text-gray-700 mb-4">
+                We're here to help! Visit the cashier for immediate assistance or contact our support team.
+              </p>
+              <div className="bg-white p-4 rounded-lg border border-indigo-100">
+                <div className="flex items-start">
+                  <div className="flex-shrink-0 mt-1">
+                    <svg className="h-5 w-5 text-indigo-500" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M17.657 16.657L13.414 20.9a1.998 1.998 0 01-2.827 0l-4.244-4.243a8 8 0 1111.314 0z" />
+                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 11a3 3 0 11-6 0 3 3 0 016 0z" />
+                    </svg>
+                  </div>
+                  <div className="ml-3">
+                    <p className="text-sm text-indigo-600">infotechvarda@gmail.com</p>
+                    <p className="text-xs text-gray-500 mt-1">Open Monday to Saturday, 8:00 AM - 5:00 PM</p>
+                  </div>
+                </div>
+              </div>
+            </div>
+            
+            <div className="space-y-4">
+              <h3 className="font-semibold text-gray-900">Quick Help</h3>
+              
+              <div className="border border-gray-200 rounded-xl overflow-hidden">
+                <div className="p-4 border-b border-gray-100 bg-gray-50">
+                  <h4 className="font-medium text-gray-900">How do I earn points?</h4>
+                </div>
+                <div className="p-4 bg-white">
+                  <p className="text-sm text-gray-600">Earn points by borrowing and returning items. Each successful return with all items in good condition will recieve a redeemable code.</p>
+                </div>
+              </div>
+              
+              <div className="border border-gray-200 rounded-xl overflow-hidden">
+                <div className="p-4 border-b border-gray-100 bg-gray-50">
+                  <h4 className="font-medium text-gray-900">What can I do with my points?</h4>
+                </div>
+                <div className="p-4 bg-white">
+                  <p className="text-sm text-gray-600">Points can be redeemed for various rewards. Check the Rewards section to see what's available and how many points you need.</p>
+                </div>
+              </div>
+            </div>
+          </div>
+        </motion.div>
       )}
     </div>
+  </div>
   );
 }
