@@ -781,9 +781,18 @@ export default function StudentPage() {
                       </div>
                       
                       <div className="flex justify-between items-center pl-4">
-                        <div>
-                          <h3 className="text-lg font-bold text-white">{reward.name}</h3>
-                          <p className="text-sm text-white/80">{reward.description || 'Awesome reward!'}</p>
+                        <div className="flex items-center space-x-4">
+                          {reward.imageUrl && (
+                            <img
+                              src={reward.imageUrl}
+                              alt={reward.name}
+                              className="h-14 w-14 rounded-lg object-cover border border-white/20"
+                            />
+                          )}
+                          <div>
+                            <h3 className="text-lg font-bold text-white">{reward.name}</h3>
+                            <p className="text-sm text-white/80">{reward.description || 'Awesome reward!'}</p>
+                          </div>
                         </div>
                         <button
                           onClick={() => claimReward(reward._id)}

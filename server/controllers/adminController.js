@@ -41,13 +41,26 @@ export const getStats = async (req, res) => {
 };
 
 export const createReward = async (req, res) => {
-  const { name, cost } = req.body;
-  if (!name || !cost) return res.status(400).json({ message: 'Missing fields' });
+  try {
+    const { name, cost, description, imageBase64 } = req.body || {};
 
-  const reward = new Reward({ name, cost });
-  await reward.save();
+    if (!name || !cost || !description) {
+      return res.status(400).json({ message: 'Missing fields' });
+    }
 
-  res.status(201).json(reward);
+    const reward = new Reward({
+      name,
+      cost,
+      description,
+      imageUrl: imageBase64 || null
+    });
+
+    await reward.save();
+    res.status(201).json(reward);
+  } catch (error) {
+    console.error('Error creating reward:', error);
+    res.status(500).json({ message: 'Error creating reward' });
+  }
 };
 
 export const getUsers = async (req, res) => {

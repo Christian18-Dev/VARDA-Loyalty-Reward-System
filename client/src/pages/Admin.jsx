@@ -94,6 +94,8 @@ export default function AdminPage() {
   // Legacy state variables (will be gradually replaced by cache)
   const [stats, setStats] = useState({});
   const [rewards, setRewards] = useState({ name: '', cost: '', description: '' });
+  const [rewardImage, setRewardImage] = useState(null);
+  const [rewardImagePreview, setRewardImagePreview] = useState(null);
   const [users, setUsers] = useState([]);
   const [claimedRewards, setClaimedRewards] = useState([]);
   const [availableRewards, setAvailableRewards] = useState([]);
@@ -561,6 +563,30 @@ export default function AdminPage() {
     return () => clearTimeout(timer);
   }, [searchTerm, currentPage]);
 
+  const handleRewardImageChange = (e) => {
+    const file = e.target.files && e.target.files[0];
+    if (!file) return;
+
+    if (!file.type.startsWith('image/')) {
+      setModalMessage('Please select a valid image file (JPEG/PNG).');
+      setShowErrorModal(true);
+      return;
+    }
+
+    const MAX_SIZE_BYTES = 5 * 1024 * 1024; // 5MB
+    if (file.size > MAX_SIZE_BYTES) {
+      setModalMessage('Image size should be less than 5MB.');
+      setShowErrorModal(true);
+      return;
+    }
+
+    setRewardImage(file);
+
+    const reader = new FileReader();
+    reader.onloadend = () => setRewardImagePreview(reader.result);
+    reader.readAsDataURL(file);
+  };
+
   const handleCreateReward = async () => {
     if (!rewards.name.trim() || !rewards.cost || !rewards.description.trim()) {
       setModalMessage('Please fill all fields including the description');
@@ -569,12 +595,34 @@ export default function AdminPage() {
     }
 
     try {
-      await axios.post(
-        `${baseUrl}/api/admin/reward`,
-        rewards,
-        { headers: { Authorization: `Bearer ${token}` } }
-      );
+      // Prepare JSON payload; include base64 image if provided
+      let imageBase64 = null;
+      if (rewardImage) {
+        // Prefer already generated preview
+        if (rewardImagePreview) {
+          imageBase64 = rewardImagePreview;
+        } else {
+          imageBase64 = await new Promise((resolve, reject) => {
+            const reader = new FileReader();
+            reader.onloadend = () => resolve(reader.result);
+            reader.onerror = reject;
+            reader.readAsDataURL(rewardImage);
+          });
+        }
+      }
+
+      const payload = {
+        name: rewards.name,
+        cost: rewards.cost,
+        description: rewards.description,
+        imageBase64
+      };
+
+      await axios.post(`${baseUrl}/api/admin/reward`, payload, { headers: { Authorization: `Bearer ${token}` } });
+
       setRewards({ name: '', cost: '', description: '' });
+      setRewardImage(null);
+      setRewardImagePreview(null);
       // Refresh rewards list
       const rewardsRes = await axios.get(`${baseUrl}/api/rewards`, {
         headers: { Authorization: `Bearer ${token}` },
@@ -3640,6 +3688,28 @@ export default function AdminPage() {
                     className="w-full px-4 py-2 border border-gray-300 rounded-xl focus:ring-2 focus:ring-purple-500 focus:border-transparent"
                     placeholder="Enter reward description"
                   />
+                </div>
+                <div className="md:col-span-3">
+                  <label className="block text-sm font-medium text-gray-700 mb-1">Reward Image (optional)</label>
+                  <input
+                    type="file"
+                    accept="image/*"
+                    onChange={handleRewardImageChange}
+                    className="w-full px-4 py-2 border border-gray-300 rounded-xl focus:ring-2 focus:ring-purple-500 focus:border-transparent bg-white"
+                  />
+                  {rewardImagePreview && (
+                    <div className="mt-3 flex items-center space-x-3">
+                      <img src={rewardImagePreview} alt="Preview" className="h-16 w-16 object-cover rounded-lg border" />
+                      <button
+                        type="button"
+                        onClick={() => { setRewardImage(null); setRewardImagePreview(null); }}
+                        className="px-3 py-1 text-sm font-medium text-white bg-red-600 rounded-lg hover:bg-red-700 focus:outline-none focus:ring-2 focus:ring-red-500 focus:ring-offset-2"
+                      >
+                        Remove
+                      </button>
+                    </div>
+                  )}
+                  <p className="mt-2 text-xs text-gray-500">JPEG/PNG, up to 5MB.</p>
                 </div>
               </div>
               <div className="mt-4">
