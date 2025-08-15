@@ -1572,7 +1572,6 @@ export default function StudentPage() {
             <button
               onClick={() => {
                 setShowSuccessPopup(false);
-                setShowFeedbackForm(true);
               }}
               className="mt-4 bg-green-600 hover:bg-green-700 text-white px-6 py-2 rounded-full font-medium transition-colors"
             >
