@@ -393,7 +393,7 @@ export default function Register() {
       <Modal isOpen={showTerms} onClose={() => setShowTerms(false)} title="Terms and Conditions">
         <h2>1. Acceptance of Terms</h2>
         <p>
-          By accessing and using the Webiste, you agree to be bound by these Terms and Conditions.
+          By accessing and using the Website, you agree to be bound by these Terms and Conditions.
           If you do not agree to these terms, please do not use our service.
         </p>
 
