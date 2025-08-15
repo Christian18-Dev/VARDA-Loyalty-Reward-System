@@ -546,7 +546,7 @@ export default function StudentPage() {
         {currentPage === 'home' && (
           <motion.div variants={itemVariants} className="space-y-6">
             <motion.div 
-              className="relative mx-auto p-3 sm:p-4 md:p-6 w-full max-w-md bg-gradient-to-br from-purple-500 via-purple-700 to-purple-500 rounded-2xl shadow-2xl text-white overflow-hidden"
+              className="relative mx-auto p-3 sm:p-4 md:p-6 w-full max-w-md bg-gradient-to-br from-blue-100 via-blue-200 to-blue-300 rounded-2xl shadow-2xl text-black overflow-hidden"
               whileHover={{ scale: 1.02 }}
               whileTap={{ scale: 0.98 }}
               style={{
@@ -557,51 +557,116 @@ export default function StudentPage() {
                 margin: "0 auto 2rem auto"
               }}
             >
-              {/* Card Content */}
-              <div className="relative z-10 flex flex-col justify-between h-full">
-                {/* Card issuer and chip */}
-                <div className="flex justify-between items-start">
-                  <div className="flex items-center space-x-3">
-                    <img src={twoGonzLogo} alt="2gonz Logo" className="h-8 sm:h-10 md:h-12 w-auto" />
-                    <div className="text-xs sm:text-sm font-medium text-white/80">LOYALTY CARD</div>
-                  </div>
-                  <div className="w-8 sm:w-10 h-6 sm:h-8 bg-gradient-to-br from-yellow-300 to-yellow-500 rounded-md flex items-center justify-center">
-                    <div className="w-6 sm:w-8 h-4 sm:h-6 bg-gradient-to-br from-yellow-400 to-yellow-600 rounded-sm border border-yellow-200/50 flex items-center justify-center">
-                      <div className="w-4 sm:w-5 h-3 sm:h-4 bg-gradient-to-br from-yellow-500 to-yellow-700 rounded-xs border border-yellow-300/50"></div>
-                    </div>
-                  </div>
-                </div>
-
-                {/* Points display with animation */}
-                <motion.div 
-                  key={points}
-                  initial={{ scale: 1.1, opacity: 0.8 }}
-                  animate={{ scale: 1, opacity: 1 }}
-                  className="text-center flex-grow flex flex-col justify-center py-2 sm:py-4"
-                >
-                  <p className="text-xs text-white/80 mb-1">POINTS BALANCE:</p>
-                  <p className="text-2xl sm:text-3xl md:text-4xl font-bold tracking-tight text-white flex items-center justify-center">
-                    {points} <span className="text-lg sm:text-xl ml-2">⭐</span>
-                  </p>
-                </motion.div>
-
-                {/* Card footer */}
-                <div className="flex justify-between items-end mt-auto pt-2 sm:pt-3">
-                  <div className="max-w-[60%]">
-                    <p className="text-xs sm:text-sm font-medium tracking-wider text-white/90 truncate">
-                      {`${user.firstName} ${user.lastName}`.toUpperCase()}
-                    </p>
-                  </div>
+              {/* Wave Background Design */}
+              <div className="absolute inset-0 pointer-events-none overflow-hidden">
+                {/* Primary wave */}
+                <div className="absolute -bottom-8 left-0 w-full h-16 bg-gradient-to-r from-blue-400/50 via-blue-500/50 to-blue-600/50 rounded-full blur-sm animate-pulse"></div>
+                
+                {/* Multiple wave layers for depth */}
+                <div className="absolute -bottom-4 left-0 w-full h-12 bg-gradient-to-r from-blue-300/40 via-blue-400/40 to-blue-500/40 rounded-full blur-sm animate-pulse" style={{ animationDelay: '0.5s' }}></div>
+                
+                {/* Top wave accent */}
+                <div className="absolute top-4 left-0 w-full h-8 bg-gradient-to-r from-transparent via-blue-400/30 to-transparent rounded-full blur-sm"></div>
+                
+                {/* Side wave accents */}
+                <div className="absolute top-1/2 -left-4 w-8 h-8 bg-gradient-to-br from-blue-400/40 to-blue-500/40 rounded-full blur-sm animate-pulse" style={{ animationDelay: '1s' }}></div>
+                <div className="absolute top-1/3 -right-2 w-6 h-6 bg-gradient-to-br from-blue-500/40 to-blue-600/40 rounded-full blur-sm animate-pulse" style={{ animationDelay: '1.5s' }}></div>
+                
+                {/* Floating wave elements */}
+                <div className="absolute top-6 right-6 w-4 h-4 bg-gradient-to-br from-blue-300/50 to-blue-400/50 rounded-full blur-sm animate-bounce" style={{ animationDelay: '0.3s' }}></div>
+                <div className="absolute bottom-6 left-8 w-3 h-3 bg-gradient-to-br from-blue-400/50 to-blue-500/50 rounded-full blur-sm animate-bounce" style={{ animationDelay: '0.7s' }}></div>
+                
+                {/* Curved wave paths */}
+                <svg className="absolute inset-0 w-full h-full" viewBox="0 0 100 100" preserveAspectRatio="none">
+                  <path 
+                    d="M0,80 Q25,60 50,80 T100,80 L100,100 L0,100 Z" 
+                    fill="url(#waveGradient1)" 
+                    opacity="0.4"
+                    className="animate-pulse"
+                  />
+                  <path 
+                    d="M0,85 Q30,65 60,85 T100,85 L100,100 L0,100 Z" 
+                    fill="url(#waveGradient2)" 
+                    opacity="0.3"
+                    className="animate-pulse"
+                    style={{ animationDelay: '0.8s' }}
+                  />
+                  <path 
+                    d="M0,90 Q35,70 65,90 T100,90 L100,100 L0,100 Z" 
+                    fill="url(#waveGradient3)" 
+                    opacity="0.25"
+                    className="animate-pulse"
+                    style={{ animationDelay: '1.2s' }}
+                  />
                   
-                  <div className="text-right">
-                    <p className="text-xs text-white/80">STATUS</p>
-                    <div className="flex items-center justify-end space-x-1">
-                      <div className="w-2 h-2 bg-green-400 rounded-full animate-pulse"></div>
-                      <p className="text-xs sm:text-sm font-medium text-white/90">ACTIVE</p>
+                  {/* Gradient definitions */}
+                  <defs>
+                    <linearGradient id="waveGradient1" x1="0%" y1="0%" x2="100%" y2="0%">
+                      <stop offset="0%" stopColor="rgba(59, 130, 246, 0.5)" />
+                      <stop offset="50%" stopColor="rgba(37, 99, 235, 0.5)" />
+                      <stop offset="100%" stopColor="rgba(59, 130, 246, 0.5)" />
+                    </linearGradient>
+                    <linearGradient id="waveGradient2" x1="0%" y1="0%" x2="100%" y2="0%">
+                      <stop offset="0%" stopColor="rgba(37, 99, 235, 0.4)" />
+                      <stop offset="50%" stopColor="rgba(29, 78, 216, 0.4)" />
+                      <stop offset="100%" stopColor="rgba(37, 99, 235, 0.4)" />
+                    </linearGradient>
+                    <linearGradient id="waveGradient3" x1="0%" y1="0%" x2="100%" y2="0%">
+                      <stop offset="0%" stopColor="rgba(29, 78, 216, 0.3)" />
+                      <stop offset="50%" stopColor="rgba(30, 64, 175, 0.3)" />
+                      <stop offset="100%" stopColor="rgba(29, 78, 216, 0.3)" />
+                    </linearGradient>
+                  </defs>
+                </svg>
+                
+                {/* Shimmer effect */}
+                <div className="absolute inset-0 bg-gradient-to-r from-transparent via-blue-400/20 to-transparent transform -skew-x-12 animate-pulse opacity-40"></div>
+              </div>
+
+                              {/* Card Content */}
+                <div className="relative z-10 flex flex-col justify-between h-full">
+                  {/* Card issuer and chip */}
+                  <div className="flex justify-between items-start">
+                    <div className="flex items-center space-x-3">
+                      <img src={twoGonzLogo} alt="2gonz Logo" className="h-8 sm:h-10 md:h-12 w-auto" />
+                      <div className="text-xs sm:text-sm font-bold text-black/90">LOYALTY CARD</div>
+                    </div>
+                    <div className="w-8 sm:w-10 h-6 sm:h-8 bg-gradient-to-br from-yellow-300 to-yellow-500 rounded-md flex items-center justify-center">
+                      <div className="w-6 sm:w-8 h-4 sm:h-6 bg-gradient-to-br from-yellow-400 to-yellow-600 rounded-sm border border-yellow-200/50 flex items-center justify-center">
+                        <div className="w-4 sm:w-5 h-3 sm:h-4 bg-gradient-to-br from-yellow-500 to-yellow-700 rounded-xs border border-yellow-300/50"></div>
+                      </div>
+                    </div>
+                  </div>
+
+                  {/* Points display with animation */}
+                  <motion.div 
+                    key={points}
+                    initial={{ scale: 1.1, opacity: 0.8 }}
+                    animate={{ scale: 1, opacity: 1 }}
+                    className="text-center flex-grow flex flex-col justify-center py-2 sm:py-4"
+                  >
+                    <p className="text-xs font-bold text-black/80 mb-1">POINTS BALANCE:</p>
+                    <p className="text-2xl sm:text-3xl md:text-4xl font-bold tracking-tight text-black flex items-center justify-center">
+                      {points} <span className="text-lg sm:text-xl ml-2">⭐</span>
+                    </p>
+                  </motion.div>
+
+                  {/* Card footer */}
+                  <div className="flex justify-between items-end mt-auto pt-2 sm:pt-3">
+                    <div className="max-w-[60%]">
+                      <p className="text-xs sm:text-sm font-bold tracking-wider text-black/90 truncate">
+                        {`${user.firstName} ${user.lastName}`.toUpperCase()}
+                      </p>
+                    </div>
+                    
+                    <div className="text-right">
+                      <div className="flex items-center justify-end space-x-1">
+                        <div className="w-2 h-2 bg-green-400 rounded-full animate-pulse"></div>
+                        <p className="text-xs sm:text-sm font-bold text-black/90">ACTIVE</p>
+                      </div>
                     </div>
                   </div>
                 </div>
-              </div>
 
               {/* Shine effect on hover */}
               <div className="absolute inset-0 pointer-events-none overflow-hidden">
@@ -694,45 +759,92 @@ export default function StudentPage() {
 
         {/* Claim Code Page */}
         {currentPage === 'claim' && (
-          <motion.div variants={itemVariants} className="space-y-6">
-            <div className="text-center">
-              <img src={twoGonzLogo} alt="2gonz Logo" className="h-16 sm:h-20 mx-auto mb-8" />
-              <h2 className="text-2xl font-bold text-blue-400">Redeem Your Code</h2>
+          <motion.div variants={itemVariants} className="space-y-8">
+            <div className="text-center relative">
+              {/* Glow aura behind logo */}
+              <div className="absolute inset-0 flex items-center justify-center">
+                <div className="w-32 h-32 sm:w-40 sm:h-40 bg-gradient-to-r from-blue-400/30 via-purple-500/30 to-blue-600/30 rounded-full blur-3xl animate-pulse"></div>
+                <div className="absolute w-24 h-24 sm:w-32 sm:h-32 bg-gradient-to-r from-blue-500/20 via-purple-400/20 to-blue-500/20 rounded-full blur-2xl animate-pulse" style={{ animationDelay: '1s' }}></div>
+                <div className="absolute w-16 h-16 sm:w-20 sm:h-20 bg-gradient-to-r from-purple-400/25 to-blue-400/25 rounded-full blur-xl animate-pulse" style={{ animationDelay: '2s' }}></div>
+              </div>
+              
+              {/* Logo with enhanced styling */}
+              <div className="relative z-10">
+                <img src={twoGonzLogo} alt="2gonz Logo" className="h-16 sm:h-20 mx-auto mb-6 drop-shadow-2xl" />
+              </div>
+              
+              {/* Enhanced title with gradient */}
+              <div className="relative z-10">
+                <h2 className="text-3xl sm:text-4xl font-bold bg-gradient-to-r from-blue-400 via-purple-400 to-blue-500 bg-clip-text text-transparent mb-2">
+                  Redeem Your Code
+                </h2>
+                <div className="w-24 h-1 bg-gradient-to-r from-blue-400 via-purple-400 to-blue-500 rounded-full mx-auto"></div>
+                <p className="text-gray-400 mt-3 text-sm sm:text-base">Enter your unique code to earn points</p>
+              </div>
             </div>
             
             <motion.div 
-              className="bg-[#1e293b] p-6 rounded-2xl shadow-lg border-2 border-dashed border-gray-700/50"
-              initial={{ scale: 0.9 }}
-              animate={{ scale: 1 }}
+              className="bg-gradient-to-br from-[#1e293b] via-[#1e293b] to-[#0f172a] p-8 rounded-3xl shadow-2xl border border-gray-700/30 relative overflow-hidden"
+              initial={{ scale: 0.9, opacity: 0 }}
+              animate={{ scale: 1, opacity: 1 }}
+              transition={{ duration: 0.5 }}
             >
-              <div className="space-y-4">
-                <div className="text-center mb-4">
-                  <div className="inline-block bg-blue-900/50 px-4 py-2 rounded-full">
-                    <span className="font-bold text-blue-300">✨  Enter Code ✨</span>
+              {/* Subtle background pattern */}
+              <div className="absolute inset-0 opacity-5">
+                <div className="absolute top-0 left-0 w-full h-full bg-gradient-to-br from-blue-400/20 via-purple-400/20 to-blue-400/20"></div>
+              </div>
+              
+              <div className="relative z-10 space-y-6">
+                <div className="text-center mb-6">
+                  <div className="inline-block bg-gradient-to-r from-blue-900/60 via-purple-900/60 to-blue-900/60 px-6 py-3 rounded-full border border-blue-500/30 shadow-lg">
+                    <span className="font-bold text-blue-300 text-lg">✨ Enter Your Code ✨</span>
                   </div>
                 </div>
                 
-                <div className="space-y-2">
-                  <input
-                    id="code-input"
-                    className="w-full border-2 border-gray-700 bg-gray-800/50 p-4 rounded-xl text-center font-mono text-xl focus:ring-2 focus:ring-blue-500 focus:border-blue-500 text-white placeholder-gray-500"
-                    placeholder="ex. 123456"
-                    value={code}
-                    onChange={(e) => setCode(e.target.value.toUpperCase())}
+                <div className="space-y-4">
+                  <div className="relative">
+                    <input
+                      id="code-input"
+                      className="w-full border-2 border-gray-600/50 bg-gray-800/30 backdrop-blur-sm p-5 rounded-2xl text-center font-mono text-2xl focus:ring-4 focus:ring-blue-500/30 focus:border-blue-400 text-white placeholder-gray-500 transition-all duration-300 shadow-lg"
+                      placeholder="ex. 123456"
+                      value={code}
+                      onChange={(e) => setCode(e.target.value.toUpperCase())}
+                      disabled={isLoading}
+                      style={{ letterSpacing: '3px' }}
+                    />
+                    {/* Input glow effect */}
+                    <div className="absolute inset-0 rounded-2xl bg-gradient-to-r from-blue-500/20 via-purple-500/20 to-blue-500/20 blur-xl opacity-0 transition-opacity duration-300 pointer-events-none"></div>
+                  </div>
+                  
+                  <button
+                    onClick={handleCodeSubmit}
                     disabled={isLoading}
-                    style={{ letterSpacing: '2px' }}
-                  />
+                    className={`w-full py-4 bg-gradient-to-r from-blue-600 via-purple-600 to-blue-700 text-white rounded-2xl font-bold text-lg hover:from-blue-700 hover:via-purple-700 hover:to-blue-800 transition-all duration-300 shadow-lg hover:shadow-xl transform hover:scale-[1.02] active:scale-[0.98] ${
+                      isLoading ? 'opacity-50 cursor-not-allowed' : ''
+                    }`}
+                  >
+                    {isLoading ? (
+                      <div className="flex items-center justify-center">
+                        <div className="w-5 h-5 border-2 border-white border-t-transparent rounded-full animate-spin mr-3"></div>
+                        Processing...
+                      </div>
+                    ) : (
+                      <span className="flex items-center justify-center">
+                        <svg xmlns="http://www.w3.org/2000/svg" className="h-5 w-5 mr-2" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z" />
+                        </svg>
+                        Submit Code
+                      </span>
+                    )}
+                  </button>
                 </div>
                 
-                <button
-                  onClick={handleCodeSubmit}
-                  disabled={isLoading}
-                  className={`w-full py-3 bg-blue-600 text-white rounded-xl font-bold hover:bg-blue-700 transition-all ${
-                    isLoading ? 'opacity-50 cursor-not-allowed' : ''
-                  }`}
-                >
-                  {isLoading ? 'Processing...' : 'Submit Code'}
-                </button>
+                {/* Decorative elements */}
+                <div className="flex justify-center space-x-2 mt-6">
+                  <div className="w-2 h-2 bg-blue-400 rounded-full animate-bounce"></div>
+                  <div className="w-2 h-2 bg-purple-400 rounded-full animate-bounce" style={{ animationDelay: '0.2s' }}></div>
+                  <div className="w-2 h-2 bg-blue-400 rounded-full animate-bounce" style={{ animationDelay: '0.4s' }}></div>
+                </div>
               </div>
             </motion.div>
           </motion.div>
@@ -780,18 +892,18 @@ export default function StudentPage() {
                         {reward.cost} pts
                       </div>
                       
-                      <div className="flex justify-between items-center pl-4">
-                        <div className="flex items-center space-x-4">
+                      <div className="flex justify-between items-center pl-0">
+                        <div className="flex items-center space-x-2">
                           {reward.imageUrl && (
                             <img
                               src={reward.imageUrl}
                               alt={reward.name}
-                              className="h-14 w-14 rounded-lg object-cover border border-white/20"
+                              className="h-14 w-14 rounded-lg object-cover"
                             />
                           )}
                           <div>
-                            <h3 className="text-lg font-bold text-white">{reward.name}</h3>
-                            <p className="text-sm text-white/80">{reward.description || 'Awesome reward!'}</p>
+                            <h3 className="text-base font-bold text-white">{reward.name}</h3>
+                            <p className="text-xs text-white/80">{reward.description || 'Awesome reward!'}</p>
                           </div>
                         </div>
                         <button
