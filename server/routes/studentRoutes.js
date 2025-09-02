@@ -5,7 +5,8 @@ import {
   getPoints, 
   claimReward, 
   updateProfile, 
-  deleteAccount 
+  deleteAccount,
+  getClaimedRewards
 } from '../controllers/studentController.js';
 import { protect, borrowAccess } from '../middleware/authMiddleware.js';
 import { getRewards } from '../controllers/rewardController.js';
@@ -35,6 +36,9 @@ router.get('/borrowed-items', protect, getBorrowedItems);
 
 // Route for claiming a reward with points
 router.post('/claim-reward/:id', protect, claimReward);
+
+// Route for getting student's claimed rewards
+router.get('/claimed-rewards', protect, getClaimedRewards);
 
 // Route for updating profile
 router.put('/profile', protect, updateProfile);

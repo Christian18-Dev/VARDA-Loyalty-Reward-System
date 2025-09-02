@@ -66,12 +66,14 @@ export const claimReward = async (req, res) => {
     req.user.pointsUsed += reward.cost;
     await req.user.save();
 
-    // Record the claim
+    // Record the claim with new model structure
     await ClaimedReward.create({
       idNumber: req.user.idNumber,
-      reward: reward.name,
+      reward: reward._id, // Reference to the reward
+      rewardName: reward.name, // Store reward name
       pointsUsed: reward.cost,
-      dateClaimed: new Date(),
+      claimedAt: new Date(),
+      status: 'claimed'
     });
 
     res.json({ 
@@ -211,6 +213,61 @@ export const deleteAccount = async (req, res) => {
     res.status(500).json({ 
       success: false,
       message: 'Failed to delete account. Please try again.'
+    });
+  }
+};
+
+export const getClaimedRewards = async (req, res) => {
+  try {
+    const claimedRewards = await ClaimedReward.find({ 
+      idNumber: req.user.idNumber 
+    })
+    .populate({
+      path: 'reward',
+      select: 'name description imageUrl cost',
+      // Handle cases where reward might be a string (old data) or ObjectId (new data)
+      match: { _id: { $exists: true } }
+    })
+    .sort({ claimedAt: -1 }); // Sort by most recent first
+
+    // Process the data to handle both old and new structures
+    const processedRewards = claimedRewards.map(claimedReward => {
+      const reward = claimedReward.toObject();
+      
+      // If reward is populated (ObjectId reference), use that data
+      if (reward.reward && typeof reward.reward === 'object' && reward.reward._id) {
+        return {
+          ...reward,
+          reward: {
+            name: reward.reward.name || reward.rewardName,
+            description: reward.reward.description,
+            imageUrl: reward.reward.imageUrl,
+            cost: reward.reward.cost
+          }
+        };
+      }
+      
+      // If reward is a string (old data), create a basic structure
+      return {
+        ...reward,
+        reward: {
+          name: reward.rewardName || reward.reward,
+          description: 'Reward details not available',
+          imageUrl: null,
+          cost: reward.pointsUsed
+        }
+      };
+    });
+
+    res.json({
+      success: true,
+      data: processedRewards
+    });
+  } catch (error) {
+    console.error('Error fetching claimed rewards:', error);
+    res.status(500).json({ 
+      success: false,
+      message: 'Failed to fetch claimed rewards' 
     });
   }
 };

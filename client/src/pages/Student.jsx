@@ -116,6 +116,8 @@ export default function StudentPage() {
   const [isReturning, setIsReturning] = useState(false);
   const [showReviewModal, setShowReviewModal] = useState(false);
   const [reviewItems, setReviewItems] = useState([]);
+  const [claimedRewards, setClaimedRewards] = useState([]);
+  const [isLoadingClaimedRewards, setIsLoadingClaimedRewards] = useState(false);
 
   const baseUrl = import.meta.env.VITE_API_BASE_URL;
   const token = user.token;
@@ -133,9 +135,30 @@ export default function StudentPage() {
     }
   };
 
+  // Add fetchClaimedRewards function
+  const fetchClaimedRewards = async () => {
+    try {
+      setIsLoadingClaimedRewards(true);
+      const response = await axios.get(`${baseUrl}/api/student/claimed-rewards`, {
+        headers: { Authorization: `Bearer ${token}` }
+      });
+      setClaimedRewards(response.data.data || []);
+    } catch (error) {
+      console.error('Error fetching claimed rewards:', error);
+      setErrorMessage('Failed to fetch claimed rewards');
+    } finally {
+      setIsLoadingClaimedRewards(false);
+    }
+  };
+
   // Call fetchUserPoints when component mounts and when token changes
   useEffect(() => {
     fetchUserPoints();
+  }, [token]);
+
+  // Call fetchClaimedRewards when component mounts and when token changes
+  useEffect(() => {
+    fetchClaimedRewards();
   }, [token]);
 
   useEffect(() => {
@@ -414,6 +437,9 @@ export default function StudentPage() {
       setClaimTime(new Date().toLocaleString());
       setShowClaimModal(true);
 
+      // Refresh claimed rewards list
+      await fetchClaimedRewards();
+
       confetti({ particleCount: 150, spread: 100, origin: { y: 0.6 } });
     } catch (err) {
       setErrorMessage(err.response?.data?.message || 'Failed to claim reward');
@@ -540,7 +566,7 @@ export default function StudentPage() {
         animate={{ opacity: 1, y: 0 }}
         exit={{ opacity: 0, y: -20 }}
         transition={{ duration: 0.3 }}
-        className="container mx-auto px-4 py-8 pb-24"
+        className="container mx-auto px-2 sm:px-4 py-6 sm:py-8 pb-20 sm:pb-24"
       >
         {/* Home Page */}
         {currentPage === 'home' && (
@@ -675,25 +701,37 @@ export default function StudentPage() {
             </motion.div>
 
             {/* Navigation Buttons */}
-            <div className="grid grid-cols-2 sm:grid-cols-3 gap-4">
+            <div className="grid grid-cols-2 sm:grid-cols-3 gap-3 sm:gap-4 px-2 sm:px-0">
               <motion.button
                 whileHover={{ scale: 1.05 }}
                 whileTap={{ scale: 0.95 }}
                 onClick={() => setCurrentPage('claim')}
-                className="flex flex-col items-center p-4 bg-[#1e293b] rounded-xl shadow-md hover:shadow-lg transition-all border border-gray-700/50"
+                className="flex flex-col items-center p-3 sm:p-4 bg-[#1e293b] rounded-lg sm:rounded-xl shadow-md hover:shadow-lg transition-all border border-gray-700/50 min-h-[80px] sm:min-h-[100px]"
               >
-                <TicketIcon className="h-8 w-8 text-purple-400" />
-                <span className="mt-2 font-medium text-gray-200">Redeem</span>
+                <TicketIcon className="h-6 w-6 sm:h-8 sm:w-8 text-purple-400" />
+                <span className="mt-1.5 sm:mt-2 font-medium text-gray-200 text-sm sm:text-base">Redeem</span>
               </motion.button>
 
               <motion.button
                 whileHover={{ scale: 1.05 }}
                 whileTap={{ scale: 0.95 }}
                 onClick={() => setCurrentPage('rewards')}
-                className="flex flex-col items-center p-4 bg-[#1e293b] rounded-xl shadow-md hover:shadow-lg transition-all border border-gray-700/50"
+                className="flex flex-col items-center p-3 sm:p-4 bg-[#1e293b] rounded-lg sm:rounded-xl shadow-md hover:shadow-lg transition-all border border-gray-700/50 min-h-[80px] sm:min-h-[100px]"
               >
-                <GiftIcon className="h-8 w-8 text-purple-400" />
-                <span className="mt-2 font-medium text-gray-200">Rewards</span>
+                <GiftIcon className="h-6 w-6 sm:h-8 sm:w-8 text-purple-400" />
+                <span className="mt-1.5 sm:mt-2 font-medium text-gray-200 text-sm sm:text-base">Rewards</span>
+              </motion.button>
+              
+              <motion.button
+                whileHover={{ scale: 1.05 }}
+                whileTap={{ scale: 0.95 }}
+                onClick={() => setCurrentPage('claimed-rewards')}
+                className="flex flex-col items-center p-3 sm:p-4 bg-[#1e293b] rounded-lg sm:rounded-xl shadow-md hover:shadow-lg transition-all border border-gray-700/50 min-h-[80px] sm:min-h-[100px] col-span-2 sm:col-span-1"
+              >
+                <svg xmlns="http://www.w3.org/2000/svg" className="h-6 w-6 sm:h-8 sm:w-8 text-green-400" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z" />
+                </svg>
+                <span className="mt-1.5 sm:mt-2 font-medium text-gray-200 text-sm sm:text-base">Claimed Rewards</span>
               </motion.button>
               
               {/*}
@@ -748,6 +786,60 @@ export default function StudentPage() {
                         >
                           {isReturning ? 'Processing...' : 'Return'}
                         </button>
+                      </motion.div>
+                    ))}
+                  </div>
+                </div>
+              </motion.div>
+            )}
+
+            {/* Claimed Rewards Summary Section */}
+            {claimedRewards.length > 0 && (
+              <motion.div 
+                initial={{ opacity: 0, y: 20 }}
+                animate={{ opacity: 1, y: 0 }}
+                className="mt-6 sm:mt-8"
+              >
+                <div className="bg-[#1e293b] p-4 sm:p-6 rounded-xl sm:rounded-2xl shadow-lg border border-gray-700/50 mx-2 sm:mx-0">
+                  <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between mb-3 sm:mb-4 space-y-2 sm:space-y-0">
+                    <h3 className="text-lg sm:text-xl font-semibold text-gray-200">Recent Claimed Rewards</h3>
+                    <button
+                      onClick={() => setCurrentPage('claimed-rewards')}
+                      className="px-3 py-1.5 sm:py-1 bg-green-600 text-white text-xs sm:text-sm rounded-lg hover:bg-green-700 transition-colors self-start sm:self-auto"
+                    >
+                      View All
+                    </button>
+                  </div>
+                  <div className="space-y-2 sm:space-y-3">
+                    {claimedRewards.slice(0, 3).map((claimedReward, index) => (
+                      <motion.div 
+                        key={claimedReward._id || index}
+                        initial={{ opacity: 0, y: 10 }}
+                        animate={{ opacity: 1, y: 0 }}
+                        transition={{ delay: index * 0.1 }}
+                        className="flex items-center space-x-3 p-2.5 sm:p-3 bg-gray-800/30 rounded-lg hover:bg-gray-800/50 transition-colors"
+                      >
+                        <div className="w-7 h-7 sm:w-8 sm:h-8 bg-green-500 rounded-full flex items-center justify-center flex-shrink-0">
+                          <svg xmlns="http://www.w3.org/2000/svg" className="h-3.5 w-3.5 sm:h-4 sm:w-4 text-white" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M5 13l4 4L19 7" />
+                          </svg>
+                        </div>
+                        <div className="flex-grow min-w-0">
+                          <h4 className="font-medium text-gray-200 text-xs sm:text-sm truncate">
+                            {claimedReward.reward?.name || 'Reward'}
+                          </h4>
+                          <p className="text-xs text-gray-400">
+                            Claimed {new Date(claimedReward.claimedAt).toLocaleDateString('en-US', {
+                              month: 'short',
+                              day: 'numeric'
+                            })}
+                          </p>
+                        </div>
+                        <div className="flex-shrink-0">
+                          <span className="text-xs text-green-400 font-medium">
+                            {claimedReward.reward?.cost || claimedReward.pointsUsed || 'N/A'} pts
+                          </span>
+                        </div>
                       </motion.div>
                     ))}
                   </div>
@@ -919,6 +1011,148 @@ export default function StudentPage() {
                     </div>
                   </motion.div>
               ))}
+                </div>
+              )}
+            </motion.div>
+          </motion.div>
+        )}
+
+        {/* Claimed Rewards Page */}
+        {currentPage === 'claimed-rewards' && (
+          <motion.div variants={itemVariants} className="space-y-4 sm:space-y-6">
+            <div className="text-center px-2">
+              <img src={twoGonzLogo} alt="2gonz Logo" className="h-12 sm:h-16 md:h-20 mx-auto mb-4 sm:mb-6 md:mb-8" />
+              <h2 className="text-xl sm:text-2xl md:text-3xl font-bold text-green-400 mb-2">Your Claimed Rewards</h2>
+              <p className="text-sm sm:text-base text-gray-400 px-4">Track all the rewards you've successfully claimed!</p>
+              <button
+                onClick={fetchClaimedRewards}
+                disabled={isLoadingClaimedRewards}
+                className="mt-3 sm:mt-4 px-3 sm:px-4 py-2 bg-green-600 text-white text-sm sm:text-base rounded-lg hover:bg-green-700 transition-colors flex items-center mx-auto space-x-2"
+              >
+                <svg xmlns="http://www.w3.org/2000/svg" className={`h-4 w-4 ${isLoadingClaimedRewards ? 'animate-spin' : ''}`} fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15" />
+                </svg>
+                <span>{isLoadingClaimedRewards ? 'Refreshing...' : 'Refresh'}</span>
+              </button>
+            </div>
+            
+            <motion.div 
+              className="bg-[#1e293b] p-3 sm:p-4 md:p-6 rounded-xl sm:rounded-2xl shadow-inner border-2 border-gray-700/50 mx-2 sm:mx-0"
+              initial={{ opacity: 0 }}
+              animate={{ opacity: 1 }}
+            >
+              {isLoadingClaimedRewards ? (
+                <div className="text-center py-8 sm:py-12">
+                  <div className="inline-flex items-center px-3 sm:px-4 py-2 font-semibold leading-6 text-blue-400 transition ease-in-out duration-150 text-sm sm:text-base">
+                    <svg className="animate-spin -ml-1 mr-2 sm:mr-3 h-4 w-4 sm:h-5 sm:w-5 text-blue-400" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24">
+                      <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4"></circle>
+                      <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path>
+                    </svg>
+                    <span className="hidden sm:inline">Loading your claimed rewards...</span>
+                    <span className="sm:hidden">Loading...</span>
+                  </div>
+                </div>
+              ) : claimedRewards.length === 0 ? (
+                <div className="text-center py-8 sm:py-12 px-4">
+                  <div className="w-16 h-16 sm:w-24 sm:h-24 bg-gray-800/50 rounded-full flex items-center justify-center mx-auto mb-3 sm:mb-4">
+                    <svg xmlns="http://www.w3.org/2000/svg" className="h-8 w-8 sm:h-12 sm:w-12 text-gray-600" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z" />
+                    </svg>
+                  </div>
+                  <h3 className="text-lg sm:text-xl font-semibold text-gray-300 mb-2">No Rewards Claimed Yet</h3>
+                  <p className="text-sm sm:text-base text-gray-500 mb-4 px-2">Start earning points and claim your first reward!</p>
+                  <button
+                    onClick={() => setCurrentPage('rewards')}
+                    className="px-4 sm:px-6 py-2 bg-blue-600 text-white text-sm sm:text-base rounded-lg hover:bg-blue-700 transition-colors"
+                  >
+                    Browse Rewards
+                  </button>
+                </div>
+              ) : (
+                <div className="space-y-3 sm:space-y-4">
+                  <div className="text-center mb-4 sm:mb-6">
+                    <div className="inline-block bg-green-900/50 px-3 sm:px-4 py-2 rounded-full">
+                      <span className="font-bold text-green-300 text-sm sm:text-base">🎉 Total Claimed: {claimedRewards.length} rewards 🎉</span>
+                    </div>
+                  </div>
+                  
+                  {claimedRewards.map((claimedReward, index) => (
+                    <motion.div 
+                      key={claimedReward._id || index}
+                      variants={itemVariants}
+                      whileHover={{ scale: 1.02 }}
+                      className="bg-gradient-to-r from-green-900/30 via-green-800/30 to-green-900/30 p-3 sm:p-4 rounded-lg sm:rounded-xl border border-green-700/50 relative overflow-hidden"
+                    >
+                      {/* Success indicator */}
+                      <div className="absolute top-2 right-2 sm:top-3 sm:right-3">
+                        <div className="w-6 h-6 sm:w-8 sm:h-8 bg-green-500 rounded-full flex items-center justify-center">
+                          <svg xmlns="http://www.w3.org/2000/svg" className="h-3 w-3 sm:h-5 sm:w-5 text-white" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M5 13l4 4L19 7" />
+                          </svg>
+                        </div>
+                      </div>
+                      
+                      <div className="flex items-start space-x-3 sm:space-x-4 pr-8 sm:pr-10">
+                        <div className="flex-shrink-0">
+                          {claimedReward.reward?.imageUrl ? (
+                            <img
+                              src={claimedReward.reward.imageUrl}
+                              alt={claimedReward.reward.name}
+                              className="h-12 w-12 sm:h-16 sm:w-16 rounded-lg object-cover border-2 border-green-500/50"
+                            />
+                          ) : (
+                            <div className="h-12 w-12 sm:h-16 sm:w-16 bg-green-600/20 rounded-lg flex items-center justify-center border-2 border-green-500/50">
+                              <svg xmlns="http://www.w3.org/2000/svg" className="h-6 w-6 sm:h-8 sm:w-8 text-green-400" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 8v13m0-13V6a2 2 0 112 2h-2a2 2 0 01-2-2z" />
+                              </svg>
+                            </div>
+                          )}
+                        </div>
+                        
+                        <div className="flex-grow min-w-0">
+                          <h3 className="text-base sm:text-lg font-bold text-green-300 mb-1 truncate">
+                            {claimedReward.reward?.name || 'Reward'}
+                          </h3>
+                          <p className="text-xs sm:text-sm text-gray-300 mb-2 line-clamp-2">
+                            {claimedReward.reward?.description || 'Awesome reward claimed!'}
+                          </p>
+                          
+                          <div className="grid grid-cols-1 sm:grid-cols-2 gap-2 sm:gap-4 text-xs sm:text-sm">
+                            <div>
+                              <span className="text-gray-400 block sm:inline">Claimed on:</span>
+                              <p className="text-green-200 font-medium text-xs sm:text-sm">
+                                {new Date(claimedReward.claimedAt).toLocaleDateString('en-US', {
+                                  year: 'numeric',
+                                  month: 'short',
+                                  day: 'numeric',
+                                  hour: '2-digit',
+                                  minute: '2-digit'
+                                })}
+                              </p>
+                            </div>
+                            <div>
+                              <span className="text-gray-400 block sm:inline">Points spent:</span>
+                              <p className="text-green-200 font-medium text-xs sm:text-sm">
+                                {claimedReward.reward?.cost || claimedReward.pointsUsed || 'N/A'} pts
+                              </p>
+                            </div>
+                          </div>
+                        </div>
+                      </div>
+                      
+                      {/* Status badge */}
+                      <div className="mt-2 sm:mt-3 pt-2 sm:pt-3 border-t border-green-700/30">
+                        <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between space-y-1 sm:space-y-0">
+                          <span className="text-xs text-green-400 font-medium">
+                            Status: Claimed Successfully
+                          </span>
+                          <span className="text-xs text-gray-400">
+                            ID: {claimedReward._id?.slice(-8) || 'N/A'}
+                          </span>
+                        </div>
+                      </div>
+                    </motion.div>
+                  ))}
                 </div>
               )}
             </motion.div>
@@ -2156,7 +2390,7 @@ function SettingsPage({ user, onBack }) {
           <div className="space-y-5">
             <div className="p-5 bg-purple-50 rounded-xl border border-purple-100">
               <p className="text-gray-700 leading-relaxed">
-                2GONZ is a loyalty reward system designed to promote sustainable practices among students by encouraging the borrowing and proper return of reusable items. Our mission is to reduce waste and foster a culture of sharing and responsibility.
+                2GONZ is a loyalty reward system designed to promote sustainable practices among students by encouraging the borrowing and proper return of reusable items.
               </p>
             </div>
             
@@ -2168,7 +2402,7 @@ function SettingsPage({ user, onBack }) {
                   </svg>
                 </div>
                 <h3 className="font-semibold text-gray-900 mb-2">Our Mission</h3>
-                <p className="text-sm text-gray-600">To create a sustainable campus environment by reducing single-use items and promoting responsible consumption.</p>
+                <p className="text-sm text-gray-600">To create a sustainable environment by reducing single-use items and promoting responsible consumption.</p>
               </div>
               
               <div className="p-5 bg-white border border-gray-100 rounded-xl shadow-sm hover:shadow-md transition-shadow">
@@ -2219,7 +2453,7 @@ function SettingsPage({ user, onBack }) {
                   </div>
                   <div className="ml-3">
                     <p className="text-sm text-indigo-600">infotechvarda@gmail.com</p>
-                    <p className="text-xs text-gray-500 mt-1">Open Monday to Saturday, 8:00 AM - 5:00 PM</p>
+                    <p className="text-xs text-gray-500 mt-1">Open Monday to Saturday, 7:00 AM - 6:00 PM</p>
                   </div>
                 </div>
               </div>
