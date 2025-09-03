@@ -1990,7 +1990,7 @@ function SettingsPage({ user, onBack }) {
                     id="confirmPassword"
                     value={currentPassword}
                     onChange={(e) => setCurrentPassword(e.target.value)}
-                    className="block w-full px-4 py-3 pr-10 border border-gray-300 rounded-xl focus:ring-2 focus:ring-red-500 focus:border-red-500 shadow-sm transition duration-150"
+                    className="block w-full px-4 py-3 pr-10 border text-black border-gray-300 rounded-xl focus:ring-2 focus:ring-red-500 focus:border-red-500 shadow-sm transition duration-150"
                     placeholder="Current password"
                     required
                     autoComplete="current-password"
@@ -2057,7 +2057,7 @@ function SettingsPage({ user, onBack }) {
             
             <div className="bg-gray-50 px-6 py-4 border-t border-gray-100 rounded-b-2xl">
               <p className="text-xs text-gray-500 text-center">
-                Having trouble? Contact support at support@2gonz.com
+                Having trouble? Contact support at infotechvarda@gmail.com
               </p>
             </div>
           </motion.div>
