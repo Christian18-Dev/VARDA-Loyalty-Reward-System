@@ -2,27 +2,130 @@ import { useEffect, useState } from 'react';
 import axios from 'axios';
 import { useAuth } from '../context/AuthContext';
 import { useNavigate } from 'react-router-dom';
-import { HomeIcon, TicketIcon, GiftIcon, LogoutIcon, ShoppingBagIcon, XIcon, TrashIcon } from '@heroicons/react/outline';
+import { HomeIcon, TicketIcon, GiftIcon, LogoutIcon, TrashIcon } from '@heroicons/react/outline';
 import { motion, AnimatePresence } from 'framer-motion';
 import confetti from 'canvas-confetti';
-import completeSetImage from '../assets/completeset.png';
-import basicSetImage from '../assets/basicset.png';
-import spoonImage from '../assets/spoon.png';
-import forkImage from '../assets/fork.png';
-import plateImage from '../assets/plate.png';
-import bowlImage from '../assets/bowl.png';
-import glassImage from '../assets/glassofwater.png'; 
-import saucerImage from '../assets/saucer.png';
 import twoGonzLogo from '../assets/2gonzlogo.png';
 import FeedbackForm from '../components/FeedbackForm';
+
+// Level configuration system
+const LOYALTY_LEVELS = {
+  BRONZE: {
+    name: 'Bronze',
+    minPoints: 0,
+    maxPoints: 49,
+    color: '#CD7F32',
+    gradient: 'from-amber-600 via-orange-500 to-amber-700',
+    bgGradient: 'from-amber-100 via-orange-200 to-amber-300',
+    textColor: 'text-amber-900',
+    borderColor: 'border-amber-400',
+    icon: '🥉',
+    description: 'Getting Started',
+    perks: ['Basic rewards access', 'Standard support']
+  },
+  SILVER: {
+    name: 'Silver',
+    minPoints: 50,
+    maxPoints: 149,
+    color: '#C0C0C0',
+    gradient: 'from-gray-400 via-gray-300 to-gray-500',
+    bgGradient: 'from-gray-100 via-gray-200 to-gray-300',
+    textColor: 'text-gray-800',
+    borderColor: 'border-gray-400',
+    icon: '🥈',
+    description: 'Loyal Customer',
+    perks: ['Priority support', 'Exclusive rewards', 'Faster processing']
+  },
+  GOLD: {
+    name: 'Gold',
+    minPoints: 150,
+    maxPoints: 299,
+    color: '#FFD700',
+    gradient: 'from-yellow-400 via-yellow-300 to-yellow-600',
+    bgGradient: 'from-yellow-100 via-yellow-200 to-yellow-300',
+    textColor: 'text-yellow-900',
+    borderColor: 'border-yellow-400',
+    icon: '🥇',
+    description: 'VIP Member',
+    perks: ['Premium rewards', 'VIP support', 'Special events', 'Bonus points']
+  },
+  PLATINUM: {
+    name: 'Platinum',
+    minPoints: 300,
+    maxPoints: 499,
+    color: '#E5E4E2',
+    gradient: 'from-gray-200 via-gray-100 to-gray-300',
+    bgGradient: 'from-gray-50 via-gray-100 to-gray-200',
+    textColor: 'text-gray-700',
+    borderColor: 'border-gray-300',
+    icon: '💎',
+    description: 'Elite Member',
+    perks: ['Elite rewards', 'Personal concierge', 'Exclusive events', 'Double points']
+  },
+  DIAMOND: {
+    name: 'Diamond',
+    minPoints: 500,
+    maxPoints: Infinity,
+    color: '#B9F2FF',
+    gradient: 'from-cyan-300 via-blue-200 to-cyan-400',
+    bgGradient: 'from-cyan-50 via-blue-100 to-cyan-200',
+    textColor: 'text-cyan-900',
+    borderColor: 'border-cyan-300',
+    icon: '💠',
+    description: 'Legendary',
+    perks: ['Legendary rewards', 'Unlimited access', 'Founder benefits', 'Triple points']
+  }
+};
+
+// Helper function to get user's current level
+const getUserLevel = (pointsUsed) => {
+  for (const [key, level] of Object.entries(LOYALTY_LEVELS)) {
+    if (pointsUsed >= level.minPoints && pointsUsed <= level.maxPoints) {
+      return { key, ...level };
+    }
+  }
+  return { key: 'BRONZE', ...LOYALTY_LEVELS.BRONZE };
+};
+
+// Helper function to get next level
+const getNextLevel = (currentLevel) => {
+  const levels = Object.entries(LOYALTY_LEVELS);
+  const currentIndex = levels.findIndex(([key]) => key === currentLevel.key);
+  if (currentIndex < levels.length - 1) {
+    const [nextKey, nextLevel] = levels[currentIndex + 1];
+    return { key: nextKey, ...nextLevel };
+  }
+  return null;
+};
+
+// Helper function to check for level up
+const checkLevelUp = (oldPointsUsed, newPointsUsed, setNewLevel, setPreviousLevel, setShowLevelUpModal) => {
+  const oldLevel = getUserLevel(oldPointsUsed);
+  const newLevel = getUserLevel(newPointsUsed);
+  
+  if (oldLevel.key !== newLevel.key) {
+    setPreviousLevel(oldLevel);
+    setNewLevel(newLevel);
+    setShowLevelUpModal(true);
+    
+    // Trigger confetti celebration
+    confetti({
+      particleCount: 200,
+      spread: 120,
+      origin: { y: 0.6 },
+      colors: [newLevel.color, '#ffffff', '#f0f0f0']
+    });
+  }
+};
 
 export default function StudentPage() {
   const { user, logout } = useAuth();
   const navigate = useNavigate();
   const [points, setPoints] = useState(0);
+  const [pointsUsed, setPointsUsed] = useState(0);
+  const [userLevel, setUserLevel] = useState(LOYALTY_LEVELS.BRONZE);
   const [rewards, setRewards] = useState([]);
   const [code, setCode] = useState('');
-  const [rating, setRating] = useState(0);
   const [errorMessage, setErrorMessage] = useState('');
   const [successMessage, setSuccessMessage] = useState('');
   const [currentPage, setCurrentPage] = useState('home');
@@ -38,86 +141,19 @@ export default function StudentPage() {
   const [showFeedbackSuccess, setShowFeedbackSuccess] = useState(false);
   const [feedbackSuccessMessage, setFeedbackSuccessMessage] = useState('');
   const [showDailyLimit, setShowDailyLimit] = useState(false);
-  const [borrowedItems, setBorrowedItems] = useState([]);
-  const [availableItems, setAvailableItems] = useState([
-    {
-      id: 1,
-      name: 'Basic Set',
-      image: basicSetImage,
-      description: 'Basic dining set (Plate, Spoon, Fork, Tray)',
-      cartQuantity: 0,
-      isSet: true
-    },
-    {
-      id: 2,
-      name: 'Complete Set',
-      image: completeSetImage,
-      description: 'Complete dining set (Plate, Bowl, Spoon, Fork, Glass, Tray)',
-      cartQuantity: 0,
-      isSet: true
-    },
-    { 
-      id: 3, 
-      name: 'Spoon', 
-      image: spoonImage,
-      description: 'Stainless steel spoon for your dining needs',
-      cartQuantity: 0
-    },
-    { 
-      id: 4, 
-      name: 'Fork', 
-      image: forkImage,
-      description: 'Stainless steel fork for your dining needs',
-      cartQuantity: 0
-    },
-    { 
-      id: 5, 
-      name: 'Plate', 
-      image: plateImage,
-      description: 'Ceramic plate',
-      cartQuantity: 0
-    },
-    { 
-      id: 6, 
-      name: 'Bowl', 
-      image: bowlImage,
-      description: 'Ceramic bowl',
-      cartQuantity: 0
-    },
-    { 
-      id: 7, 
-      name: 'Saucer', 
-      image: saucerImage,
-      description: 'Smaller plate',
-      cartQuantity: 0
-    },
-    { 
-      id: 8, 
-      name: 'Glass', 
-      image: glassImage,
-      description: 'Glass for water and beverages',
-      cartQuantity: 0
-    },
-  ]);
-  const [showCart, setShowCart] = useState(false);
-  const [showSuccessModal, setShowSuccessModal] = useState(false);
   const [showCodeSuccessModal, setShowCodeSuccessModal] = useState(false);
   const [codeSuccessMessage, setCodeSuccessMessage] = useState('');
   const [showCodeErrorModal, setShowCodeErrorModal] = useState(false);
   const [codeErrorMessage, setCodeErrorMessage] = useState('');
   const [message, setMessage] = useState({ type: '', text: '' });
   const [error, setError] = useState('');
-  const [currentReturnItem, setCurrentReturnItem] = useState(null);
-  const [modalType, setModalType] = useState('');
-  const [modalItems, setModalItems] = useState([]);
-  const [modalTime, setModalTime] = useState('');
   const [showFeedbackForm, setShowFeedbackForm] = useState(false);
-  const [isSubmitting, setIsSubmitting] = useState(false);
-  const [isReturning, setIsReturning] = useState(false);
-  const [showReviewModal, setShowReviewModal] = useState(false);
-  const [reviewItems, setReviewItems] = useState([]);
   const [claimedRewards, setClaimedRewards] = useState([]);
   const [isLoadingClaimedRewards, setIsLoadingClaimedRewards] = useState(false);
+  const [showLevelUpModal, setShowLevelUpModal] = useState(false);
+  const [newLevel, setNewLevel] = useState(null);
+  const [previousLevel, setPreviousLevel] = useState(null);
+  const [showLevelDetailsModal, setShowLevelDetailsModal] = useState(false);
 
   const baseUrl = import.meta.env.VITE_API_BASE_URL;
   const token = user.token;
@@ -129,6 +165,11 @@ export default function StudentPage() {
         headers: { Authorization: `Bearer ${token}` }
       });
       setPoints(response.data.points);
+      setPointsUsed(response.data.pointsUsed || 0);
+      
+      // Update user level based on points used
+      const currentLevel = getUserLevel(response.data.pointsUsed || 0);
+      setUserLevel(currentLevel);
     } catch (error) {
       console.error('Error fetching user points:', error);
       setError('Failed to fetch points balance');
@@ -174,7 +215,12 @@ export default function StudentPage() {
           }),
         ]);
         setPoints(pointsRes.data.points);
+        setPointsUsed(pointsRes.data.pointsUsed || 0);
         setRewards(rewardsRes.data);
+        
+        // Update user level based on points used
+        const currentLevel = getUserLevel(pointsRes.data.pointsUsed || 0);
+        setUserLevel(currentLevel);
       } catch (error) {
         console.error('Error fetching data:', error);
         setErrorMessage('Failed to load data. Please try again.');
@@ -206,166 +252,6 @@ export default function StudentPage() {
     }
     throw lastError;
   };
-
-  // Update handleConfirmOrder function
-  const handleConfirmOrder = async () => {
-    if (isSubmitting) return; // Prevent multiple submissions
-    
-    const itemsToBorrow = availableItems.filter(item => item.cartQuantity > 0);
-    
-    if (itemsToBorrow.length === 0) {
-      setErrorMessage('Your cart is empty. Please add items before confirming your borrow.');
-      return;
-    }
-
-    console.log('Starting borrow process...');
-    const timestamp = new Date().toISOString();
-    const orderDetails = {
-      studentId: user._id,
-      studentIdNumber: user.idNumber,
-      items: itemsToBorrow.map(item => ({
-        name: item.name,
-        quantity: item.cartQuantity
-      })),
-      timestamp: timestamp
-    };
-
-    try {
-      setIsSubmitting(true);
-      console.log('Making API call to borrow items...');
-      // Use retry logic for the API call
-      const response = await retryOperation(async () => {
-        return await axios.post(
-          `${baseUrl}/api/student/borrow-items`,
-          orderDetails,
-          {
-            headers: { Authorization: `Bearer ${token}` },
-            timeout: 30000 // Increased timeout to 30 seconds
-          }
-        );
-      });
-      console.log('API call successful:', response.data);
-
-      // Store items and time for modal display
-      console.log('Setting modal state...');
-      setModalItems(itemsToBorrow);
-      setModalTime(new Date().toLocaleString());
-      setModalType('borrow');
-      setSuccessMessage('Borrow Complete!');
-      setShowSuccessModal(true);
-      console.log('Modal state set:', {
-        modalItems: itemsToBorrow,
-        modalTime: new Date().toLocaleString(),
-        modalType: 'borrow',
-        showSuccessModal: true
-      });
-      setShowCart(false); // Close cart only after successful borrow
-
-      // Reset cart quantities
-      setAvailableItems(prevItems => 
-        prevItems.map(item => ({ ...item, cartQuantity: 0 }))
-      );
-
-      // Fetch updated borrowed items with retry
-      await retryOperation(fetchBorrowedItems);
-    } catch (error) {
-      console.error('Error creating borrow record:', error);
-      if (error.code === 'ECONNABORTED') {
-        setErrorMessage('Request timed out. Please check your connection and try again.');
-      } else if (error.code === 'ECONNRESET') {
-        setErrorMessage('Network connection was lost. Please refresh the page.');
-      } else {
-        setErrorMessage('Failed to create borrow record. Please try again.');
-      }
-    } finally {
-      setIsSubmitting(false);
-    }
-  };
-
-  // Update handleReturn function
-  const handleReturn = async (item) => {
-    if (isReturning) return; // Prevent multiple submissions
-    
-    try {
-      setIsReturning(true);
-      const returnData = {
-        studentId: user._id,
-        studentIdNumber: user.idNumber,
-        items: item.items,
-        timestamp: item.borrowTime
-      };
-
-      // Use retry logic for the API call
-      await retryOperation(async () => {
-        return await axios.post(
-          `${baseUrl}/api/student/return-items`,
-          returnData,
-          {
-            headers: { Authorization: `Bearer ${token}` },
-            timeout: 30000 // Increased timeout to 30 seconds
-          }
-        );
-      });
-
-      // Store items and time for modal display
-      setModalItems(item.items);
-      setModalTime(new Date().toLocaleString());
-      setModalType('return');
-      setSuccessMessage('Return Complete!');
-      setShowSuccessModal(true);
-
-      // Fetch updated borrowed items with retry
-      await retryOperation(fetchBorrowedItems);
-    } catch (error) {
-      console.error('Error returning items:', error);
-      if (error.code === 'ECONNABORTED') {
-        setErrorMessage('Request timed out. Please check your connection and try again.');
-      } else if (error.code === 'ECONNRESET') {
-        setErrorMessage('Network connection was lost. Please refresh the page.');
-      } else {
-        setErrorMessage('Failed to return items. Please try again.');
-      }
-    } finally {
-      setIsReturning(false);
-    }
-  };
-
-  // Update fetchBorrowedItems function with better error handling and caching
-  const fetchBorrowedItems = async () => {
-    try {
-      const response = await axios.get(
-        `${baseUrl}/api/student/borrowed-items`,
-        {
-          headers: { Authorization: `Bearer ${token}` },
-          timeout: 10000 // Reduced timeout to 10 seconds
-        }
-      );
-      
-      // Only update state if we have new data
-      if (response.data.data) {
-        setBorrowedItems(response.data.data);
-      }
-    } catch (error) {
-      console.error('Error fetching borrowed items:', error);
-      if (error.code === 'ECONNABORTED') {
-        setErrorMessage('Request timed out. Please check your connection and try again.');
-      } else if (error.code === 'ECONNRESET') {
-        setErrorMessage('Network connection was lost. Please refresh the page.');
-      } else {
-        setErrorMessage('Failed to fetch borrowed items. Please refresh the page.');
-      }
-    }
-  };
-
-  // Update polling interval for borrowed items
-  useEffect(() => {
-    if (currentPage === 'borrow' || currentPage === 'home') {
-      fetchBorrowedItems();
-      // Increase polling interval to 60 seconds
-      const pollInterval = setInterval(fetchBorrowedItems, 60000);
-      return () => clearInterval(pollInterval);
-    }
-  }, [currentPage, token]);
 
   const handleCodeSubmit = async () => {
     if (isLoading) return; // Prevent multiple submissions
@@ -431,6 +317,16 @@ export default function StudentPage() {
       );
 
       setPoints(response.data.newPoints);
+      
+      // Update points used and user level
+      const oldPointsUsed = pointsUsed;
+      const newPointsUsed = pointsUsed + (rewards.find(r => r._id === rewardId)?.cost || 0);
+      setPointsUsed(newPointsUsed);
+      const newLevel = getUserLevel(newPointsUsed);
+      setUserLevel(newLevel);
+      
+      // Check for level up
+      checkLevelUp(oldPointsUsed, newPointsUsed, setNewLevel, setPreviousLevel, setShowLevelUpModal);
 
       const claimed = rewards.find((r) => r._id === rewardId);
       setClaimedRewardName(claimed?.name || 'Reward');
@@ -443,6 +339,29 @@ export default function StudentPage() {
       confetti({ particleCount: 150, spread: 100, origin: { y: 0.6 } });
     } catch (err) {
       setErrorMessage(err.response?.data?.message || 'Failed to claim reward');
+    } finally {
+      setIsLoading(false);
+    }
+  };
+
+  const handleVerification = async () => {
+    try {
+      setIsLoading(true);
+      setVerificationError('');
+
+      const response = await axios.post(
+        `${baseUrl}/api/student/verify-reward-claim`,
+        { verificationCode },
+        { headers: { Authorization: `Bearer ${user.token}` } }
+      );
+
+      if (response.data.success) {
+        setVerificationCode('');
+        setShowClaimModal(false);
+        setShowSuccessPopup(true);
+      }
+    } catch (err) {
+      setVerificationError(err.response?.data?.message || 'Verification failed');
     } finally {
       setIsLoading(false);
     }
@@ -572,35 +491,41 @@ export default function StudentPage() {
         {currentPage === 'home' && (
           <motion.div variants={itemVariants} className="space-y-6">
             <motion.div 
-              className="relative mx-auto p-3 sm:p-4 md:p-6 w-full max-w-md bg-gradient-to-br from-blue-100 via-blue-200 to-blue-300 rounded-2xl shadow-2xl text-black overflow-hidden"
+              className={`relative mx-auto p-3 sm:p-4 md:p-6 w-full max-w-md bg-gradient-to-br ${userLevel.bgGradient} rounded-2xl shadow-2xl text-black overflow-hidden border-2 ${userLevel.borderColor} cursor-pointer ${
+                userLevel.key === 'DIAMOND' ? 'ring-4 ring-cyan-300/50 ring-opacity-75' : ''
+              }`}
               whileHover={{ scale: 1.02 }}
               whileTap={{ scale: 0.98 }}
+              onClick={() => setShowLevelDetailsModal(true)}
               style={{
                 perspective: "1000px",
                 transformStyle: "preserve-3d",
                 height: "clamp(220px, 50vw, 280px)",
                 width: "clamp(280px, 85vw, 400px)",
-                margin: "0 auto 2rem auto"
+                margin: "0 auto 2rem auto",
+                ...(userLevel.key === 'DIAMOND' && {
+                  boxShadow: '0 0 30px rgba(34, 211, 238, 0.5), 0 0 60px rgba(34, 211, 238, 0.3), 0 0 90px rgba(34, 211, 238, 0.1)'
+                })
               }}
             >
-              {/* Wave Background Design */}
+              {/* Level-based Background Design */}
               <div className="absolute inset-0 pointer-events-none overflow-hidden">
-                {/* Primary wave */}
-                <div className="absolute -bottom-8 left-0 w-full h-16 bg-gradient-to-r from-blue-400/50 via-blue-500/50 to-blue-600/50 rounded-full blur-sm animate-pulse"></div>
+                {/* Level-specific decorative elements */}
+                <div className={`absolute -bottom-8 left-0 w-full h-16 bg-gradient-to-r ${userLevel.gradient} opacity-50 rounded-full blur-sm animate-pulse`}></div>
                 
                 {/* Multiple wave layers for depth */}
-                <div className="absolute -bottom-4 left-0 w-full h-12 bg-gradient-to-r from-blue-300/40 via-blue-400/40 to-blue-500/40 rounded-full blur-sm animate-pulse" style={{ animationDelay: '0.5s' }}></div>
+                <div className={`absolute -bottom-4 left-0 w-full h-12 bg-gradient-to-r ${userLevel.gradient} opacity-40 rounded-full blur-sm animate-pulse`} style={{ animationDelay: '0.5s' }}></div>
                 
                 {/* Top wave accent */}
-                <div className="absolute top-4 left-0 w-full h-8 bg-gradient-to-r from-transparent via-blue-400/30 to-transparent rounded-full blur-sm"></div>
+                <div className={`absolute top-4 left-0 w-full h-8 bg-gradient-to-r from-transparent via-current to-transparent opacity-30 rounded-full blur-sm`} style={{ color: userLevel.color }}></div>
                 
                 {/* Side wave accents */}
-                <div className="absolute top-1/2 -left-4 w-8 h-8 bg-gradient-to-br from-blue-400/40 to-blue-500/40 rounded-full blur-sm animate-pulse" style={{ animationDelay: '1s' }}></div>
-                <div className="absolute top-1/3 -right-2 w-6 h-6 bg-gradient-to-br from-blue-500/40 to-blue-600/40 rounded-full blur-sm animate-pulse" style={{ animationDelay: '1.5s' }}></div>
+                <div className={`absolute top-1/2 -left-4 w-8 h-8 bg-gradient-to-br ${userLevel.gradient} opacity-40 rounded-full blur-sm animate-pulse`} style={{ animationDelay: '1s' }}></div>
+                <div className={`absolute top-1/3 -right-2 w-6 h-6 bg-gradient-to-br ${userLevel.gradient} opacity-40 rounded-full blur-sm animate-pulse`} style={{ animationDelay: '1.5s' }}></div>
                 
-                {/* Floating wave elements */}
-                <div className="absolute top-6 right-6 w-4 h-4 bg-gradient-to-br from-blue-300/50 to-blue-400/50 rounded-full blur-sm animate-bounce" style={{ animationDelay: '0.3s' }}></div>
-                <div className="absolute bottom-6 left-8 w-3 h-3 bg-gradient-to-br from-blue-400/50 to-blue-500/50 rounded-full blur-sm animate-bounce" style={{ animationDelay: '0.7s' }}></div>
+                {/* Floating level elements */}
+                <div className={`absolute top-6 right-6 w-4 h-4 bg-gradient-to-br ${userLevel.gradient} opacity-50 rounded-full blur-sm animate-bounce`} style={{ animationDelay: '0.3s' }}></div>
+                <div className={`absolute bottom-6 left-8 w-3 h-3 bg-gradient-to-br ${userLevel.gradient} opacity-50 rounded-full blur-sm animate-bounce`} style={{ animationDelay: '0.7s' }}></div>
                 
                 {/* Curved wave paths */}
                 <svg className="absolute inset-0 w-full h-full" viewBox="0 0 100 100" preserveAspectRatio="none">
@@ -640,26 +565,30 @@ export default function StudentPage() {
                     <linearGradient id="waveGradient3" x1="0%" y1="0%" x2="100%" y2="0%">
                       <stop offset="0%" stopColor="rgba(29, 78, 216, 0.3)" />
                       <stop offset="50%" stopColor="rgba(30, 64, 175, 0.3)" />
-                      <stop offset="100%" stopColor="rgba(29, 78, 216, 0.3)" />
+                        <stop offset="100%" stopColor="rgba(29, 78, 216, 0.3)" />
                     </linearGradient>
                   </defs>
                 </svg>
                 
-                {/* Shimmer effect */}
-                <div className="absolute inset-0 bg-gradient-to-r from-transparent via-blue-400/20 to-transparent transform -skew-x-12 animate-pulse opacity-40"></div>
+                {/* Shimmer effect - enhanced for Diamond level */}
+                <div className={`absolute inset-0 bg-gradient-to-r from-transparent via-current to-transparent transform -skew-x-12 animate-pulse opacity-40`} style={{ color: userLevel.color }}>
+                  {userLevel.key === 'DIAMOND' && (
+                    <div className="absolute inset-0 bg-gradient-to-r from-cyan-300/30 via-blue-200/30 to-cyan-300/30 animate-pulse"></div>
+                  )}
+                </div>
               </div>
 
                               {/* Card Content */}
                 <div className="relative z-10 flex flex-col justify-between h-full">
-                  {/* Card issuer and chip */}
+                  {/* Card issuer and level chip */}
                   <div className="flex justify-between items-start">
                     <div className="flex items-center space-x-3">
                       <img src={twoGonzLogo} alt="2gonz Logo" className="h-8 sm:h-10 md:h-12 w-auto" />
                       <div className="text-xs sm:text-sm font-bold text-black/90">LOYALTY CARD</div>
                     </div>
-                    <div className="w-8 sm:w-10 h-6 sm:h-8 bg-gradient-to-br from-yellow-300 to-yellow-500 rounded-md flex items-center justify-center">
-                      <div className="w-6 sm:w-8 h-4 sm:h-6 bg-gradient-to-br from-yellow-400 to-yellow-600 rounded-sm border border-yellow-200/50 flex items-center justify-center">
-                        <div className="w-4 sm:w-5 h-3 sm:h-4 bg-gradient-to-br from-yellow-500 to-yellow-700 rounded-xs border border-yellow-300/50"></div>
+                    <div className={`w-8 sm:w-10 h-6 sm:h-8 bg-gradient-to-br ${userLevel.gradient} rounded-md flex items-center justify-center`}>
+                      <div className={`w-6 sm:w-8 h-4 sm:h-6 bg-gradient-to-br ${userLevel.gradient} rounded-sm border border-white/50 flex items-center justify-center`}>
+                        <div className="text-xs sm:text-sm font-bold">{userLevel.icon}</div>
                       </div>
                     </div>
                   </div>
@@ -732,66 +661,9 @@ export default function StudentPage() {
                   <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z" />
                 </svg>
                 <span className="mt-1.5 sm:mt-2 font-medium text-gray-200 text-sm sm:text-base">Claimed Rewards</span>
-              </motion.button>
-              
-              {/*}
-              <motion.button
-                whileHover={{ scale: 1.05 }}
-                whileTap={{ scale: 0.95 }}
-                onClick={() => setCurrentPage('borrow')}
-                className="flex flex-col items-center p-4 bg-[#1e293b] rounded-xl shadow-md hover:shadow-lg transition-all border border-gray-700/50"
-              >
-                <ShoppingBagIcon className="h-8 w-8 text-purple-400" />
-                <span className="mt-2 font-medium text-gray-200">Borrow</span>
-              </motion.button>
-              */}
+              </motion.button>        
             </div>
 
-            {/* Borrowed Items Section */}
-            {borrowedItems.length > 0 && (
-              <motion.div 
-                initial={{ opacity: 0, y: 20 }}
-                animate={{ opacity: 1, y: 0 }}
-                className="mt-8"
-              >
-                {/* Reminder Banner */}
-                <div className="mb-4 p-4 rounded-xl bg-gradient-to-r from-blue-700 via-purple-700 to-blue-800 shadow-md border border-blue-600/40 flex items-center">
-                  <svg xmlns="http://www.w3.org/2000/svg" className="h-6 w-6 text-blue-300 mr-3 flex-shrink-0" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M13 16h-1v-4h-1m1-4h.01M12 20a8 8 0 100-16 8 8 0 000 16z" />
-                  </svg>
-                  <span className="text-blue-100 font-medium text-base">Reminder: Please Click the Return Button once you are done using the items.</span>
-                </div>
-                <div className="bg-[#1e293b] p-6 rounded-2xl shadow-lg border border-gray-700/50">
-                  <h3 className="text-xl font-semibold text-gray-200 mb-4">Your Borrowed Items</h3>
-                  <div className="space-y-4">
-                    {borrowedItems.map((item) => (
-                      <motion.div 
-                        key={item._id}
-                        initial={{ opacity: 0, y: 20 }}
-                        animate={{ opacity: 1, y: 0 }}
-                        className="flex items-center justify-between p-4 bg-gray-800/50 rounded-xl"
-                      >
-                        <div className="flex items-center space-x-4">
-                          <div>
-                            <h4 className="font-medium text-gray-200">{item.items.map(i => i.name).join(', ')}</h4>
-                            <p className="text-sm text-gray-400">Borrowed on: {new Date(item.borrowTime).toLocaleString('en-US', { timeZone: 'Asia/Manila' })}</p>
-                          </div>
-                        </div>
-                        <button
-                          onClick={() => handleReturn(item)}
-                          disabled={isReturning}
-                          className={`px-4 py-2 bg-green-600 text-white rounded-lg hover:bg-green-700 transition-colors ${
-                            isReturning ? 'opacity-50 cursor-not-allowed' : ''
-                          }`}
-                        >
-                          {isReturning ? 'Processing...' : 'Return'}
-                        </button>
-                      </motion.div>
-                    ))}
-                  </div>
-                </div>
-              </motion.div>
-            )}
 
             {/* Claimed Rewards Summary Section */}
             {claimedRewards.length > 0 && (
@@ -801,14 +673,8 @@ export default function StudentPage() {
                 className="mt-6 sm:mt-8"
               >
                 <div className="bg-[#1e293b] p-4 sm:p-6 rounded-xl sm:rounded-2xl shadow-lg border border-gray-700/50 mx-2 sm:mx-0">
-                  <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between mb-3 sm:mb-4 space-y-2 sm:space-y-0">
+                  <div className="mb-3 sm:mb-4">
                     <h3 className="text-lg sm:text-xl font-semibold text-gray-200">Recent Claimed Rewards</h3>
-                    <button
-                      onClick={() => setCurrentPage('claimed-rewards')}
-                      className="px-3 py-1.5 sm:py-1 bg-green-600 text-white text-xs sm:text-sm rounded-lg hover:bg-green-700 transition-colors self-start sm:self-auto"
-                    >
-                      View All
-                    </button>
                   </div>
                   <div className="space-y-2 sm:space-y-3">
                     {claimedRewards.slice(0, 3).map((claimedReward, index) => (
@@ -1094,17 +960,19 @@ export default function StudentPage() {
                       
                       <div className="flex items-start space-x-3 sm:space-x-4 pr-8 sm:pr-10">
                         <div className="flex-shrink-0">
-                          {claimedReward.reward?.imageUrl ? (
+                          {claimedReward.reward?.imageUrl && (
                             <img
                               src={claimedReward.reward.imageUrl}
                               alt={claimedReward.reward.name}
                               className="h-12 w-12 sm:h-16 sm:w-16 rounded-lg object-cover border-2 border-green-500/50"
+                              onError={(e) => {
+                                console.log('Image failed to load:', claimedReward.reward.imageUrl);
+                              }}
                             />
-                          ) : (
-                            <div className="h-12 w-12 sm:h-16 sm:w-16 bg-green-600/20 rounded-lg flex items-center justify-center border-2 border-green-500/50">
-                              <svg xmlns="http://www.w3.org/2000/svg" className="h-6 w-6 sm:h-8 sm:w-8 text-green-400" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 8v13m0-13V6a2 2 0 112 2h-2a2 2 0 01-2-2z" />
-                              </svg>
+                          )}
+                          {!claimedReward.reward?.imageUrl && (
+                            <div className="h-12 w-12 sm:h-16 sm:w-16 bg-gray-600/20 rounded-lg flex items-center justify-center border-2 border-gray-500/50">
+                              <span className="text-xs text-gray-400">No Image</span>
                             </div>
                           )}
                         </div>
@@ -1146,9 +1014,6 @@ export default function StudentPage() {
                           <span className="text-xs text-green-400 font-medium">
                             Status: Claimed Successfully
                           </span>
-                          <span className="text-xs text-gray-400">
-                            ID: {claimedReward._id?.slice(-8) || 'N/A'}
-                          </span>
                         </div>
                       </div>
                     </motion.div>
@@ -1158,207 +1023,6 @@ export default function StudentPage() {
             </motion.div>
           </motion.div>
         )}
-
-        {/* Borrowing Page */}
-        {/*
-        {currentPage === 'borrow' && (
-          <motion.div variants={itemVariants} className="space-y-6">
-            <div className="text-center">
-              <img src={twoGonzLogo} alt="2gonz Logo" className="h-16 sm:h-20 mx-auto mb-8" />
-              <h2 className="text-2xl font-bold text-blue-400">Borrow Items</h2>
-              <p className="text-gray-400 mt-1">Select items to borrow for your needs</p>
-            </div>
-          
-            <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-              {availableItems.map((item) => (
-                <motion.div 
-                  key={item.id}
-                  whileHover={{ scale: 1.02 }}
-                  className={`bg-[#1e293b] rounded-xl shadow-md overflow-hidden border border-gray-700/50 ${
-                    item.isSet ? 'md:col-span-2' : ''
-                  }`}
-                >
-                  <div className="relative h-48 overflow-hidden">
-                    <img 
-                      src={item.image} 
-                      alt={item.name}
-                      className="w-full h-full object-cover"
-                    />
-                  </div>
-                  <div className="p-4">
-                    <h4 className="font-bold text-lg text-gray-200">{item.name}</h4>
-                    <p className="text-sm text-gray-400 mb-3">{item.description}</p>
-                    <div className="flex items-center justify-between">
-                      <div className="flex items-center space-x-2">
-                        <button
-                          onClick={() => handleRemoveFromCart(item.id)}
-                          disabled={item.cartQuantity === 0}
-                          className={`w-8 h-8 rounded-full flex items-center justify-center text-lg font-bold transition-all ${
-                            item.cartQuantity === 0
-                              ? 'bg-gray-800 text-gray-600 cursor-not-allowed'
-                              : 'bg-red-600 text-white hover:bg-red-700'
-                          }`}
-                        >
-                          -
-                        </button>
-                        <span className="w-8 text-center font-medium text-gray-200">{item.cartQuantity}</span>
-                        <button
-                          onClick={() => handleAddToCart(item.id)}
-                          className="w-8 h-8 rounded-full flex items-center justify-center text-lg font-bold transition-all bg-blue-600 text-white hover:bg-blue-700"
-                        >
-                          +
-                        </button>
-                      </div>
-                    </div>
-                  </div>
-                </motion.div>
-              ))}
-            </div>
-
-            {availableItems.some(item => item.cartQuantity > 0) && (
-              <motion.button
-                initial={{ opacity: 0, y: 20 }}
-                animate={{ opacity: 1, y: 0 }}
-                onClick={() => setShowCart(true)}
-                className="fixed bottom-24 right-6 bg-blue-600 text-white p-4 rounded-full shadow-lg hover:bg-blue-700 transition-all flex items-center space-x-2"
-              >
-                <svg xmlns="http://www.w3.org/2000/svg" className="h-6 w-6" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M3 3h2l.4 2M7 13h10l4-8H5.4M7 13L5.4 5M7 13l-2.293 2.293c-.63.63-.184 1.707.707 1.707H17m0 0a2 2 0 100 4 2 2 0 000-4zm-8 2a2 2 0 11-4 0 2 2 0 014 0z" />
-                </svg>
-                <span className="font-bold">
-                  {availableItems.reduce((total, item) => total + item.cartQuantity, 0)}
-                </span>
-              </motion.button>
-            )}
-
-            {showCart && (
-              <div className="fixed inset-0 bg-black/50 backdrop-blur-sm z-50">
-                <motion.div 
-                  initial={{ x: '100%' }}
-                  animate={{ x: 0 }}
-                  exit={{ x: '100%' }}
-                  className="absolute right-0 top-0 h-full w-full max-w-md bg-[#1e293b] shadow-xl border-l border-gray-700/50"
-                >
-                  <div className="p-6 h-full flex flex-col">
-                    <div className="flex justify-between items-center mb-6">
-                      <h3 className="text-xl font-bold text-gray-200">Your Cart</h3>
-                      <button 
-                        onClick={() => setShowCart(false)}
-                        className="text-gray-400 hover:text-gray-200"
-                      >
-                        <svg xmlns="http://www.w3.org/2000/svg" className="h-6 w-6" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
-                        </svg>
-                      </button>
-                    </div>
-
-                    <div className="flex-grow overflow-y-auto">
-                      {availableItems.some(item => item.cartQuantity > 0) ? (
-                        <>
-                          <div className="bg-blue-900/50 p-4 rounded-xl mb-4">
-                            <div className="flex justify-between items-center">
-                              <span className="text-blue-300 font-medium">Total Items:</span>
-                              <span className="text-blue-200 font-bold">
-                                {availableItems.reduce((total, item) => total + item.cartQuantity, 0)}
-                              </span>
-                            </div>
-                          </div>
-
-                          {availableItems
-                            .filter(item => item.cartQuantity > 0)
-                            .map(item => (
-                              <div key={item.id} className="flex items-center space-x-4 p-4 bg-gray-800/50 rounded-xl mb-4">
-                                <img 
-                                  src={item.image} 
-                                  alt={item.name}
-                                  className="w-20 h-20 object-cover rounded-lg"
-                                />
-                                <div className="flex-grow">
-                                  <h4 className="font-medium text-gray-200">{item.name}</h4>
-                                  <p className="text-sm text-gray-400 mt-1">{item.description}</p>
-                                  <div className="flex items-center justify-between mt-2">
-                                    <div className="flex items-center space-x-2">
-                                      <button
-                                        onClick={() => handleRemoveFromCart(item.id)}
-                                        className="w-6 h-6 rounded-full flex items-center justify-center text-sm font-bold bg-red-600 text-white hover:bg-red-700"
-                                      >
-                                        -
-                                      </button>
-                                      <span className="w-8 text-center font-medium text-gray-200">{item.cartQuantity}</span>
-                                      <button
-                                        onClick={() => handleAddToCart(item.id)}
-                                        className="w-6 h-6 rounded-full flex items-center justify-center text-sm font-bold bg-blue-600 text-white hover:bg-blue-700"
-                                      >
-                                        +
-                                      </button>
-                                    </div>
-                                    <span className="text-sm font-medium text-gray-400">
-                                      {item.isSet ? 'Complete Set' : 'Individual Item'}
-                                    </span>
-                                  </div>
-                                </div>
-                              </div>
-                            ))}
-                        </>
-                      ) : (
-                        <div className="flex flex-col items-center justify-center h-64 text-center">
-                          <svg xmlns="http://www.w3.org/2000/svg" className="h-16 w-16 text-gray-600 mb-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M3 3h2l.4 2M7 13h10l4-8H5.4M7 13L5.4 5M7 13l-2.293 2.293c-.63.63-.184 1.707.707 1.707H17m0 0a2 2 0 100 4 2 2 0 000-4zm-8 2a2 2 0 11-4 0 2 2 0 014 0z" />
-                          </svg>
-                          <h4 className="text-lg font-medium text-gray-400 mb-2">Your cart is empty</h4>
-                          <p className="text-gray-500">Add items to your cart to proceed with your borrow</p>
-                        </div>
-                      )}
-                    </div>
-
-                    <div className="mt-6 space-y-4">
-                      {availableItems.some(item => item.cartQuantity > 0) && (
-                        <div className="bg-gray-800/50 p-4 rounded-xl">
-                          <h4 className="font-medium text-gray-200 mb-2">Borrow Summary</h4>
-                          <div className="space-y-2">
-                            {availableItems
-                              .filter(item => item.cartQuantity > 0)
-                              .map(item => (
-                                <div key={item.id} className="flex justify-between text-sm">
-                                  <span className="text-gray-400">{item.name} x {item.cartQuantity}</span>
-                                  <span className="font-medium text-gray-300">
-                                    {item.isSet ? 'Complete Set' : 'Individual Item'}
-                                  </span>
-                                </div>
-                              ))}
-                          </div>
-                        </div>
-                      )}
-                      
-                      <button
-                        onClick={() => {
-                          const itemsToBorrow = availableItems.filter(item => item.cartQuantity > 0);
-                          setReviewItems(itemsToBorrow);
-                          setShowReviewModal(true);
-                        }}
-                        disabled={!availableItems.some(item => item.cartQuantity > 0) || isSubmitting}
-                        className={`w-full py-4 rounded-xl font-bold transition-all ${
-                          availableItems.some(item => item.cartQuantity > 0) && !isSubmitting
-                            ? 'bg-blue-600 text-white hover:bg-blue-700'
-                            : 'bg-gray-800 text-gray-600 cursor-not-allowed'
-                        }`}
-                      >
-                        {isSubmitting ? (
-                          <div className="flex items-center justify-center">
-                            <div className="w-5 h-5 border-2 border-white border-t-transparent rounded-full animate-spin mr-2"></div>
-                            Processing...
-                          </div>
-                        ) : (
-                          'Confirm Borrow'
-                        )}
-                      </button>
-                    </div>
-                  </div>
-                </motion.div>
-              </div>
-            )}
-          </motion.div>
-        )} 
 
         {/* Settings Page */}
         {currentPage === 'settings' && (
@@ -1446,88 +1110,15 @@ export default function StudentPage() {
             </div>
 
             <button
-              onClick={() => {
-                if (verificationCode === '0102') {
-                  setVerificationError('');
-                  setVerificationCode('');
-                  setShowClaimModal(false);
-                  setShowSuccessPopup(true);
-                } else {
-                  setVerificationError('Invalid verification code');
-                }
-              }}
+              onClick={handleVerification}
               className="mt-2 w-full bg-blue-600 text-white px-4 py-2 rounded-full hover:bg-blue-700 transition disabled:opacity-50"
-              disabled={verificationCode.length !== 4}
+              disabled={verificationCode.length !== 4 || isLoading}
             >
-              Verify & Continue
+              {isLoading ? 'Verifying...' : 'Verify & Continue'}
             </button>
           </motion.div>
         </div>
       )}
-
-      {/* Success Modal */}
-      {/*
-      {showSuccessModal && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 backdrop-blur-sm">
-          <motion.div 
-            initial={{ scale: 0.9, opacity: 0 }}
-            animate={{ scale: 1, opacity: 1 }}
-            className="bg-[#1e293b] rounded-2xl p-6 max-w-sm w-full shadow-xl border-2 border-gray-700/50"
-          >
-            <div className="text-center space-y-4">
-              <div className="w-16 h-16 bg-green-900/50 rounded-full flex items-center justify-center mx-auto">
-                <svg xmlns="http://www.w3.org/2000/svg" className="h-8 w-8 text-green-400" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M5 13l4 4L19 7" />
-                </svg>
-              </div>
-              <h3 className="text-xl font-bold text-gray-200">
-                {modalType === 'borrow' ? 'Borrow Complete!' : 'Return Complete!'}
-              </h3>
-              <div className="bg-gray-800/50 p-4 rounded-xl">
-                <p className="text-gray-300 mb-2">
-                  <span className="font-bold text-gray-200">ID Number:</span> {user.idNumber}
-                </p>
-                <p className="text-gray-300 mb-2">
-                  <span className="font-bold text-gray-200">
-                    {modalType === 'borrow' ? 'Borrow Time:' : 'Return Time:'}
-                  </span> {modalTime}
-                </p>
-                <p className="text-gray-300">
-                  <span className="font-bold text-gray-200">
-                    {modalType === 'borrow' ? 'Borrowed Items:' : 'Returned Items:'}
-                  </span>
-                </p>
-                <ul className="text-gray-300 mt-2 space-y-1">
-                  {modalItems.map((item, index) => (
-                    <li key={index}>• {item.name} (x{item.quantity || item.cartQuantity})</li>
-                  ))}
-                </ul>
-                <div className="mt-4 p-3 bg-blue-900/30 rounded-lg border border-blue-700/50">
-                  <p className="text-blue-300 font-medium">
-                    Please show this to the Concierge as Proof.
-                  </p>
-                </div>
-              </div>
-              <button 
-                onClick={() => {
-                  setShowSuccessModal(false);
-                  if (modalType === 'return') {
-                    setShowFeedbackForm(true);
-                  }
-                  if (modalType === 'borrow') {
-                    setCurrentPage('home');
-                  }
-                  setModalItems([]); // Clear modal items
-                  setModalTime(''); // Clear modal time
-                }}
-                className="w-full py-3 bg-blue-600 text-white rounded-xl font-bold hover:bg-blue-700 transition-all"
-              >
-                OK
-              </button>
-            </div>
-          </motion.div>
-        </div>
-      )} */}
 
       {/* Code Success Modal */}
       {showCodeSuccessModal && (
@@ -1752,6 +1343,7 @@ export default function StudentPage() {
                 onClick={() => {
                   setShowFeedbackSuccess(false);
                   setFeedbackSuccessMessage('');
+                  setCurrentPage('home');
                 }}
                 className="w-full py-3 bg-blue-600 text-white rounded-xl font-bold hover:bg-blue-700 transition-all"
               >
@@ -1806,6 +1398,7 @@ export default function StudentPage() {
             <button
               onClick={() => {
                 setShowSuccessPopup(false);
+                setCurrentPage('home');
               }}
               className="mt-4 bg-green-600 hover:bg-green-700 text-white px-6 py-2 rounded-full font-medium transition-colors"
             >
@@ -1822,40 +1415,202 @@ export default function StudentPage() {
         />
       )}
 
-
-
-      {showReviewModal && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 backdrop-blur-sm">
+      {/* Level Details Modal */}
+      {showLevelDetailsModal && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/70 backdrop-blur-sm">
           <motion.div
             initial={{ scale: 0.9, opacity: 0 }}
             animate={{ scale: 1, opacity: 1 }}
-            className="bg-[#1e293b] rounded-2xl p-6 max-w-sm w-full shadow-xl border-2 border-blue-700/50"
+            exit={{ scale: 0.9, opacity: 0 }}
+            className="bg-[#1e293b] rounded-2xl p-6 max-w-md w-full mx-4 shadow-2xl border-2 border-gray-700/50"
           >
-            <div className="text-center space-y-4">
-              <h3 className="text-xl font-bold text-blue-300">Review & Confirm</h3>
-              <p className="text-gray-300">You are about to borrow the following items:</p>
-              <ul className="text-gray-200 mt-2 space-y-1">
-                {reviewItems.map((item, idx) => (
-                  <li key={idx}>• {item.name} (x{item.cartQuantity})</li>
-                ))}
-              </ul>
-              <div className="flex gap-4 mt-6">
+            <div className="text-center space-y-6">
+              {/* Header */}
+              <div className="flex items-center justify-between">
+                <div className="flex items-center space-x-3">
+                  <span className="text-2xl">{userLevel.icon}</span>
+                  <div>
+                    <h2 className="text-xl font-bold text-gray-200">{userLevel.name} Level</h2>
+                    <p className="text-sm text-gray-400">{userLevel.description}</p>
+                  </div>
+                </div>
                 <button
-                  onClick={() => setShowReviewModal(false)}
-                  className="flex-1 py-2 rounded-xl font-bold bg-gray-700 text-gray-200 hover:bg-gray-600 transition-all"
+                  onClick={() => setShowLevelDetailsModal(false)}
+                  className="text-gray-400 hover:text-gray-200 transition-colors"
                 >
-                  Cancel
-                </button>
-                <button
-                  onClick={async () => {
-                    setShowReviewModal(false);
-                    await handleConfirmOrder();
-                  }}
-                  className="flex-1 py-2 rounded-xl font-bold bg-blue-600 text-white hover:bg-blue-700 transition-all"
-                >
-                  Confirm
+                  <svg className="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
+                  </svg>
                 </button>
               </div>
+              
+              {/* Progress Bar */}
+              <div className="space-y-3">
+                <div className="flex justify-between text-sm text-gray-400">
+                  <span>{pointsUsed} points used</span>
+                  {getNextLevel(userLevel) && (
+                    <span>{getNextLevel(userLevel).minPoints} for next level</span>
+                  )}
+                </div>
+                <div className="w-full bg-gray-700 rounded-full h-3">
+                  <motion.div 
+                    className={`h-3 rounded-full bg-gradient-to-r ${userLevel.gradient}`}
+                    initial={{ width: 0 }}
+                    animate={{ 
+                      width: getNextLevel(userLevel) 
+                        ? `${Math.min(100, ((pointsUsed - userLevel.minPoints) / (getNextLevel(userLevel).minPoints - userLevel.minPoints)) * 100)}%`
+                        : '100%'
+                    }}
+                    transition={{ duration: 1, ease: "easeOut" }}
+                  />
+                </div>
+                {getNextLevel(userLevel) && (
+                  <p className="text-xs text-gray-500">
+                    {getNextLevel(userLevel).minPoints - pointsUsed} more points to reach {getNextLevel(userLevel).name} level
+                  </p>
+                )}
+                {!getNextLevel(userLevel) && (
+                  <p className="text-xs text-yellow-400 font-semibold">
+                    🎉 You've reached the highest level!
+                  </p>
+                )}
+              </div>
+              
+              {/* Level Benefits */}
+              <div className="space-y-3">
+                <h3 className="text-lg font-semibold text-gray-200">Current Benefits</h3>
+                <div className="space-y-2">
+                  {userLevel.perks.map((perk, index) => (
+                    <motion.div
+                      key={index}
+                      initial={{ opacity: 0, x: -20 }}
+                      animate={{ opacity: 1, x: 0 }}
+                      transition={{ delay: index * 0.1 }}
+                      className="flex items-center space-x-3 p-2 bg-gray-800/50 rounded-lg"
+                    >
+                      <span className="text-green-400">✓</span>
+                      <span className="text-gray-300 text-sm">{perk}</span>
+                    </motion.div>
+                  ))}
+                </div>
+              </div>
+              
+              {/* All Levels Overview */}
+              <div className="space-y-3">
+                <h3 className="text-lg font-semibold text-gray-200">All Levels</h3>
+                <div className="space-y-2">
+                  {Object.entries(LOYALTY_LEVELS).map(([key, level]) => (
+                    <div
+                      key={key}
+                      className={`flex items-center justify-between p-2 rounded-lg ${
+                        userLevel.key === key 
+                          ? `bg-gradient-to-r ${level.gradient} text-white` 
+                          : 'bg-gray-800/30 text-gray-400'
+                      }`}
+                    >
+                      <div className="flex items-center space-x-2">
+                        <span>{level.icon}</span>
+                        <span className="text-sm font-medium">{level.name}</span>
+                      </div>
+                      <span className="text-xs">
+                        {level.minPoints === Infinity ? '500+' : `${level.minPoints}-${level.maxPoints}`} pts
+                      </span>
+                    </div>
+                  ))}
+                </div>
+              </div>
+            </div>
+          </motion.div>
+        </div>
+      )}
+
+      {/* Level Up Modal */}
+      {showLevelUpModal && newLevel && previousLevel && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/70 backdrop-blur-sm">
+          <motion.div
+            initial={{ scale: 0.5, opacity: 0, rotateY: -180 }}
+            animate={{ scale: 1, opacity: 1, rotateY: 0 }}
+            transition={{ 
+              type: "spring", 
+              damping: 15, 
+              stiffness: 300,
+              duration: 0.8 
+            }}
+            className="bg-gradient-to-br from-gray-900 via-gray-800 to-gray-900 rounded-3xl p-8 max-w-md w-full mx-4 shadow-2xl border-2 border-gray-600 relative overflow-hidden"
+          >
+            {/* Animated background */}
+            <div className="absolute inset-0 bg-gradient-to-r from-transparent via-white/5 to-transparent transform -skew-x-12 animate-pulse"></div>
+            
+            <div className="relative z-10 text-center space-y-6">
+              {/* Level up icon */}
+              <motion.div
+                initial={{ scale: 0, rotate: -180 }}
+                animate={{ scale: 1, rotate: 0 }}
+                transition={{ delay: 0.3, type: "spring", damping: 15 }}
+                className="w-24 h-24 mx-auto bg-gradient-to-br from-yellow-400 to-orange-500 rounded-full flex items-center justify-center shadow-2xl"
+              >
+                <span className="text-4xl">🎉</span>
+              </motion.div>
+              
+              {/* Level up text */}
+              <motion.div
+                initial={{ opacity: 0, y: 20 }}
+                animate={{ opacity: 1, y: 0 }}
+                transition={{ delay: 0.5 }}
+              >
+                <h2 className="text-3xl font-bold text-white mb-2">LEVEL UP!</h2>
+                <div className="flex items-center justify-center space-x-4 mb-4">
+                  <div className={`px-4 py-2 rounded-full bg-gradient-to-r ${previousLevel.gradient} text-white font-bold`}>
+                    {previousLevel.icon} {previousLevel.name}
+                  </div>
+                  <div className="text-2xl text-gray-400">→</div>
+                  <div className={`px-4 py-2 rounded-full bg-gradient-to-r ${newLevel.gradient} text-white font-bold`}>
+                    {newLevel.icon} {newLevel.name}
+                  </div>
+                </div>
+                <p className="text-gray-300 text-lg">{newLevel.description}</p>
+              </motion.div>
+              
+              {/* New benefits */}
+              <motion.div
+                initial={{ opacity: 0, y: 20 }}
+                animate={{ opacity: 1, y: 0 }}
+                transition={{ delay: 0.7 }}
+                className="bg-gray-800/50 p-4 rounded-xl border border-gray-600"
+              >
+                <h3 className="text-lg font-semibold text-white mb-3">New Benefits Unlocked!</h3>
+                <div className="space-y-2">
+                  {newLevel.perks.map((perk, index) => (
+                    <motion.div
+                      key={index}
+                      initial={{ opacity: 0, x: -20 }}
+                      animate={{ opacity: 1, x: 0 }}
+                      transition={{ delay: 0.8 + index * 0.1 }}
+                      className="flex items-center space-x-2 text-gray-300"
+                    >
+                      <span className="text-green-400">✓</span>
+                      <span>{perk}</span>
+                    </motion.div>
+                  ))}
+                </div>
+              </motion.div>
+              
+              {/* Continue button */}
+              <motion.button
+                initial={{ opacity: 0, y: 20 }}
+                animate={{ opacity: 1, y: 0 }}
+                transition={{ delay: 1 }}
+                whileHover={{ scale: 1.05 }}
+                whileTap={{ scale: 0.95 }}
+                onClick={() => {
+                  setShowLevelUpModal(false);
+                  setNewLevel(null);
+                  setPreviousLevel(null);
+                }}
+                className={`w-full py-4 bg-gradient-to-r ${newLevel.gradient} text-white rounded-xl font-bold text-lg shadow-lg hover:shadow-xl transition-all duration-300`}
+              >
+                Continue Your Journey! 🚀
+              </motion.button>
             </div>
           </motion.div>
         </div>

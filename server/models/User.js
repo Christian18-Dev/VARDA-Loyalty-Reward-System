@@ -30,9 +30,21 @@ const userSchema = new mongoose.Schema({
       'colonelsCurry',
       'chillers',
       'luckyShawarma',
-      'yumdimdum'
+      'yumdimdum',
+      'guest'
     ],
     default: 'student'
+  },
+  university: {
+    type: String,
+    enum: [
+      'ateneo',
+      'dlsulipa',
+      'lpudavao',
+      'mapuadavao',
+      'mapuamakati'
+    ],
+    default: 'ateneo'
   },
   points: { type: Number, default: 0 },   // Loyalty points
   pointsUsed: { type: Number, default: 0 }, // Total loyalty points spent

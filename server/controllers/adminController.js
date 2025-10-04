@@ -141,7 +141,8 @@ export const updateUserRole = async (req, res) => {
       'teacher', 
       'ateneoStaff', 
       'cashier', 
-      'concierge', 
+      'concierge',
+      'guest'
     ];
     if (!validRoles.includes(role)) {
       return res.status(400).json({ message: 'Invalid role' });
@@ -442,5 +443,29 @@ export const validateBorrowGraphData = async (req, res) => {
       message: 'Error validating borrow graph data',
       error: error.message
     });
+  }
+};
+
+export const verifyAdminCode = async (req, res) => {
+  try {
+    const { adminCode } = req.body;
+
+    if (!adminCode) {
+      return res.status(400).json({ message: 'Admin code is required' });
+    }
+
+    const expectedCode = process.env.ADMIN_VERIFICATION_CODE || '696969';
+
+    if (adminCode !== expectedCode) {
+      return res.status(400).json({ message: 'Invalid admin code' });
+    }
+
+    res.json({ 
+      success: true,
+      message: 'Admin verification successful' 
+    });
+  } catch (error) {
+    console.error('Error verifying admin code:', error);
+    res.status(500).json({ message: 'Server error' });
   }
 };

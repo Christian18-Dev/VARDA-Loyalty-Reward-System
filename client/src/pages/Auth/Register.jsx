@@ -22,6 +22,7 @@ export default function Register() {
   const [isLoading, setIsLoading] = useState(false);
   const [showUserTypeModal, setShowUserTypeModal] = useState(true);
   const [userType, setUserType] = useState('');
+  const [university, setUniversity] = useState('');
   const { login } = useAuth();
   const navigate = useNavigate();
 
@@ -45,6 +46,10 @@ export default function Register() {
     }
     if (!email.trim()) {
       setErrorMessage('Please enter your Email');
+      return false;
+    }
+    if (!university) {
+      setErrorMessage('Please select your university');
       return false;
     }
     if (!idNumber.trim()) {
@@ -88,15 +93,16 @@ export default function Register() {
 
     try {
       setIsLoading(true);
-      const userData = {
-        firstName,
-        lastName,
-        email,
-        password,
-        idNumber,
-        termsAccepted: true,
-        role: userType === 'guest' ? 'guest' : 'student'
-      };
+       const userData = {
+         firstName,
+         lastName,
+         email,
+         password,
+         idNumber,
+         termsAccepted: true,
+         role: userType === 'guest' ? 'guest' : 'student',
+         university: university
+       };
       
       console.log('Sending registration data:', userData);
       
@@ -147,7 +153,7 @@ export default function Register() {
               }}
               className="w-full bg-blue-600 hover:bg-blue-700 text-white font-semibold py-3 rounded-xl transition shadow-md"
             >
-              Ateneans
+              Student
             </button>
             <button
               onClick={() => {
@@ -248,6 +254,25 @@ export default function Register() {
                 required
               />
             </div>
+             <div>
+               <label className="block mb-1 text-sm font-medium text-gray-200">University</label>
+               <select
+                 className="w-full px-4 py-2 bg-gray-800/50 border border-gray-700 rounded-xl focus:ring-2 focus:ring-blue-500 focus:outline-none transition text-white"
+                 value={university}
+                 onChange={(e) => {
+                   setUniversity(e.target.value);
+                   setErrorMessage('');
+                 }}
+                 required
+               >
+                 <option value="" disabled>Select your University</option>
+                 <option value="ateneo">Ateneo de Manila University</option>
+                 <option value="lpudavao">Lyceum of the Philippines - Davao</option>
+                 <option value="mapuadavao">Mapúa Malayan Colleges Mindanao</option>
+                 <option value="mapuamakati">Mapúa University Makati</option>
+                 <option value="dlsulipa">De La Salle Lipa</option>
+               </select>
+             </div>
             <div>
               <label className="block mb-1 text-sm font-medium text-gray-200">
                 {userType === 'guest' ? 'Phone Number' : 'ID Number'}

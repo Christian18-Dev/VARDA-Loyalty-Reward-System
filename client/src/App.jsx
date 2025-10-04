@@ -14,8 +14,8 @@ function ProtectedRoute({ children, role }) {
   const { user } = useAuth();
   if (!user) return <Navigate to="/login" />;
   
-  // For student page, allow access to student, teacher, and ateneoStaff roles
-  if (role === 'student' && ['student', 'teacher', 'ateneoStaff'].includes(user.role)) {
+  // For student page, allow access to student, teacher, ateneoStaff, and guest roles
+  if (role === 'student' && ['student', 'teacher', 'ateneoStaff', 'guest'].includes(user.role)) {
     return children;
   }
   

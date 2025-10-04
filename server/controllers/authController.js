@@ -13,7 +13,7 @@ const generateToken = (user) => {
 };
 
 export const registerUser = async (req, res) => {
-  const { firstName, lastName, password, termsAccepted, idNumber, email } = req.body;
+  const { firstName, lastName, password, termsAccepted, idNumber, email, role, university } = req.body;
   
   if (!termsAccepted) {
     return res.status(400).json({ message: 'Terms and conditions must be accepted' });
@@ -53,6 +53,8 @@ export const registerUser = async (req, res) => {
       email,
       password: hashed,
       idNumber,
+      role: role || 'student',
+      university: university || 'ateneo',
       termsAccepted: true,
       termsAcceptedAt: new Date()
     };

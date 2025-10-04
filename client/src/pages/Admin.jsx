@@ -791,27 +791,41 @@ export default function AdminPage() {
   };
 
   const handleAdminCodeVerification = async () => {
-    if (!adminCode || adminCode !== '696969') {
-      setPasswordError('Invalid admin code');
+    if (!adminCode) {
+      setPasswordError('Admin code is required');
       return;
     }
 
     try {
-      await axios.put(
-        `${baseUrl}/api/admin/users/${selectedUser._id}/password`,
-        { password: newPassword },
+      // First verify the admin code with the backend
+      const verifyResponse = await axios.post(
+        `${baseUrl}/api/admin/verify-admin-code`,
+        { adminCode },
         { headers: { Authorization: `Bearer ${token}` } }
       );
-      setShowAdminCodeModal(false);
-      setNewPassword('');
-      setConfirmPassword('');
-      setAdminCode('');
-      setPasswordError('');
-      setModalMessage('Password updated successfully!');
-      setShowSuccessModal(true);
+
+      if (verifyResponse.data.success) {
+        // If verification successful, proceed with password update
+        await axios.put(
+          `${baseUrl}/api/admin/users/${selectedUser._id}/password`,
+          { password: newPassword },
+          { headers: { Authorization: `Bearer ${token}` } }
+        );
+        setShowAdminCodeModal(false);
+        setNewPassword('');
+        setConfirmPassword('');
+        setAdminCode('');
+        setPasswordError('');
+        setModalMessage('Password updated successfully!');
+        setShowSuccessModal(true);
+      }
     } catch (error) {
-      console.error('Error updating password:', error);
-      setPasswordError(error.response?.data?.message || 'Error updating password');
+      console.error('Error in admin verification or password update:', error);
+      if (error.response?.status === 400) {
+        setPasswordError(error.response.data.message || 'Invalid admin code');
+      } else {
+        setPasswordError(error.response?.data?.message || 'Error updating password');
+      }
     }
   };
 
@@ -3535,6 +3549,9 @@ export default function AdminPage() {
                           Role
                         </th>
                         <th scope="col" className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                          University
+                        </th>
+                        <th scope="col" className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
                           Actions
                         </th>
                       </tr>
@@ -3568,7 +3585,16 @@ export default function AdminPage() {
                               <option value="ateneoStaff">Ateneo Staff</option>
                               <option value="cashier">Cashier</option>
                               <option value="concierge">Concierge</option>
+                              <option value="guest">Guest</option>
                             </select>
+                          </td>
+                          <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500">
+                            <span className="px-2 inline-flex text-xs leading-5 font-semibold rounded-full bg-blue-100 text-blue-800">
+                              {u.university === 'ateneo' ? 'Ateneo' : 
+                               u.university === 'up' ? 'UP' :
+                               u.university === 'dlsu' ? 'DLSU' :
+                               u.university === 'ust' ? 'UST' : 'Unknown'}
+                            </span>
                           </td>
                           <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500 space-x-2">
                             {u.role !== 'admin' && (

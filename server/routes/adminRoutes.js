@@ -1,6 +1,6 @@
 import express from 'express';
 import { protect, admin } from '../middleware/authMiddleware.js';
-import { getStats, createReward, getUsers, getClaimedRewards, updateUserRole, updateUserPassword, getAllPointsUsage, getRedemptionHistory, validateBorrowGraphData } from '../controllers/adminController.js';
+import { getStats, createReward, getUsers, getClaimedRewards, updateUserRole, updateUserPassword, getAllPointsUsage, getRedemptionHistory, validateBorrowGraphData, verifyAdminCode } from '../controllers/adminController.js';
 import { getBorrowedItems, getBorrowedItemHistory, getReturnedItemHistory, deleteReturnedItem } from '../controllers/borrowedItemController.js';
 import { exportBorrowedItems, exportReturnedItems } from '../controllers/exportController.js';
 import { getFeedbackStats, getFeedbackComments } from '../controllers/feedbackController.js';
@@ -35,5 +35,8 @@ router.get('/feedback-stats', protect, admin, getFeedbackStats);
 
 // Get feedback comments with date range filtering
 router.get('/feedback-comments', protect, admin, getFeedbackComments);
+
+// Admin verification route
+router.post('/verify-admin-code', protect, admin, verifyAdminCode);
 
 export default router;

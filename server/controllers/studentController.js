@@ -95,7 +95,8 @@ export const getPoints = async (req, res) => {
     }
 
     res.json({ 
-      points: user.points
+      points: user.points,
+      pointsUsed: user.pointsUsed || 0
     });
   } catch (error) {
     console.error('Error getting points:', error);
@@ -222,36 +223,49 @@ export const getClaimedRewards = async (req, res) => {
     const claimedRewards = await ClaimedReward.find({ 
       idNumber: req.user.idNumber 
     })
-    .populate({
-      path: 'reward',
-      select: 'name description imageUrl cost',
-      // Handle cases where reward might be a string (old data) or ObjectId (new data)
-      match: { _id: { $exists: true } }
-    })
     .sort({ claimedAt: -1 }); // Sort by most recent first
 
-    // Process the data to handle both old and new structures
+    // Get all unique reward IDs
+    const rewardIds = [...new Set(claimedRewards.map(cr => cr.reward).filter(Boolean))];
+
+    // Fetch all rewards in one query
+    const Reward = (await import('../models/Reward.js')).default;
+    const rewards = await Reward.find({ _id: { $in: rewardIds } });
+
+    // Create a map for quick lookup
+    const rewardMap = new Map();
+    rewards.forEach(reward => {
+      rewardMap.set(reward._id.toString(), reward);
+    });
+
+    // Process the data
     const processedRewards = claimedRewards.map(claimedReward => {
       const reward = claimedReward.toObject();
       
-      // If reward is populated (ObjectId reference), use that data
-      if (reward.reward && typeof reward.reward === 'object' && reward.reward._id) {
+      // Try to find the actual reward data
+      let rewardData = null;
+      if (reward.reward) {
+        const rewardId = reward.reward.toString();
+        rewardData = rewardMap.get(rewardId);
+      }
+      
+      if (rewardData) {
         return {
           ...reward,
           reward: {
-            name: reward.reward.name || reward.rewardName,
-            description: reward.reward.description,
-            imageUrl: reward.reward.imageUrl,
-            cost: reward.reward.cost
+            name: rewardData.name || reward.rewardName,
+            description: rewardData.description,
+            imageUrl: rewardData.imageUrl,
+            cost: rewardData.cost
           }
         };
       }
       
-      // If reward is a string (old data), create a basic structure
+      // Fallback for missing reward data
       return {
         ...reward,
         reward: {
-          name: reward.rewardName || reward.reward,
+          name: reward.rewardName || 'Unknown Reward',
           description: 'Reward details not available',
           imageUrl: null,
           cost: reward.pointsUsed
@@ -269,5 +283,29 @@ export const getClaimedRewards = async (req, res) => {
       success: false,
       message: 'Failed to fetch claimed rewards' 
     });
+  }
+};
+
+export const verifyRewardClaim = async (req, res) => {
+  try {
+    const { verificationCode } = req.body;
+
+    if (!verificationCode) {
+      return res.status(400).json({ message: 'Verification code is required' });
+    }
+
+    const expectedCode = process.env.REWARD_VERIFICATION_CODE || '0102';
+
+    if (verificationCode !== expectedCode) {
+      return res.status(400).json({ message: 'Invalid verification code' });
+    }
+
+    res.json({ 
+      success: true,
+      message: 'Verification successful' 
+    });
+  } catch (error) {
+    console.error('Error verifying reward claim:', error);
+    res.status(500).json({ message: 'Server error' });
   }
 };
