@@ -58,7 +58,7 @@ const LOYALTY_LEVELS = {
     bgGradient: 'from-gray-50 via-gray-100 to-gray-200',
     textColor: 'text-gray-700',
     borderColor: 'border-gray-300',
-    icon: '💎',
+    icon: '💠',
     description: 'Elite Member',
     perks: ['Elite rewards', 'Personal concierge', 'Exclusive events', 'Double points']
   },
@@ -71,7 +71,7 @@ const LOYALTY_LEVELS = {
     bgGradient: 'from-cyan-50 via-blue-100 to-cyan-200',
     textColor: 'text-cyan-900',
     borderColor: 'border-cyan-300',
-    icon: '💠',
+    icon: '💎',
     description: 'Legendary',
     perks: ['Legendary rewards', 'Unlimited access', 'Founder benefits', 'Triple points']
   }
@@ -325,8 +325,14 @@ export default function StudentPage() {
       const newLevel = getUserLevel(newPointsUsed);
       setUserLevel(newLevel);
       
-      // Check for level up
-      checkLevelUp(oldPointsUsed, newPointsUsed, setNewLevel, setPreviousLevel, setShowLevelUpModal);
+      // Store level up data for later use (don't show immediately)
+      const oldLevel = getUserLevel(oldPointsUsed);
+      const newLevelData = getUserLevel(newPointsUsed);
+      if (oldLevel.key !== newLevelData.key) {
+        setPreviousLevel(oldLevel);
+        setNewLevel(newLevelData);
+        // Don't show level up modal yet - will show after verification
+      }
 
       const claimed = rewards.find((r) => r._id === rewardId);
       setClaimedRewardName(claimed?.name || 'Reward');
@@ -359,6 +365,9 @@ export default function StudentPage() {
         setVerificationCode('');
         setShowClaimModal(false);
         setShowSuccessPopup(true);
+        
+        // Level up modal will be shown when user clicks Continue on success popup
+        // (handled in the success popup button click handler)
       }
     } catch (err) {
       setVerificationError(err.response?.data?.message || 'Verification failed');
@@ -1399,6 +1408,19 @@ export default function StudentPage() {
               onClick={() => {
                 setShowSuccessPopup(false);
                 setCurrentPage('home');
+                // If there's a level up waiting, show it now
+                if (newLevel && previousLevel) {
+                  // Trigger confetti celebration for level up
+                  confetti({
+                    particleCount: 200,
+                    spread: 120,
+                    origin: { y: 0.6 },
+                    colors: [newLevel.color, '#ffffff', '#f0f0f0']
+                  });
+                  setTimeout(() => {
+                    setShowLevelUpModal(true);
+                  }, 500);
+                }
               }}
               className="mt-4 bg-green-600 hover:bg-green-700 text-white px-6 py-2 rounded-full font-medium transition-colors"
             >
