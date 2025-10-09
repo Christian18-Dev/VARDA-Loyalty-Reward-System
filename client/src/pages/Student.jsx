@@ -154,6 +154,8 @@ export default function StudentPage() {
   const [newLevel, setNewLevel] = useState(null);
   const [previousLevel, setPreviousLevel] = useState(null);
   const [showLevelDetailsModal, setShowLevelDetailsModal] = useState(false);
+  const [showClaimedRewardModal, setShowClaimedRewardModal] = useState(false);
+  const [selectedClaimedReward, setSelectedClaimedReward] = useState(null);
 
   const baseUrl = import.meta.env.VITE_API_BASE_URL;
   const token = user.token;
@@ -190,6 +192,17 @@ export default function StudentPage() {
     } finally {
       setIsLoadingClaimedRewards(false);
     }
+  };
+
+  const handleClaimedRewardClick = (claimedReward) => {
+    setSelectedClaimedReward(claimedReward);
+    setShowClaimedRewardModal(true);
+  };
+
+  const closeClaimedRewardModal = () => {
+    console.log('Closing claimed reward modal');
+    setShowClaimedRewardModal(false);
+    setSelectedClaimedReward(null);
   };
 
   // Call fetchUserPoints when component mounts and when token changes
@@ -956,7 +969,8 @@ export default function StudentPage() {
                       key={claimedReward._id || index}
                       variants={itemVariants}
                       whileHover={{ scale: 1.02 }}
-                      className="bg-gradient-to-r from-green-900/30 via-green-800/30 to-green-900/30 p-3 sm:p-4 rounded-lg sm:rounded-xl border border-green-700/50 relative overflow-hidden"
+                      onClick={() => handleClaimedRewardClick(claimedReward)}
+                      className="bg-gradient-to-r from-green-900/30 via-green-800/30 to-green-900/30 p-3 sm:p-4 rounded-lg sm:rounded-xl border border-green-700/50 relative overflow-hidden cursor-pointer"
                     >
                       {/* Success indicator */}
                       <div className="absolute top-2 right-2 sm:top-3 sm:right-3">
@@ -1633,6 +1647,115 @@ export default function StudentPage() {
               >
                 Continue Your Journey! 🚀
               </motion.button>
+            </div>
+          </motion.div>
+        </div>
+      )}
+
+      {/* Claimed Reward Details Modal */}
+      {showClaimedRewardModal && selectedClaimedReward && (
+        <div 
+          className="fixed inset-0 z-50 flex items-center justify-center bg-black/70 backdrop-blur-sm"
+          onClick={closeClaimedRewardModal}
+        >
+          <motion.div
+            initial={{ scale: 0.5, opacity: 0 }}
+            animate={{ scale: 1, opacity: 1 }}
+            exit={{ scale: 0.5, opacity: 0 }}
+            transition={{ 
+              type: "spring", 
+              damping: 20, 
+              stiffness: 300
+            }}
+            onClick={(e) => e.stopPropagation()}
+            className="bg-gradient-to-br from-gray-900/95 via-slate-800/95 to-gray-700/95 rounded-xl sm:rounded-2xl p-4 sm:p-6 max-w-sm sm:max-w-md w-full mx-2 sm:mx-4 shadow-2xl border-2 border-blue-500/50 relative overflow-hidden max-h-[90vh] overflow-y-auto"
+
+          >
+            {/* Close button */}
+            <button
+              onClick={closeClaimedRewardModal}
+              className="absolute top-3 right-3 sm:top-4 sm:right-4 text-gray-300 hover:text-white transition-colors z-20 p-2 rounded-full hover:bg-gray-700/50"
+            >
+              <svg xmlns="http://www.w3.org/2000/svg" className="h-5 w-5 sm:h-6 sm:w-6" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
+              </svg>
+            </button>
+            
+            <div className="relative z-10 space-y-4 sm:space-y-6">
+              {/* Header */}
+              <div className="text-center">
+                <div className="w-12 h-12 sm:w-16 sm:h-16 mx-auto bg-green-500 rounded-full flex items-center justify-center mb-3 sm:mb-4">
+                  <svg xmlns="http://www.w3.org/2000/svg" className="h-6 w-6 sm:h-8 sm:w-8 text-white" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M5 13l4 4L19 7" />
+                  </svg>
+                </div>
+                <h2 className="text-xl sm:text-2xl font-bold text-green-300 mb-1 sm:mb-2">Reward Details</h2>
+                <p className="text-gray-300 text-sm sm:text-base">Here are the details of your claimed reward</p>
+              </div>
+
+              {/* Reward Image */}
+              {selectedClaimedReward.reward?.imageUrl && (
+                <div className="flex justify-center">
+                  <img
+                    src={selectedClaimedReward.reward.imageUrl}
+                    alt={selectedClaimedReward.reward.name}
+                    className="h-24 w-24 sm:h-32 sm:w-32 rounded-lg sm:rounded-xl object-cover border-2 sm:border-4 border-green-500/50 shadow-lg"
+                    onError={(e) => {
+                      e.target.style.display = 'none';
+                    }}
+                  />
+                </div>
+              )}
+
+              {/* Reward Information */}
+              <div className="bg-green-800/30 p-3 sm:p-4 rounded-lg sm:rounded-xl border border-green-700/50 space-y-3 sm:space-y-4">
+                <div>
+                  <h3 className="text-lg sm:text-xl font-bold text-green-300 mb-1 sm:mb-2">
+                    {selectedClaimedReward.reward?.name || 'Reward'}
+                  </h3>
+                  <p className="text-gray-300 text-xs sm:text-sm">
+                    {selectedClaimedReward.reward?.description || 'Awesome reward claimed!'}
+                  </p>
+                </div>
+
+                <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 sm:gap-4 text-xs sm:text-sm">
+                  <div className="bg-green-900/30 p-2 sm:p-3 rounded-lg">
+                    <span className="text-gray-400 block text-xs sm:text-sm">Points Spent</span>
+                    <span className="text-green-300 font-bold text-sm sm:text-lg">
+                      {selectedClaimedReward.reward?.cost || selectedClaimedReward.pointsUsed || 'N/A'} pts
+                    </span>
+                  </div>
+                  <div className="bg-green-900/30 p-2 sm:p-3 rounded-lg">
+                    <span className="text-gray-400 block text-xs sm:text-sm">Claimed Date</span>
+                    <span className="text-green-300 font-bold text-xs sm:text-sm">
+                      {new Date(selectedClaimedReward.claimedAt).toLocaleDateString('en-US', {
+                        month: 'short',
+                        day: 'numeric',
+                        year: 'numeric'
+                      })}
+                    </span>
+                  </div>
+                </div>
+
+                <div className="bg-green-900/30 p-2 sm:p-3 rounded-lg">
+                  <span className="text-gray-400 block text-xs sm:text-sm">Claimed Time</span>
+                  <span className="text-green-300 font-medium text-xs sm:text-sm">
+                    {new Date(selectedClaimedReward.claimedAt).toLocaleTimeString('en-US', {
+                      hour: '2-digit',
+                      minute: '2-digit',
+                      hour12: true
+                    })}
+                  </span>
+                </div>
+
+                <div className="flex items-center justify-center space-x-2 bg-green-500/20 p-2 sm:p-3 rounded-lg border border-green-500/30">
+                  <svg xmlns="http://www.w3.org/2000/svg" className="h-4 w-4 sm:h-5 sm:w-5 text-green-400" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z" />
+                  </svg>
+                  <span className="text-green-300 font-medium text-xs sm:text-sm">Successfully Claimed</span>
+                </div>
+              </div>
+
             </div>
           </motion.div>
         </div>
