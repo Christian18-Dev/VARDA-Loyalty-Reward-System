@@ -146,7 +146,7 @@ export default function CashierPage() {
       const printText = 
       '\n\n' + // Reduced empty lines at top
       '    -------------------------\n' +
-      '      2GONZ LOYALTY REWARD\n' +
+      '      VARDA LOYALTY REWARD\n' +
       '    -------------------------\n\n' +
       `    Code: ${generatedCode}\n` +
       `    ${new Date().toLocaleString()}\n\n` +
@@ -324,7 +324,7 @@ export default function CashierPage() {
         const printText = 
         '\n\n' + // Reduced empty lines at top
         '    -------------------------\n' +
-        '      2GONZ LOYALTY REWARD\n' +
+        '      VARDA LOYALTY REWARD\n' +
         '    -------------------------\n\n' +
         `    Code: ${generatedCode}\n` +
         `    ${new Date().toLocaleString()}\n\n` +

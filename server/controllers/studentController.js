@@ -3,6 +3,7 @@ import Reward from '../models/Reward.js';
 import Feedback from '../models/Feedback.js';
 import ClaimedReward from '../models/ClaimedReward.js';
 import User from '../models/User.js';
+import MealRegistration from '../models/MealRegistration.js';
 import bcrypt from 'bcryptjs';
 
 export const claimCode = async (req, res) => {
@@ -306,6 +307,119 @@ export const verifyRewardClaim = async (req, res) => {
     });
   } catch (error) {
     console.error('Error verifying reward claim:', error);
+    res.status(500).json({ message: 'Server error' });
+  }
+};
+
+// Meal Registration Functions
+export const registerMeals = async (req, res) => {
+  try {
+    const { meals } = req.body;
+    const user = req.user;
+
+    // Validate that at least one meal is selected
+    if (!meals || (!meals.breakfast && !meals.lunch && !meals.dinner)) {
+      return res.status(400).json({ 
+        message: 'Please select at least one meal (Breakfast, Lunch, or Dinner)' 
+      });
+    }
+
+    // Check if user is from LIMA
+    if (user.university !== 'lima') {
+      return res.status(403).json({ 
+        message: 'Meal registration is only available for LIMA students' 
+      });
+    }
+
+    // Get today's date at midnight for comparison
+    const today = new Date();
+    today.setHours(0, 0, 0, 0);
+    const tomorrow = new Date(today);
+    tomorrow.setDate(tomorrow.getDate() + 1);
+
+    // Check if there's an active registration for today
+    const existingRegistration = await MealRegistration.findOne({
+      idNumber: user.idNumber,
+      registrationDate: {
+        $gte: today,
+        $lt: tomorrow
+      },
+      status: 'active'
+    });
+
+    if (existingRegistration) {
+      // Update existing registration
+      existingRegistration.meals = {
+        breakfast: meals.breakfast || false,
+        lunch: meals.lunch || false,
+        dinner: meals.dinner || false
+      };
+      await existingRegistration.save();
+
+      return res.json({
+        success: true,
+        message: 'Meal registration updated successfully',
+        registration: existingRegistration
+      });
+    }
+
+    // Create new registration
+    const registration = await MealRegistration.create({
+      idNumber: user.idNumber,
+      firstName: user.firstName,
+      lastName: user.lastName,
+      university: user.university,
+      meals: {
+        breakfast: meals.breakfast || false,
+        lunch: meals.lunch || false,
+        dinner: meals.dinner || false
+      }
+    });
+
+    res.json({
+      success: true,
+      message: 'Meal registration successful',
+      registration
+    });
+  } catch (error) {
+    console.error('Error registering meals:', error);
+    res.status(500).json({ message: 'Server error' });
+  }
+};
+
+export const getMealRegistration = async (req, res) => {
+  try {
+    const user = req.user;
+
+    // Check if user is from LIMA
+    if (user.university !== 'lima') {
+      return res.status(403).json({ 
+        message: 'Meal registration is only available for LIMA students' 
+      });
+    }
+
+    // Get today's date at midnight for comparison
+    const today = new Date();
+    today.setHours(0, 0, 0, 0);
+    const tomorrow = new Date(today);
+    tomorrow.setDate(tomorrow.getDate() + 1);
+
+    // Find active registration for today
+    const registration = await MealRegistration.findOne({
+      idNumber: user.idNumber,
+      registrationDate: {
+        $gte: today,
+        $lt: tomorrow
+      },
+      status: 'active'
+    });
+
+    res.json({
+      success: true,
+      registration: registration || null
+    });
+  } catch (error) {
+    console.error('Error fetching meal registration:', error);
     res.status(500).json({ message: 'Server error' });
   }
 };

@@ -2,7 +2,7 @@ import { useState } from 'react';
 import { useNavigate, Link } from 'react-router-dom';
 import { useAuth } from '../../context/AuthContext';
 import axios from 'axios';
-import logo from '../../assets/2gonzlogo.png';
+import logo from '../../assets/varda.svg';
 
 const API_BASE_URL = import.meta.env.VITE_API_BASE_URL;
 
@@ -141,8 +141,7 @@ export default function Register() {
       <div className="fixed inset-0 backdrop-blur-md bg-black/20 flex items-center justify-center p-4 z-50">
         <div className="max-w-md w-full bg-gradient-to-br from-[#1e293b] to-[#334155] rounded-3xl shadow-xl p-8 space-y-6 border border-gray-700/50">
           <div className="flex flex-col items-center">
-            <img src={logo} alt="2Gonz Logo" className="w-32 h-32 object-contain mb-4" />
-
+            <img src={logo} alt="Varda Food Group Logo" className="w-32 h-32 rounded-full bg-gray-200 object-contain p-2"/>
             <p className="text-gray-400 mt-2 text-lg">Choose to register</p>
           </div>
           <div className="space-y-4">
@@ -211,7 +210,7 @@ export default function Register() {
       {!showUserTypeModal && (
         <div className="max-w-md w-full bg-gradient-to-br from-[#1e293b] to-[#334155] rounded-3xl shadow-xl p-8 space-y-6 border border-gray-700/50">
           <div className="flex flex-col items-center">
-            <img src={logo} alt="2Gonz Logo" className="w-32 h-32 object-contain mb-4" />
+            <img src={logo} alt="Varda Food Group Logo" className="w-32 h-32 rounded-full bg-gray-200 object-contain p-2"/>
           </div>
           <form onSubmit={handleSubmit} className="space-y-5">
             <div>
@@ -268,6 +267,7 @@ export default function Register() {
                  <option value="" disabled>Select your University</option>
                  <option value="ateneo">Ateneo de Manila University</option>
                  <option value="lpudavao">Lyceum of the Philippines - Davao</option>
+                 <option value="lima">Lyceum International Maritime Academy</option>
                  <option value="mapuadavao">Mapúa Malayan Colleges Mindanao</option>
                  <option value="mapuamakati">Mapúa University Makati</option>
                  <option value="dlsulipa">De La Salle Lipa</option>
@@ -485,7 +485,7 @@ export default function Register() {
           At Varda Group, we are committed to protecting your privacy. This Privacy Policy outlines our practices regarding the collection, use, and disclosure of information that we may collect from you or receive from your use of our services.
         </p>
 
-        <p><em><strong>Disclaimer:</strong> Varda Group is a concessionaire operating the canteen on the 2nd floor of the Gonzaga Building at Ateneo de Manila University. The "2Gonz Website Privacy Act" is an internal policy, initiated and implemented solely by Varda Group, and is not an Ateneo de Manila University policy or initiative.</em></p>
+        <p><em><strong>Disclaimer:</strong> Varda Group is a concessionaire operating the canteen on the 2nd floor of the Gonzaga Building at Ateneo de Manila University. The "Varda Food Group Website Privacy Act" is an internal policy, initiated and implemented solely by Varda Group, and is not an Ateneo de Manila University policy or initiative.</em></p>
 
         <h2>1. Information We Collect</h2>
         <p>We may collect the following types of information:</p>

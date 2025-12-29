@@ -41,6 +41,7 @@ const userSchema = new mongoose.Schema({
       'ateneo',
       'dlsulipa',
       'lpudavao',
+      'lima',
       'mapuadavao',
       'mapuamakati'
     ],

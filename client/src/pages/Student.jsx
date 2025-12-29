@@ -5,7 +5,7 @@ import { useNavigate } from 'react-router-dom';
 import { HomeIcon, TicketIcon, GiftIcon, LogoutIcon, TrashIcon } from '@heroicons/react/outline';
 import { motion, AnimatePresence } from 'framer-motion';
 import confetti from 'canvas-confetti';
-import twoGonzLogo from '../assets/2gonzlogo.png';
+import logo from '../assets/varda.svg';
 import FeedbackForm from '../components/FeedbackForm';
 
 // Level configuration system
@@ -156,6 +156,13 @@ export default function StudentPage() {
   const [showLevelDetailsModal, setShowLevelDetailsModal] = useState(false);
   const [showClaimedRewardModal, setShowClaimedRewardModal] = useState(false);
   const [selectedClaimedReward, setSelectedClaimedReward] = useState(null);
+  const [mealRegistration, setMealRegistration] = useState({
+    breakfast: false,
+    lunch: false,
+    dinner: false
+  });
+  const [isLoadingMealRegistration, setIsLoadingMealRegistration] = useState(false);
+  const [mealRegistrationMessage, setMealRegistrationMessage] = useState({ type: '', text: '' });
 
   const baseUrl = import.meta.env.VITE_API_BASE_URL;
   const token = user.token;
@@ -214,6 +221,96 @@ export default function StudentPage() {
   useEffect(() => {
     fetchClaimedRewards();
   }, [token]);
+
+  // Reset meal registration form when navigating to the meal registration page
+  useEffect(() => {
+    if (currentPage === 'lima-meal-registration' && user.university === 'lima') {
+      // Clear the form when opening the page
+      setMealRegistration({
+        breakfast: false,
+        lunch: false,
+        dinner: false
+      });
+      setMealRegistrationMessage({ type: '', text: '' });
+    }
+  }, [currentPage, user.university]);
+
+  // Fetch meal registration
+  const fetchMealRegistration = async () => {
+    try {
+      const response = await axios.get(`${baseUrl}/api/student/meal-registration`, {
+        headers: { Authorization: `Bearer ${token}` }
+      });
+      if (response.data.success && response.data.registration) {
+        setMealRegistration({
+          breakfast: response.data.registration.meals.breakfast || false,
+          lunch: response.data.registration.meals.lunch || false,
+          dinner: response.data.registration.meals.dinner || false
+        });
+      } else {
+        setMealRegistration({
+          breakfast: false,
+          lunch: false,
+          dinner: false
+        });
+      }
+    } catch (error) {
+      console.error('Error fetching meal registration:', error);
+      setMealRegistration({
+        breakfast: false,
+        lunch: false,
+        dinner: false
+      });
+    }
+  };
+
+  // Submit meal registration
+  const handleMealRegistrationSubmit = async () => {
+    // Check if at least one meal is selected
+    if (!mealRegistration.breakfast && !mealRegistration.lunch && !mealRegistration.dinner) {
+      setMealRegistrationMessage({
+        type: 'error',
+        text: 'Please select at least one meal (Breakfast, Lunch, or Dinner)'
+      });
+      return;
+    }
+
+    try {
+      setIsLoadingMealRegistration(true);
+      setMealRegistrationMessage({ type: '', text: '' });
+
+      const response = await axios.post(
+        `${baseUrl}/api/student/meal-registration`,
+        { meals: mealRegistration },
+        { headers: { Authorization: `Bearer ${token}` } }
+      );
+
+      if (response.data.success) {
+        setMealRegistrationMessage({
+          type: 'success',
+          text: response.data.message || 'Meal registration successful!'
+        });
+        // Clear the form after successful submission
+        setMealRegistration({
+          breakfast: false,
+          lunch: false,
+          dinner: false
+        });
+        // Clear message after 3 seconds
+        setTimeout(() => {
+          setMealRegistrationMessage({ type: '', text: '' });
+        }, 3000);
+      }
+    } catch (error) {
+      console.error('Error submitting meal registration:', error);
+      setMealRegistrationMessage({
+        type: 'error',
+        text: error.response?.data?.message || 'Failed to register meals. Please try again.'
+      });
+    } finally {
+      setIsLoadingMealRegistration(false);
+    }
+  };
 
   useEffect(() => {
     const fetchData = async () => {
@@ -600,12 +697,12 @@ export default function StudentPage() {
                 </div>
               </div>
 
-                              {/* Card Content */}
+               {/* Card Content */}
                 <div className="relative z-10 flex flex-col justify-between h-full">
                   {/* Card issuer and level chip */}
                   <div className="flex justify-between items-start">
                     <div className="flex items-center space-x-3">
-                      <img src={twoGonzLogo} alt="2gonz Logo" className="h-8 sm:h-10 md:h-12 w-auto" />
+                      <img src={logo} alt="Varda Food Group Logo" className="h-8 sm:h-10 md:h-12 w-auto" />
                       <div className="text-xs sm:text-sm font-bold text-black/90">LOYALTY CARD</div>
                     </div>
                     <div className={`w-8 sm:w-10 h-6 sm:h-8 bg-gradient-to-br ${userLevel.gradient} rounded-md flex items-center justify-center`}>
@@ -613,7 +710,7 @@ export default function StudentPage() {
                         <div className="text-xs sm:text-sm font-bold">{userLevel.icon}</div>
                       </div>
                     </div>
-                  </div>
+                  </div>  
 
                   {/* Points display with animation */}
                   <motion.div 
@@ -683,7 +780,21 @@ export default function StudentPage() {
                   <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z" />
                 </svg>
                 <span className="mt-1.5 sm:mt-2 font-medium text-gray-200 text-sm sm:text-base">Claimed Rewards</span>
-              </motion.button>        
+              </motion.button>
+
+              {user.university === 'lima' && (
+                <motion.button
+                  whileHover={{ scale: 1.05 }}
+                  whileTap={{ scale: 0.95 }}
+                  onClick={() => setCurrentPage('lima-meal-registration')}
+                  className="flex flex-col items-center p-3 sm:p-4 bg-[#1e293b] rounded-lg sm:rounded-xl shadow-md hover:shadow-lg transition-all border border-gray-700/50 min-h-[80px] sm:min-h-[100px] col-span-2 sm:col-span-1"
+                >
+                  <svg xmlns="http://www.w3.org/2000/svg" className="h-6 w-6 sm:h-8 sm:w-8 text-orange-400" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M3 3h2l.4 2M7 13h10l4-8H5.4M7 13L5.4 5M7 13l-2.293 2.293c-.63.63-.184 1.707.707 1.707H17m0 0a2 2 0 100 4 2 2 0 000-4zm-8 2a2 2 0 11-4 0 2 2 0 014 0z" />
+                  </svg>
+                  <span className="mt-1.5 sm:mt-2 font-medium text-gray-200 text-sm sm:text-base">LIMA - Meal Registration</span>
+                </motion.button>
+              )}
             </div>
 
 
@@ -750,7 +861,7 @@ export default function StudentPage() {
               
               {/* Logo with enhanced styling */}
               <div className="relative z-10">
-                <img src={twoGonzLogo} alt="2gonz Logo" className="h-16 sm:h-20 mx-auto mb-6 drop-shadow-2xl" />
+                <img src={logo} alt="Varda Food Group Logo" className="h-16 sm:h-20 mx-auto mb-6 drop-shadow-2xl" />
               </div>
               
               {/* Enhanced title with gradient */}
@@ -834,7 +945,7 @@ export default function StudentPage() {
         {currentPage === 'rewards' && (
           <motion.div variants={itemVariants} className="space-y-6">
             <div className="text-center">
-              <img src={twoGonzLogo} alt="2gonz Logo" className="h-16 sm:h-20 mx-auto mb-8" />
+              <img src={logo} alt="Varda Food Group Logo" className="h-16 sm:h-20 mx-auto mb-8" />
               <h2 className="text-2xl font-bold text-blue-400">Rewards Available!</h2>
               <p className="text-gray-400 mt-1">Claim your Rewards and go to the Cashier for Assistance!</p>
             </div>
@@ -909,7 +1020,7 @@ export default function StudentPage() {
         {currentPage === 'claimed-rewards' && (
           <motion.div variants={itemVariants} className="space-y-4 sm:space-y-6">
             <div className="text-center px-2">
-              <img src={twoGonzLogo} alt="2gonz Logo" className="h-12 sm:h-16 md:h-20 mx-auto mb-4 sm:mb-6 md:mb-8" />
+              <img src={logo} alt="Varda Food Group Logo" className="h-12 sm:h-16 md:h-20 mx-auto mb-4 sm:mb-6 md:mb-8" />
               <h2 className="text-xl sm:text-2xl md:text-3xl font-bold text-green-400 mb-2">Your Claimed Rewards</h2>
               <p className="text-sm sm:text-base text-gray-400 px-4">Track all the rewards you've successfully claimed!</p>
               <button
@@ -1041,6 +1152,159 @@ export default function StudentPage() {
                       </div>
                     </motion.div>
                   ))}
+                </div>
+              )}
+            </motion.div>
+          </motion.div>
+        )}
+
+        {/* LIMA Meal Registration Page */}
+        {currentPage === 'lima-meal-registration' && (
+          <motion.div variants={itemVariants} className="space-y-4 sm:space-y-6">
+            <div className="text-center px-2">
+              <img src={logo} alt="Varda Food Group Logo" className="h-12 sm:h-16 md:h-20 mx-auto mb-4 sm:mb-6 md:mb-8" />
+              <h2 className="text-xl sm:text-2xl md:text-3xl font-bold text-orange-400 mb-2">LIMA - Meal Registration</h2>
+              <p className="text-sm sm:text-base text-gray-400 px-4">Select the meals you want to register for today</p>
+            </div>
+
+            <motion.div 
+              className="bg-[#1e293b] p-4 sm:p-6 md:p-8 rounded-xl sm:rounded-2xl shadow-inner border-2 border-gray-700/50 mx-2 sm:mx-0"
+              initial={{ opacity: 0 }}
+              animate={{ opacity: 1 }}
+            >
+              {/* Message Display */}
+              {mealRegistrationMessage.text && (
+                <div className={`mb-4 sm:mb-6 p-3 sm:p-4 rounded-lg ${
+                  mealRegistrationMessage.type === 'success' 
+                    ? 'bg-green-900/50 border border-green-700/50' 
+                    : 'bg-red-900/50 border border-red-700/50'
+                }`}>
+                  <p className={`text-sm sm:text-base ${
+                    mealRegistrationMessage.type === 'success' ? 'text-green-300' : 'text-red-300'
+                  }`}>
+                    {mealRegistrationMessage.text}
+                  </p>
+                </div>
+              )}
+
+              {/* Meal Selection */}
+              <div className="space-y-4 sm:space-y-6">
+                <h3 className="text-lg sm:text-xl font-semibold text-gray-200 mb-4">Select Your Meals</h3>
+                
+                {/* Breakfast */}
+                <motion.label
+                  whileHover={{ scale: 1.02 }}
+                  whileTap={{ scale: 0.98 }}
+                  className="flex items-center p-4 sm:p-5 bg-gray-800/50 rounded-xl border-2 border-gray-700/50 cursor-pointer hover:border-orange-500/50 transition-all"
+                >
+                  <input
+                    type="checkbox"
+                    checked={mealRegistration.breakfast}
+                    onChange={(e) => setMealRegistration({ ...mealRegistration, breakfast: e.target.checked })}
+                    className="w-5 h-5 sm:w-6 sm:h-6 text-orange-500 bg-gray-700 border-gray-600 rounded focus:ring-orange-500 focus:ring-2"
+                  />
+                  <div className="ml-4 flex-1">
+                    <div className="flex items-center space-x-3">
+                      <svg xmlns="http://www.w3.org/2000/svg" className="h-6 w-6 sm:h-8 sm:w-8 text-yellow-400" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 3v1m0 16v1m9-9h-1M4 12H3m15.364 6.364l-.707-.707M6.343 6.343l-.707-.707m12.728 0l-.707.707M6.343 17.657l-.707.707M16 12a4 4 0 11-8 0 4 4 0 018 0z" />
+                      </svg>
+                      <div>
+                        <h4 className="text-base sm:text-lg font-bold text-white">Breakfast</h4>
+                        <p className="text-xs sm:text-sm text-gray-400">Start your day with a nutritious meal</p>
+                      </div>
+                    </div>
+                  </div>
+                </motion.label>
+
+                {/* Lunch */}
+                <motion.label
+                  whileHover={{ scale: 1.02 }}
+                  whileTap={{ scale: 0.98 }}
+                  className="flex items-center p-4 sm:p-5 bg-gray-800/50 rounded-xl border-2 border-gray-700/50 cursor-pointer hover:border-orange-500/50 transition-all"
+                >
+                  <input
+                    type="checkbox"
+                    checked={mealRegistration.lunch}
+                    onChange={(e) => setMealRegistration({ ...mealRegistration, lunch: e.target.checked })}
+                    className="w-5 h-5 sm:w-6 sm:h-6 text-orange-500 bg-gray-700 border-gray-600 rounded focus:ring-orange-500 focus:ring-2"
+                  />
+                  <div className="ml-4 flex-1">
+                    <div className="flex items-center space-x-3">
+                      <svg xmlns="http://www.w3.org/2000/svg" className="h-6 w-6 sm:h-8 sm:w-8 text-orange-400" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 8v4l3 3m6-3a9 9 0 11-18 0 9 9 0 0118 0z" />
+                      </svg>
+                      <div>
+                        <h4 className="text-base sm:text-lg font-bold text-white">Lunch</h4>
+                        <p className="text-xs sm:text-sm text-gray-400">Midday meal to keep you energized</p>
+                      </div>
+                    </div>
+                  </div>
+                </motion.label>
+
+                {/* Dinner */}
+                <motion.label
+                  whileHover={{ scale: 1.02 }}
+                  whileTap={{ scale: 0.98 }}
+                  className="flex items-center p-4 sm:p-5 bg-gray-800/50 rounded-xl border-2 border-gray-700/50 cursor-pointer hover:border-orange-500/50 transition-all"
+                >
+                  <input
+                    type="checkbox"
+                    checked={mealRegistration.dinner}
+                    onChange={(e) => setMealRegistration({ ...mealRegistration, dinner: e.target.checked })}
+                    className="w-5 h-5 sm:w-6 sm:h-6 text-orange-500 bg-gray-700 border-gray-600 rounded focus:ring-orange-500 focus:ring-2"
+                  />
+                  <div className="ml-4 flex-1">
+                    <div className="flex items-center space-x-3">
+                      <svg xmlns="http://www.w3.org/2000/svg" className="h-6 w-6 sm:h-8 sm:w-8 text-purple-400" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M20.354 15.354A9 9 0 018.646 3.646 9.003 9.003 0 0012 21a9.003 9.003 0 008.354-5.646z" />
+                      </svg>
+                      <div>
+                        <h4 className="text-base sm:text-lg font-bold text-white">Dinner</h4>
+                        <p className="text-xs sm:text-sm text-gray-400">Evening meal to end your day</p>
+                      </div>
+                    </div>
+                  </div>
+                </motion.label>
+              </div>
+
+              {/* Submit Button */}
+              <div className="mt-6 sm:mt-8">
+                <motion.button
+                  whileHover={{ scale: 1.02 }}
+                  whileTap={{ scale: 0.98 }}
+                  onClick={handleMealRegistrationSubmit}
+                  disabled={isLoadingMealRegistration}
+                  className="w-full bg-gradient-to-r from-orange-600 to-orange-700 hover:from-orange-700 hover:to-orange-800 text-white font-bold py-3 sm:py-4 rounded-xl shadow-lg transition-all disabled:opacity-50 disabled:cursor-not-allowed text-sm sm:text-base"
+                >
+                  {isLoadingMealRegistration ? (
+                    <div className="flex items-center justify-center space-x-2">
+                      <svg className="animate-spin h-5 w-5" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24">
+                        <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4"></circle>
+                        <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path>
+                      </svg>
+                      <span>Registering...</span>
+                    </div>
+                  ) : (
+                    'Register Meals'
+                  )}
+                </motion.button>
+              </div>
+
+              {/* Current Registration Info */}
+              {(mealRegistration.breakfast || mealRegistration.lunch || mealRegistration.dinner) && (
+                <div className="mt-4 sm:mt-6 p-3 sm:p-4 bg-blue-900/30 border border-blue-700/50 rounded-lg">
+                  <p className="text-xs sm:text-sm text-blue-300 font-medium mb-2">Selected Meals:</p>
+                  <div className="flex flex-wrap gap-2">
+                    {mealRegistration.breakfast && (
+                      <span className="px-2 sm:px-3 py-1 bg-blue-700/50 text-blue-200 rounded-full text-xs sm:text-sm">Breakfast</span>
+                    )}
+                    {mealRegistration.lunch && (
+                      <span className="px-2 sm:px-3 py-1 bg-blue-700/50 text-blue-200 rounded-full text-xs sm:text-sm">Lunch</span>
+                    )}
+                    {mealRegistration.dinner && (
+                      <span className="px-2 sm:px-3 py-1 bg-blue-700/50 text-blue-200 rounded-full text-xs sm:text-sm">Dinner</span>
+                    )}
+                  </div>
                 </div>
               )}
             </motion.div>
@@ -2283,14 +2547,14 @@ function SettingsPage({ user, onBack }) {
               </svg>
             </div>
             <h2 className="text-2xl font-bold bg-gradient-to-r from-purple-600 to-indigo-600 bg-clip-text text-transparent">
-              About 2GONZ
+              About Varda Food Group
             </h2>
           </div>
           
           <div className="space-y-5">
             <div className="p-5 bg-purple-50 rounded-xl border border-purple-100">
               <p className="text-gray-700 leading-relaxed">
-                2GONZ is a loyalty reward system designed to promote sustainable practices among students by encouraging the borrowing and proper return of reusable items.
+                Varda Food Group Web Application is a loyalty reward system designed to promote sustainable practices among students by encouraging the borrowing and proper return of reusable items.
               </p>
             </div>
             

@@ -2,7 +2,8 @@ import { useState } from 'react';
 import { useNavigate, Link } from 'react-router-dom';
 import { useAuth } from '../../context/AuthContext';
 import axios from 'axios';
-import logo from '../../assets/2gonzlogo.png';
+import logo from '../../assets/varda.svg';
+import bgImage from '../../assets/vardabg.png';
 
 const API_BASE_URL = import.meta.env.VITE_API_BASE_URL;
 
@@ -62,19 +63,19 @@ export default function Login() {
   };
 
   return (
-    <div className="min-h-screen flex items-center justify-center bg-gradient-to-br from-[#0f172a] to-[#1e293b] p-4">
-      <div className="max-w-md w-full bg-gradient-to-br from-[#1e293b] to-[#334155] rounded-3xl shadow-xl p-8 space-y-6 border border-gray-700/50">
+    <div className="min-h-screen flex items-center justify-center bg-center bg-cover p-4" style={{ backgroundImage: `url(${bgImage})` }}>
+      <div className="max-w-md w-full bg-gradient-to-br from-orange-100 via-orange-200 to-orange-100 rounded-3xl shadow-xl p-8 space-y-6 border border-gray-100">
         <div className="flex flex-col items-center">
-          <img src={logo} alt="2Gonz Logo" className="w-32 h-32 object-contain mb-4" />
+        <img src={logo} alt="Varda Food Group Logo" className="w-50 h-50 rounded-full object-contain"/>
         </div>
         <form onSubmit={handleSubmit} className="space-y-5">
           <div>
-            <label className="block mb-1 text-sm font-medium text-gray-200">ID/Phone number</label>
+            <label className="block mb-1 text-sm font-bold text-black">ID/Phone number</label>
             <input
-              type="text"
+              type="text" 
               inputMode="numeric"
               pattern="[0-9]*"
-              className="w-full px-4 py-2 bg-gray-800/50 border border-gray-700 rounded-xl focus:ring-2 focus:ring-blue-500 focus:outline-none transition text-white placeholder-gray-400"
+              className="w-full px-4 py-2 bg-white border-gray-200 border rounded-xl focus:ring-2 focus:ring-rose-400 focus:outline-none transition text-black placeholder-gray-400"
               placeholder="Enter your ID/Phone number"
               value={idNumber}
               onChange={(e) => {
@@ -88,11 +89,11 @@ export default function Login() {
             />
           </div>
           <div>
-            <label className="block mb-1 text-sm font-medium text-gray-200">Password</label>
+            <label className="block mb-1 text-sm font-bold text-black">Password</label>
             <div className="relative">
               <input
                 type={showPassword ? "text" : "password"}
-                className="w-full px-4 py-2 bg-gray-800/50 border border-gray-700 rounded-xl focus:ring-2 focus:ring-blue-500 focus:outline-none transition text-white placeholder-gray-400"
+                className="w-full px-4 py-2 bg-white border-gray-200 border rounded-xl focus:ring-2 focus:ring-rose-400 focus:outline-none transition text-black placeholder-gray-400"
                 placeholder="Enter your password"
                 value={password}
                 onChange={(e) => {

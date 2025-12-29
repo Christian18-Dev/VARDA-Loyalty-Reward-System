@@ -18,7 +18,7 @@ import { motion, AnimatePresence } from 'framer-motion';
 import ExcelJS from 'exceljs';
 import { PDFDownloadLink, Document, Page, Text, View, StyleSheet, Image } from '@react-pdf/renderer';
 import { pdf } from '@react-pdf/renderer';
-import logo from '../assets/2gonzlogo.png';
+import logo from '../assets/varda.svg';
 import { Line } from 'react-chartjs-2';
 import {
   Chart as ChartJS,
@@ -3591,9 +3591,11 @@ export default function AdminPage() {
                           <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500">
                             <span className="px-2 inline-flex text-xs leading-5 font-semibold rounded-full bg-blue-100 text-blue-800">
                               {u.university === 'ateneo' ? 'Ateneo' : 
-                               u.university === 'up' ? 'UP' :
-                               u.university === 'dlsu' ? 'DLSU' :
-                               u.university === 'ust' ? 'UST' : 'Unknown'}
+                               u.university === 'dlsulipa' ? 'DLSU Lipa' :
+                               u.university === 'lpudavao' ? 'LPU Davao' :
+                               u.university === 'lima' ? 'LIMA' :
+                               u.university === 'mapuadavao' ? 'Mapúa Mindanao' :
+                               u.university === 'mapuamakati' ? 'Mapúa Makati' : 'Unknown'}
                             </span>
                           </td>
                           <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500 space-x-2">

@@ -1,7 +1,7 @@
 import { useState, useEffect } from 'react';
 import { useParams, useNavigate, Link } from 'react-router-dom';
 import axios from 'axios';
-import logo from '../../assets/2gonzlogo.png';
+import logo from '../../assets/varda.svg';
 
 const API_BASE_URL = import.meta.env.VITE_API_BASE_URL;
 
@@ -90,7 +90,7 @@ export default function ResetPassword() {
       <div className="min-h-screen flex items-center justify-center bg-gradient-to-br from-[#0f172a] to-[#1e293b] p-4">
         <div className="max-w-md w-full bg-gradient-to-br from-[#1e293b] to-[#334155] rounded-3xl shadow-xl p-8 space-y-6 border border-gray-700/50">
           <div className="flex flex-col items-center">
-            <img src={logo} alt="2Gonz Logo" className="w-32 h-32 object-contain mb-4" />
+            <img src={logo} alt="Varda Food Group Logo" className="w-32 h-32 rounded-full bg-gray-200 object-contain p-2"/>
             <div className="flex items-center justify-center">
               <div className="w-8 h-8 border-2 border-blue-500 border-t-transparent rounded-full animate-spin mr-3"></div>
               <span className="text-white">Verifying reset link...</span>
@@ -106,7 +106,7 @@ export default function ResetPassword() {
       <div className="min-h-screen flex items-center justify-center bg-gradient-to-br from-[#0f172a] to-[#1e293b] p-4">
         <div className="max-w-md w-full bg-gradient-to-br from-[#1e293b] to-[#334155] rounded-3xl shadow-xl p-8 space-y-6 border border-gray-700/50">
           <div className="flex flex-col items-center">
-            <img src={logo} alt="2Gonz Logo" className="w-32 h-32 object-contain mb-4" />
+            <img src={logo} alt="Varda Food Group Logo" className="w-32 h-32 rounded-full bg-gray-200 object-contain p-2"/>
             <h1 className="text-2xl font-bold text-white mb-2">Invalid Reset Link</h1>
             <div className="p-3 bg-red-900/50 border-l-4 border-red-500 rounded-lg flex items-start space-x-2">
               <svg xmlns="http://www.w3.org/2000/svg" className="h-5 w-5 text-red-500 mt-0.5" viewBox="0 0 20 20" fill="currentColor">
@@ -138,7 +138,7 @@ export default function ResetPassword() {
     <div className="min-h-screen flex items-center justify-center bg-gradient-to-br from-[#0f172a] to-[#1e293b] p-4">
       <div className="max-w-md w-full bg-gradient-to-br from-[#1e293b] to-[#334155] rounded-3xl shadow-xl p-8 space-y-6 border border-gray-700/50">
         <div className="flex flex-col items-center">
-          <img src={logo} alt="2Gonz Logo" className="w-32 h-32 object-contain mb-4" />
+          <img src={logo} alt="Varda Food Group Logo" className="w-32 h-32 rounded-full bg-gray-200 object-contain p-2"/>
           <h1 className="text-2xl font-bold text-white mb-2">Reset Password</h1>
           <p className="text-gray-400 text-center">
             Enter your new password below.

@@ -1,7 +1,7 @@
 import { useState } from 'react';
 import { Link } from 'react-router-dom';
 import axios from 'axios';
-import logo from '../../assets/2gonzlogo.png';
+import logo from '../../assets/varda.svg';
 
 const API_BASE_URL = import.meta.env.VITE_API_BASE_URL;
 
@@ -43,9 +43,8 @@ export default function ForgotPassword() {
     <div className="min-h-screen flex items-center justify-center bg-gradient-to-br from-[#0f172a] to-[#1e293b] p-4">
       <div className="max-w-md w-full bg-gradient-to-br from-[#1e293b] to-[#334155] rounded-3xl shadow-xl p-8 space-y-6 border border-gray-700/50">
         <div className="flex flex-col items-center">
-          <img src={logo} alt="2Gonz Logo" className="w-32 h-32 object-contain mb-4" />
-          <h1 className="text-2xl font-bold text-white mb-2">Forgot Password</h1>
-          <p className="text-gray-400 text-center">
+        <img src={logo} alt="Varda Food Group Logo" className="w-32 h-32 rounded-full bg-gray-200 object-contain p-2"/>
+          <p className="text-gray-400 text-center pt-4">
             Enter your email address and we'll send you a link to reset your password.
           </p>
         </div>

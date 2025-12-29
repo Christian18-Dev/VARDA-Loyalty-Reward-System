@@ -17,7 +17,7 @@ import { motion, AnimatePresence } from 'framer-motion';
 import ExcelJS from 'exceljs';
 import { PDFDownloadLink, Document, Page, Text, View, StyleSheet, Image } from '@react-pdf/renderer';
 import { pdf } from '@react-pdf/renderer';
-import logo from '../assets/2gonzlogo.png';
+import logo from '../assets/varda.svg';
 import completeSetImage from '../assets/completeset.png';
 import basicSetImage from '../assets/basicset.png';
 import spoonImage from '../assets/spoon.png';

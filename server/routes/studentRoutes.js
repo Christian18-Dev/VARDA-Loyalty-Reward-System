@@ -7,7 +7,9 @@ import {
   updateProfile, 
   deleteAccount,
   getClaimedRewards,
-  verifyRewardClaim
+  verifyRewardClaim,
+  registerMeals,
+  getMealRegistration
 } from '../controllers/studentController.js';
 import { protect, borrowAccess } from '../middleware/authMiddleware.js';
 import { getRewards } from '../controllers/rewardController.js';
@@ -62,5 +64,9 @@ router.post('/return-items', borrowAccess, processReturnQR);
 
 // Add feedback route
 router.post('/feedback', protect, feedbackSubmit);
+
+// Meal registration routes
+router.post('/meal-registration', protect, registerMeals);
+router.get('/meal-registration', protect, getMealRegistration);
 
 export default router;
