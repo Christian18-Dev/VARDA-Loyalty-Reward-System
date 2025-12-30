@@ -331,18 +331,29 @@ export const registerMeals = async (req, res) => {
       });
     }
 
-    // Get today's date at midnight for comparison
-    const today = new Date();
-    today.setHours(0, 0, 0, 0);
-    const tomorrow = new Date(today);
-    tomorrow.setDate(tomorrow.getDate() + 1);
+    // Use Philippine time (Asia/Manila) and a 24-hour window from 5 AM PH time to 5 AM next day
+    const now = new Date();
+    const philNow = new Date(now.toLocaleString('en-US', { timeZone: 'Asia/Manila' }));
 
-    // Check if there's an active registration for today
+    // Compute the start of the current 5 AM–5 AM window in PH time
+    const windowStart = new Date(philNow);
+    windowStart.setHours(5, 0, 0, 0); // 5:00 AM
+
+    // If current PH time is before 5 AM, use previous day's 5 AM as window start
+    if (philNow < windowStart) {
+      windowStart.setDate(windowStart.getDate() - 1);
+    }
+
+    // End of window is 24 hours after start (next day's 5 AM)
+    const windowEnd = new Date(windowStart);
+    windowEnd.setDate(windowEnd.getDate() + 1);
+
+    // Check if there's an active registration in the current 5 AM–5 AM PH window
     const existingRegistration = await MealRegistration.findOne({
       idNumber: user.idNumber,
       registrationDate: {
-        $gte: today,
-        $lt: tomorrow
+        $gte: windowStart,
+        $lt: windowEnd
       },
       status: 'active'
     });
@@ -398,18 +409,29 @@ export const getMealRegistration = async (req, res) => {
       });
     }
 
-    // Get today's date at midnight for comparison
-    const today = new Date();
-    today.setHours(0, 0, 0, 0);
-    const tomorrow = new Date(today);
-    tomorrow.setDate(tomorrow.getDate() + 1);
+    // Use Philippine time (Asia/Manila) and a 24-hour window from 5 AM PH time to 5 AM next day
+    const now = new Date();
+    const philNow = new Date(now.toLocaleString('en-US', { timeZone: 'Asia/Manila' }));
 
-    // Find active registration for today
+    // Compute the start of the current 5 AM–5 AM window in PH time
+    const windowStart = new Date(philNow);
+    windowStart.setHours(5, 0, 0, 0); // 5:00 AM
+
+    // If current PH time is before 5 AM, use previous day's 5 AM as window start
+    if (philNow < windowStart) {
+      windowStart.setDate(windowStart.getDate() - 1);
+    }
+
+    // End of window is 24 hours after start (next day's 5 AM)
+    const windowEnd = new Date(windowStart);
+    windowEnd.setDate(windowEnd.getDate() + 1);
+
+    // Find active registration in the current 5 AM–5 AM PH window
     const registration = await MealRegistration.findOne({
       idNumber: user.idNumber,
       registrationDate: {
-        $gte: today,
-        $lt: tomorrow
+        $gte: windowStart,
+        $lt: windowEnd
       },
       status: 'active'
     });

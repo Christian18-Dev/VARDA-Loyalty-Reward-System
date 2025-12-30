@@ -2,6 +2,8 @@ import Code from '../models/Code.js'; // Make sure this line is at the top of yo
 import ClaimedReward from '../models/ClaimedReward.js';
 import PointsUsage from '../models/PointsUsage.js';
 import User from '../models/User.js';
+import MealRegistration from '../models/MealRegistration.js';
+import AvailHistory from '../models/AvailHistory.js';
 
 export const generateCode = async (req, res) => {
   try {
@@ -82,6 +84,169 @@ export const getPointsUsageHistory = async (req, res) => {
     res.json(pointsUsageWithUserDetails);
   } catch (error) {
     console.error('Error fetching points usage history:', error);
+    res.status(500).json({ message: 'Server error' });
+  }
+};
+
+// Get meal registrations for LIMA students (only accessible by cashierlima)
+export const getLimaMealRegistrations = async (req, res) => {
+  try {
+    // Check if user has cashierlima role
+    if (req.user.role !== 'cashierlima') {
+      return res.status(403).json({ message: 'Access denied. Only cashierlima role can access this endpoint.' });
+    }
+
+    // Get meal registrations for students with university = 'lima'
+    const mealRegistrations = await MealRegistration.find({ 
+      university: 'lima',
+      status: 'active'
+    })
+      .sort({ registrationDate: -1 })
+      .lean();
+
+    // Populate accountID from User model
+    const mealRegistrationsWithAccountID = await Promise.all(
+      mealRegistrations.map(async (registration) => {
+        const user = await User.findOne({ idNumber: registration.idNumber })
+          .select('accountID')
+          .lean();
+        
+        return {
+          ...registration,
+          accountID: user?.accountID || null
+        };
+      })
+    );
+
+    res.json(mealRegistrationsWithAccountID);
+  } catch (error) {
+    console.error('Error fetching LIMA meal registrations:', error);
+    res.status(500).json({ message: 'Server error' });
+  }
+};
+
+// Mark a meal as availed (only accessible by cashierlima)
+export const availMeal = async (req, res) => {
+  try {
+    // Check if user has cashierlima role
+    if (req.user.role !== 'cashierlima') {
+      return res.status(403).json({ message: 'Access denied. Only cashierlima role can access this endpoint.' });
+    }
+
+    const { registrationId, mealType } = req.body;
+
+    // Validate meal type
+    if (!['breakfast', 'lunch', 'dinner'].includes(mealType)) {
+      return res.status(400).json({ message: 'Invalid meal type. Must be breakfast, lunch, or dinner.' });
+    }
+
+    // Find the meal registration
+    const registration = await MealRegistration.findById(registrationId);
+    if (!registration) {
+      return res.status(404).json({ message: 'Meal registration not found' });
+    }
+
+    // Check if the meal was registered
+    if (!registration.meals[mealType]) {
+      return res.status(400).json({ message: `This student did not register for ${mealType}.` });
+    }
+
+    // Check if the meal was already availed
+    if (registration.mealsAvailed[mealType]) {
+      return res.status(400).json({ message: `${mealType.charAt(0).toUpperCase() + mealType.slice(1)} has already been availed.` });
+    }
+
+    // Get user's accountID
+    const user = await User.findOne({ idNumber: registration.idNumber })
+      .select('accountID')
+      .lean();
+
+    // Mark the meal as availed
+    registration.mealsAvailed[mealType] = true;
+    await registration.save();
+
+    // Create history entry
+    await AvailHistory.create({
+      registrationId: registration._id,
+      idNumber: registration.idNumber,
+      accountID: user?.accountID || null,
+      firstName: registration.firstName,
+      lastName: registration.lastName,
+      mealType: mealType,
+      availedBy: {
+        idNumber: req.user.idNumber,
+        name: `${req.user.firstName} ${req.user.lastName}`
+      },
+      registrationDate: registration.registrationDate
+    });
+
+    res.json({
+      success: true,
+      message: `${mealType.charAt(0).toUpperCase() + mealType.slice(1)} marked as availed successfully`,
+      registration
+    });
+  } catch (error) {
+    console.error('Error availing meal:', error);
+    res.status(500).json({ message: 'Server error' });
+  }
+};
+
+// Get avail history (only accessible by cashierlima)
+export const getAvailHistory = async (req, res) => {
+  try {
+    // Check if user has cashierlima role
+    if (req.user.role !== 'cashierlima') {
+      return res.status(403).json({ message: 'Access denied. Only cashierlima role can access this endpoint.' });
+    }
+
+    // Get query parameters for filtering
+    const { startDate, endDate, mealType, accountID, search } = req.query;
+
+    // Build query
+    const query = {};
+
+    // Date range filter
+    if (startDate || endDate) {
+      query.availedAt = {};
+      if (startDate) {
+        const start = new Date(startDate);
+        start.setHours(0, 0, 0, 0);
+        query.availedAt.$gte = start;
+      }
+      if (endDate) {
+        const end = new Date(endDate);
+        end.setHours(23, 59, 59, 999);
+        query.availedAt.$lte = end;
+      }
+    }
+
+    // Meal type filter
+    if (mealType && ['breakfast', 'lunch', 'dinner'].includes(mealType)) {
+      query.mealType = mealType;
+    }
+
+    // AccountID filter
+    if (accountID) {
+      query.accountID = parseInt(accountID);
+    }
+
+    // Search filter (by name or idNumber)
+    if (search) {
+      query.$or = [
+        { firstName: { $regex: search, $options: 'i' } },
+        { lastName: { $regex: search, $options: 'i' } },
+        { idNumber: { $regex: search, $options: 'i' } }
+      ];
+    }
+
+    // Fetch history with sorting (newest first)
+    const history = await AvailHistory.find(query)
+      .sort({ availedAt: -1 })
+      .lean();
+
+    res.json(history);
+  } catch (error) {
+    console.error('Error fetching avail history:', error);
     res.status(500).json({ message: 'Server error' });
   }
 };

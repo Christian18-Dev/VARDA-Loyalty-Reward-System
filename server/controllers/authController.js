@@ -12,6 +12,30 @@ const generateToken = (user) => {
   );
 };
 
+// Generate next accountID
+const getNextAccountID = async () => {
+  try {
+    // Find the user with the highest accountID
+    const lastUser = await User.findOne({ accountID: { $exists: true } })
+      .sort({ accountID: -1 })
+      .select('accountID')
+      .lean();
+    
+    // If no user exists with accountID, start from 1
+    if (!lastUser || !lastUser.accountID) {
+      return 1;
+    }
+    
+    // Return the next accountID
+    return lastUser.accountID + 1;
+  } catch (error) {
+    console.error('Error generating accountID:', error);
+    // Fallback: try to get count and add 1
+    const count = await User.countDocuments({ accountID: { $exists: true } });
+    return count + 1;
+  }
+};
+
 export const registerUser = async (req, res) => {
   const { firstName, lastName, password, termsAccepted, idNumber, email, role, university } = req.body;
   
@@ -46,8 +70,12 @@ export const registerUser = async (req, res) => {
       return res.status(400).json({ message: 'Email already registered' });
     }
 
+    // Generate next accountID
+    const accountID = await getNextAccountID();
+    
     const hashed = await bcrypt.hash(password, 10);
     const userData = { 
+      accountID,
       firstName,
       lastName,
       email,

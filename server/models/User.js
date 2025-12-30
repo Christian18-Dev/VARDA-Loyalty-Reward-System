@@ -3,6 +3,7 @@ import mongoose from 'mongoose';
 const userSchema = new mongoose.Schema({
   firstName: { type: String, required: true },
   lastName: { type: String, required: true },
+  accountID: { type: Number, unique: true, sparse: true },
   idNumber: { type: String, required: true, unique: true },
   email: { 
     type: String, 
@@ -22,6 +23,7 @@ const userSchema = new mongoose.Schema({
       'teacher', 
       'ateneoStaff', 
       'cashier', 
+      'cashierlima',
       'admin', 
       'concierge', 
       'catering',

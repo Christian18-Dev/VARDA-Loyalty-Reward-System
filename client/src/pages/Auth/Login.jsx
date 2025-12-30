@@ -38,6 +38,7 @@ export default function Login() {
       // Check for store roles
       const storeRoles = [
         'cashier',
+        'cashierlima',
         'varda',
         'blueCafe',
         'colonelsCurry',

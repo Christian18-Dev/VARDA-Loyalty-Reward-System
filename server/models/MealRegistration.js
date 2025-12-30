@@ -10,6 +10,11 @@ const mealRegistrationSchema = new mongoose.Schema({
     lunch: { type: Boolean, default: false },
     dinner: { type: Boolean, default: false }
   },
+  mealsAvailed: {
+    breakfast: { type: Boolean, default: false },
+    lunch: { type: Boolean, default: false },
+    dinner: { type: Boolean, default: false }
+  },
   registrationDate: { type: Date, default: Date.now },
   status: { 
     type: String, 

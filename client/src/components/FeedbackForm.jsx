@@ -112,7 +112,7 @@ const FeedbackForm = ({ onSubmit, onClose }) => {
       >
         <div className="text-center mb-4 sm:mb-6">
           <div className="flex justify-center mb-4">
-            <img src={twoGonzLogo} alt="Varda Food Group Logo" className="h-12 sm:h-16" />
+            <img src={twoGonzLogo} alt="Varda Group Logo" className="h-12 sm:h-16" />
           </div>
           <h3 className="text-xl sm:text-2xl font-bold text-gray-200">Feedback Form</h3>
           <p className="text-gray-400 mt-2 text-sm">Please rate your experience with our service.</p>

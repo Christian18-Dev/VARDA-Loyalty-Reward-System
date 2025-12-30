@@ -1,4 +1,4 @@
-import { useEffect, useState } from 'react';
+import { useEffect, useState, useCallback, useRef } from 'react';
 import axios from 'axios';
 import { useAuth } from '../context/AuthContext';
 import { useNavigate } from 'react-router-dom';
@@ -6,6 +6,7 @@ import { HomeIcon, TicketIcon, GiftIcon, LogoutIcon, TrashIcon } from '@heroicon
 import { motion, AnimatePresence } from 'framer-motion';
 import confetti from 'canvas-confetti';
 import logo from '../assets/varda.svg';
+import bgImage from '../assets/vardabg.png';
 import FeedbackForm from '../components/FeedbackForm';
 
 // Level configuration system
@@ -161,8 +162,16 @@ export default function StudentPage() {
     lunch: false,
     dinner: false
   });
+  const [mealsAvailed, setMealsAvailed] = useState({
+    breakfast: false,
+    lunch: false,
+    dinner: false
+  });
   const [isLoadingMealRegistration, setIsLoadingMealRegistration] = useState(false);
   const [mealRegistrationMessage, setMealRegistrationMessage] = useState({ type: '', text: '' });
+  const [showAvailNotification, setShowAvailNotification] = useState(false);
+  const [availedMealType, setAvailedMealType] = useState('');
+  const [notifiedMeals, setNotifiedMeals] = useState({ breakfast: false, lunch: false, dinner: false });
 
   const baseUrl = import.meta.env.VITE_API_BASE_URL;
   const token = user.token;
@@ -222,6 +231,95 @@ export default function StudentPage() {
     fetchClaimedRewards();
   }, [token]);
 
+  // Use ref to track previous mealsAvailed state to avoid stale closures
+  const prevMealsAvailedRef = useRef(mealsAvailed);
+  const notifiedMealsRef = useRef({ breakfast: false, lunch: false, dinner: false });
+  const hasLocalMealChangesRef = useRef(false); // Track if user has unsaved meal selections
+
+  // Function to show avail notification (can be called from anywhere)
+  const showAvailNotificationForMeal = useCallback((mealType) => {
+    setAvailedMealType(mealType);
+    setShowAvailNotification(true);
+  }, []);
+
+  // Fetch meal registration - memoized with useCallback to prevent unnecessary recreations
+  const fetchMealRegistration = useCallback(async () => {
+    try {
+      const response = await axios.get(`${baseUrl}/api/student/meal-registration`, {
+        headers: { Authorization: `Bearer ${token}` }
+      });
+      if (response.data.success && response.data.registration) {
+        const newMealRegistration = {
+          breakfast: response.data.registration.meals.breakfast || false,
+          lunch: response.data.registration.meals.lunch || false,
+          dinner: response.data.registration.meals.dinner || false
+        };
+        const newMealsAvailed = {
+          breakfast: response.data.registration.mealsAvailed?.breakfast || false,
+          lunch: response.data.registration.mealsAvailed?.lunch || false,
+          dinner: response.data.registration.mealsAvailed?.dinner || false
+        };
+
+        // Get previous state from ref to avoid stale closure issues
+        const prevMealsAvailed = prevMealsAvailedRef.current;
+        const notifiedMeals = notifiedMealsRef.current;
+
+        // Update ref before state updates
+        prevMealsAvailedRef.current = newMealsAvailed;
+
+        // Only update mealRegistration state if:
+        // 1. Values actually changed, AND
+        // 2. User doesn't have unsaved local changes (on meal registration page)
+        setMealRegistration(prev => {
+          // Don't overwrite if user has unsaved changes and is on meal registration page
+          if (hasLocalMealChangesRef.current && currentPage === 'lima-meal-registration') {
+            return prev; // Keep local changes
+          }
+          
+          if (prev.breakfast === newMealRegistration.breakfast &&
+              prev.lunch === newMealRegistration.lunch &&
+              prev.dinner === newMealRegistration.dinner) {
+            return prev; // No change, return previous state
+          }
+          return newMealRegistration;
+        });
+
+        setMealsAvailed(prev => {
+          if (prev.breakfast === newMealsAvailed.breakfast &&
+              prev.lunch === newMealsAvailed.lunch &&
+              prev.dinner === newMealsAvailed.dinner) {
+            return prev; // No change, return previous state
+          }
+          return newMealsAvailed;
+        });
+      } else {
+        // Only reset if there was previous data AND no local unsaved changes
+        setMealRegistration(prev => {
+          // Don't reset if user has unsaved changes and is on meal registration page
+          if (hasLocalMealChangesRef.current && currentPage === 'lima-meal-registration') {
+            return prev; // Keep local changes
+          }
+          
+          if (prev.breakfast || prev.lunch || prev.dinner) {
+            return { breakfast: false, lunch: false, dinner: false };
+          }
+          return prev;
+        });
+        setMealsAvailed(prev => {
+          if (prev.breakfast || prev.lunch || prev.dinner) {
+            prevMealsAvailedRef.current = { breakfast: false, lunch: false, dinner: false };
+            notifiedMealsRef.current = { breakfast: false, lunch: false, dinner: false };
+            return { breakfast: false, lunch: false, dinner: false };
+          }
+          return prev;
+        });
+      }
+    } catch (error) {
+      console.error('Error fetching meal registration:', error);
+      // Don't reset state on error to avoid flickering
+    }
+  }, [token, baseUrl, currentPage]);
+
   // Reset meal registration form when navigating to the meal registration page
   useEffect(() => {
     if (currentPage === 'lima-meal-registration' && user.university === 'lima') {
@@ -232,37 +330,24 @@ export default function StudentPage() {
         dinner: false
       });
       setMealRegistrationMessage({ type: '', text: '' });
+      hasLocalMealChangesRef.current = false; // Reset the flag
+      // Fetch meal registration when page opens
+      fetchMealRegistration();
     }
-  }, [currentPage, user.university]);
+  }, [currentPage, user.university, fetchMealRegistration]);
 
-  // Fetch meal registration
-  const fetchMealRegistration = async () => {
-    try {
-      const response = await axios.get(`${baseUrl}/api/student/meal-registration`, {
-        headers: { Authorization: `Bearer ${token}` }
-      });
-      if (response.data.success && response.data.registration) {
-        setMealRegistration({
-          breakfast: response.data.registration.meals.breakfast || false,
-          lunch: response.data.registration.meals.lunch || false,
-          dinner: response.data.registration.meals.dinner || false
-        });
-      } else {
-        setMealRegistration({
-          breakfast: false,
-          lunch: false,
-          dinner: false
-        });
-      }
-    } catch (error) {
-      console.error('Error fetching meal registration:', error);
-      setMealRegistration({
-        breakfast: false,
-        lunch: false,
-        dinner: false
-      });
+  // Set up polling for meal registration to check for availed meals (works on all pages)
+  useEffect(() => {
+    let pollInterval;
+    if (user.university === 'lima') {
+      // Poll every 5 seconds (optimized from 3 seconds to reduce server load)
+      // Poll on all pages, not just meal registration page
+      pollInterval = setInterval(fetchMealRegistration, 5000);
     }
-  };
+    return () => {
+      if (pollInterval) clearInterval(pollInterval);
+    };
+  }, [user.university, fetchMealRegistration]);
 
   // Submit meal registration
   const handleMealRegistrationSubmit = async () => {
@@ -296,6 +381,9 @@ export default function StudentPage() {
           lunch: false,
           dinner: false
         });
+        hasLocalMealChangesRef.current = false; // Clear the flag after successful submission
+        // Refresh meal registration data
+        await fetchMealRegistration();
         // Clear message after 3 seconds
         setTimeout(() => {
           setMealRegistrationMessage({ type: '', text: '' });
@@ -594,7 +682,10 @@ export default function StudentPage() {
   }, [message]);
 
   return (
-    <div className="min-h-screen bg-[#0f172a] text-white">
+    <div
+      className="min-h-screen bg-center bg-cover"
+      style={{ backgroundImage: `url(${bgImage})` }}
+    >
       <AnimatePresence>
         {message.text && <MessageDisplay />}
       </AnimatePresence>
@@ -728,9 +819,16 @@ export default function StudentPage() {
                   {/* Card footer */}
                   <div className="flex justify-between items-end mt-auto pt-2 sm:pt-3">
                     <div className="max-w-[60%]">
-                      <p className="text-xs sm:text-sm font-bold tracking-wider text-black/90 truncate">
+                      <p className="text-xs font-bold tracking-wider text-black/90 truncate">
                         {`${user.firstName} ${user.lastName}`.toUpperCase()}
                       </p>
+                      {user.accountID && (
+                        <div className="mt-1.5">
+                          <span className="inline-flex items-center px-2 py-0.5 rounded-full text-xs font-bold font-mono bg-black/10 text-black/80 border border-black/20">
+                            {user.accountID}
+                          </span>
+                        </div>
+                      )}
                     </div>
                     
                     <div className="text-right">
@@ -754,32 +852,32 @@ export default function StudentPage() {
                 whileHover={{ scale: 1.05 }}
                 whileTap={{ scale: 0.95 }}
                 onClick={() => setCurrentPage('claim')}
-                className="flex flex-col items-center p-3 sm:p-4 bg-[#1e293b] rounded-lg sm:rounded-xl shadow-md hover:shadow-lg transition-all border border-gray-700/50 min-h-[80px] sm:min-h-[100px]"
+                className="flex flex-col items-center p-3 sm:p-4 bg-gradient-to-br from-orange-100 via-orange-200 to-orange-100 rounded-lg sm:rounded-xl shadow-md hover:shadow-lg transition-all border border-gray-200 min-h-[80px] sm:min-h-[100px]"
               >
-                <TicketIcon className="h-6 w-6 sm:h-8 sm:w-8 text-purple-400" />
-                <span className="mt-1.5 sm:mt-2 font-medium text-gray-200 text-sm sm:text-base">Redeem</span>
+                <TicketIcon className="h-6 w-6 sm:h-8 sm:w-8 text-blue-600" />
+                <span className="mt-1.5 sm:mt-2 font-medium text-black text-sm sm:text-base">Redeem</span>
               </motion.button>
 
               <motion.button
                 whileHover={{ scale: 1.05 }}
                 whileTap={{ scale: 0.95 }}
                 onClick={() => setCurrentPage('rewards')}
-                className="flex flex-col items-center p-3 sm:p-4 bg-[#1e293b] rounded-lg sm:rounded-xl shadow-md hover:shadow-lg transition-all border border-gray-700/50 min-h-[80px] sm:min-h-[100px]"
+                className="flex flex-col items-center p-3 sm:p-4 bg-gradient-to-br from-orange-100 via-orange-200 to-orange-100 rounded-lg sm:rounded-xl shadow-md hover:shadow-lg transition-all border border-gray-200 min-h-[80px] sm:min-h-[100px]"
               >
-                <GiftIcon className="h-6 w-6 sm:h-8 sm:w-8 text-purple-400" />
-                <span className="mt-1.5 sm:mt-2 font-medium text-gray-200 text-sm sm:text-base">Rewards</span>
+                <GiftIcon className="h-6 w-6 sm:h-8 sm:w-8 text-blue-600" />
+                <span className="mt-1.5 sm:mt-2 font-medium text-black text-sm sm:text-base">Rewards</span>
               </motion.button>
               
               <motion.button
                 whileHover={{ scale: 1.05 }}
                 whileTap={{ scale: 0.95 }}
                 onClick={() => setCurrentPage('claimed-rewards')}
-                className="flex flex-col items-center p-3 sm:p-4 bg-[#1e293b] rounded-lg sm:rounded-xl shadow-md hover:shadow-lg transition-all border border-gray-700/50 min-h-[80px] sm:min-h-[100px] col-span-2 sm:col-span-1"
+                className="flex flex-col items-center p-3 sm:p-4 bg-gradient-to-br from-orange-100 via-orange-200 to-orange-100 rounded-lg sm:rounded-xl shadow-md hover:shadow-lg transition-all border border-gray-200 min-h-[80px] sm:min-h-[100px] col-span-2 sm:col-span-1"
               >
-                <svg xmlns="http://www.w3.org/2000/svg" className="h-6 w-6 sm:h-8 sm:w-8 text-green-400" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                <svg xmlns="http://www.w3.org/2000/svg" className="h-6 w-6 sm:h-8 sm:w-8 text-green-600" fill="none" viewBox="0 0 24 24" stroke="currentColor">
                   <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z" />
                 </svg>
-                <span className="mt-1.5 sm:mt-2 font-medium text-gray-200 text-sm sm:text-base">Claimed Rewards</span>
+                <span className="mt-1.5 sm:mt-2 font-medium text-black text-sm sm:text-base">Claimed Rewards</span>
               </motion.button>
 
               {user.university === 'lima' && (
@@ -787,12 +885,12 @@ export default function StudentPage() {
                   whileHover={{ scale: 1.05 }}
                   whileTap={{ scale: 0.95 }}
                   onClick={() => setCurrentPage('lima-meal-registration')}
-                  className="flex flex-col items-center p-3 sm:p-4 bg-[#1e293b] rounded-lg sm:rounded-xl shadow-md hover:shadow-lg transition-all border border-gray-700/50 min-h-[80px] sm:min-h-[100px] col-span-2 sm:col-span-1"
+                  className="flex flex-col items-center p-3 sm:p-4 bg-gradient-to-br from-orange-100 via-orange-200 to-orange-100 rounded-lg sm:rounded-xl shadow-md hover:shadow-lg transition-all border border-gray-200 min-h-[80px] sm:min-h-[100px] col-span-2 sm:col-span-1"
                 >
-                  <svg xmlns="http://www.w3.org/2000/svg" className="h-6 w-6 sm:h-8 sm:w-8 text-orange-400" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                  <svg xmlns="http://www.w3.org/2000/svg" className="h-6 w-6 sm:h-8 sm:w-8 text-orange-500" fill="none" viewBox="0 0 24 24" stroke="currentColor">
                     <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M3 3h2l.4 2M7 13h10l4-8H5.4M7 13L5.4 5M7 13l-2.293 2.293c-.63.63-.184 1.707.707 1.707H17m0 0a2 2 0 100 4 2 2 0 000-4zm-8 2a2 2 0 11-4 0 2 2 0 014 0z" />
                   </svg>
-                  <span className="mt-1.5 sm:mt-2 font-medium text-gray-200 text-sm sm:text-base">LIMA - Meal Registration</span>
+                  <span className="mt-1.5 sm:mt-2 font-medium text-black text-sm sm:text-base">LIMA - Meal Registration</span>
                 </motion.button>
               )}
             </div>
@@ -805,9 +903,9 @@ export default function StudentPage() {
                 animate={{ opacity: 1, y: 0 }}
                 className="mt-6 sm:mt-8"
               >
-                <div className="bg-[#1e293b] p-4 sm:p-6 rounded-xl sm:rounded-2xl shadow-lg border border-gray-700/50 mx-2 sm:mx-0">
+                <div className="bg-gradient-to-br from-orange-50 via-orange-100 to-orange-50 p-4 sm:p-6 rounded-xl sm:rounded-2xl shadow-lg border border-gray-200 mx-2 sm:mx-0">
                   <div className="mb-3 sm:mb-4">
-                    <h3 className="text-lg sm:text-xl font-semibold text-gray-200">Recent Claimed Rewards</h3>
+                    <h3 className="text-lg sm:text-xl font-semibold text-black">Recent Claimed Rewards</h3>
                   </div>
                   <div className="space-y-2 sm:space-y-3">
                     {claimedRewards.slice(0, 3).map((claimedReward, index) => (
@@ -816,7 +914,7 @@ export default function StudentPage() {
                         initial={{ opacity: 0, y: 10 }}
                         animate={{ opacity: 1, y: 0 }}
                         transition={{ delay: index * 0.1 }}
-                        className="flex items-center space-x-3 p-2.5 sm:p-3 bg-gray-800/30 rounded-lg hover:bg-gray-800/50 transition-colors"
+                        className="flex items-center space-x-3 p-2.5 sm:p-3 bg-white/80 rounded-lg hover:bg-white transition-colors border border-gray-200"
                       >
                         <div className="w-7 h-7 sm:w-8 sm:h-8 bg-green-500 rounded-full flex items-center justify-center flex-shrink-0">
                           <svg xmlns="http://www.w3.org/2000/svg" className="h-3.5 w-3.5 sm:h-4 sm:w-4 text-white" fill="none" viewBox="0 0 24 24" stroke="currentColor">
@@ -824,10 +922,10 @@ export default function StudentPage() {
                           </svg>
                         </div>
                         <div className="flex-grow min-w-0">
-                          <h4 className="font-medium text-gray-200 text-xs sm:text-sm truncate">
+                          <h4 className="font-medium text-gray-800 text-xs sm:text-sm truncate">
                             {claimedReward.reward?.name || 'Reward'}
                           </h4>
-                          <p className="text-xs text-gray-400">
+                          <p className="text-xs text-gray-500">
                             Claimed {new Date(claimedReward.claimedAt).toLocaleDateString('en-US', {
                               month: 'short',
                               day: 'numeric'
@@ -875,7 +973,7 @@ export default function StudentPage() {
             </div>
             
             <motion.div 
-              className="bg-gradient-to-br from-[#1e293b] via-[#1e293b] to-[#0f172a] p-8 rounded-3xl shadow-2xl border border-gray-700/30 relative overflow-hidden"
+              className="bg-gradient-to-br from-orange-100 via-orange-200 to-orange-100 p-8 rounded-3xl shadow-2xl border border-gray-200 relative overflow-hidden"
               initial={{ scale: 0.9, opacity: 0 }}
               animate={{ scale: 1, opacity: 1 }}
               transition={{ duration: 0.5 }}
@@ -896,7 +994,7 @@ export default function StudentPage() {
                   <div className="relative">
                     <input
                       id="code-input"
-                      className="w-full border-2 border-gray-600/50 bg-gray-800/30 backdrop-blur-sm p-5 rounded-2xl text-center font-mono text-2xl focus:ring-4 focus:ring-blue-500/30 focus:border-blue-400 text-white placeholder-gray-500 transition-all duration-300 shadow-lg"
+                      className="w-full border border-gray-200 bg-white p-5 rounded-2xl text-center font-mono text-2xl focus:ring-4 focus:ring-rose-400/60 focus:border-rose-400 text-black placeholder-gray-400 transition-all duration-300 shadow-lg"
                       placeholder="ex. 123456"
                       value={code}
                       onChange={(e) => setCode(e.target.value.toUpperCase())}
@@ -907,10 +1005,10 @@ export default function StudentPage() {
                     <div className="absolute inset-0 rounded-2xl bg-gradient-to-r from-blue-500/20 via-purple-500/20 to-blue-500/20 blur-xl opacity-0 transition-opacity duration-300 pointer-events-none"></div>
                   </div>
                   
-                  <button
+                    <button
                     onClick={handleCodeSubmit}
                     disabled={isLoading}
-                    className={`w-full py-4 bg-gradient-to-r from-blue-600 via-purple-600 to-blue-700 text-white rounded-2xl font-bold text-lg hover:from-blue-700 hover:via-purple-700 hover:to-blue-800 transition-all duration-300 shadow-lg hover:shadow-xl transform hover:scale-[1.02] active:scale-[0.98] ${
+                      className={`w-full py-4 bg-blue-600 text-white rounded-2xl font-bold text-lg hover:bg-blue-700 transition-all duration-300 shadow-lg hover:shadow-xl transform hover:scale-[1.02] active:scale-[0.98] ${
                       isLoading ? 'opacity-50 cursor-not-allowed' : ''
                     }`}
                   >
@@ -946,18 +1044,18 @@ export default function StudentPage() {
           <motion.div variants={itemVariants} className="space-y-6">
             <div className="text-center">
               <img src={logo} alt="Varda Food Group Logo" className="h-16 sm:h-20 mx-auto mb-8" />
-              <h2 className="text-2xl font-bold text-blue-400">Rewards Available!</h2>
-              <p className="text-gray-400 mt-1">Claim your Rewards and go to the Cashier for Assistance!</p>
+              <h2 className="text-2xl font-bold text-blue-700">Rewards Available!</h2>
+              <p className="text-gray-700 mt-1">Claim your Rewards and go to the Cashier for Assistance!</p>
             </div>
             
             <motion.div 
-              className="bg-[#1e293b] p-4 rounded-2xl shadow-inner border-2 border-gray-700/50"
+              className="bg-gradient-to-br from-orange-50 via-orange-100 to-orange-50 p-4 rounded-2xl shadow-inner border border-gray-200"
               initial={{ opacity: 0 }}
               animate={{ opacity: 1 }}
             >
               <div className="text-center mb-4">
-                <div className="inline-block bg-blue-900/50 px-4 py-2 rounded-full">
-                  <span className="font-bold text-blue-300">🌟 You have: {points} points 🌟</span>
+                <div className="inline-block bg-blue-50 px-4 py-2 rounded-full border border-blue-200">
+                  <span className="font-bold text-blue-700">🌟 You have: {points} points 🌟</span>
                 </div>
               </div>
               
@@ -975,11 +1073,11 @@ export default function StudentPage() {
                     key={reward._id}
                     variants={itemVariants}
                     whileHover={{ scale: 1.03 }}
-                    className={`p-1 rounded-xl ${points >= reward.cost ? 'bg-gradient-to-r from-indigo-600 via-purple-700 to-purple-800' : 'bg-gray-800/50'}`}
+                    className={`p-1 rounded-xl ${points >= reward.cost ? 'bg-gradient-to-r from-blue-500 via-blue-600 to-blue-700' : 'bg-gray-200'}`}
                   >
-                    <div className="bg-gradient-to-br from-indigo-400 via-purple-600 to-purple-700 p-4 rounded-lg border-2 border-dashed border-white/20 relative overflow-hidden">
-                      <div className="absolute top-0 left-0 w-2 h-full bg-white"></div>
-                      <div className="absolute top-2 right-2 text-xs font-bold bg-white/10 px-2 py-1 rounded text-white">
+                    <div className="bg-white p-4 rounded-lg border border-gray-200 relative overflow-hidden">
+                      <div className="absolute top-0 left-0 w-2 h-full bg-blue-500/80"></div>
+                      <div className="absolute top-2 right-2 text-xs font-bold bg-blue-50 px-2 py-1 rounded text-blue-700 border border-blue-200">
                         {reward.cost} pts
                       </div>
                       
@@ -993,16 +1091,16 @@ export default function StudentPage() {
                             />
                           )}
                           <div>
-                            <h3 className="text-base font-bold text-white">{reward.name}</h3>
-                            <p className="text-xs text-white/80">{reward.description || 'Awesome reward!'}</p>
+                            <h3 className="text-base font-bold text-gray-900">{reward.name}</h3>
+                            <p className="text-xs text-gray-600">{reward.description || 'Awesome reward!'}</p>
                           </div>
                         </div>
                         <button
                           onClick={() => claimReward(reward._id)}
                           disabled={points < reward.cost || isLoading}
                           className={`px-4 py-2 rounded-lg font-bold shadow-md transition-all ${points >= reward.cost ? 
-                            'bg-blue-400 hover:bg-blue-500 text-white' : 
-                            'bg-gray-800 text-gray-600'}`}
+                            'bg-blue-600 hover:bg-blue-700 text-white' : 
+                            'bg-gray-300 text-gray-500'}`}
                         >
                           Claim!
                         </button>
@@ -1021,8 +1119,8 @@ export default function StudentPage() {
           <motion.div variants={itemVariants} className="space-y-4 sm:space-y-6">
             <div className="text-center px-2">
               <img src={logo} alt="Varda Food Group Logo" className="h-12 sm:h-16 md:h-20 mx-auto mb-4 sm:mb-6 md:mb-8" />
-              <h2 className="text-xl sm:text-2xl md:text-3xl font-bold text-green-400 mb-2">Your Claimed Rewards</h2>
-              <p className="text-sm sm:text-base text-gray-400 px-4">Track all the rewards you've successfully claimed!</p>
+              <h2 className="text-xl sm:text-2xl md:text-3xl font-bold text-green-700 mb-2">Your Claimed Rewards</h2>
+              <p className="text-sm sm:text-base text-gray-700 px-4">Track all the rewards you've successfully claimed!</p>
               <button
                 onClick={fetchClaimedRewards}
                 disabled={isLoadingClaimedRewards}
@@ -1036,14 +1134,14 @@ export default function StudentPage() {
             </div>
             
             <motion.div 
-              className="bg-[#1e293b] p-3 sm:p-4 md:p-6 rounded-xl sm:rounded-2xl shadow-inner border-2 border-gray-700/50 mx-2 sm:mx-0"
+              className="bg-gradient-to-br from-orange-50 via-orange-100 to-orange-50 p-3 sm:p-4 md:p-6 rounded-xl sm:rounded-2xl shadow-inner border border-gray-200 mx-2 sm:mx-0"
               initial={{ opacity: 0 }}
               animate={{ opacity: 1 }}
             >
               {isLoadingClaimedRewards ? (
                 <div className="text-center py-8 sm:py-12">
-                  <div className="inline-flex items-center px-3 sm:px-4 py-2 font-semibold leading-6 text-blue-400 transition ease-in-out duration-150 text-sm sm:text-base">
-                    <svg className="animate-spin -ml-1 mr-2 sm:mr-3 h-4 w-4 sm:h-5 sm:w-5 text-blue-400" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24">
+                  <div className="inline-flex items-center px-3 sm:px-4 py-2 font-semibold leading-6 text-blue-700 transition ease-in-out duration-150 text-sm sm:text-base">
+                    <svg className="animate-spin -ml-1 mr-2 sm:mr-3 h-4 w-4 sm:h-5 sm:w-5 text-blue-700" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24">
                       <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4"></circle>
                       <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path>
                     </svg>
@@ -1053,13 +1151,13 @@ export default function StudentPage() {
                 </div>
               ) : claimedRewards.length === 0 ? (
                 <div className="text-center py-8 sm:py-12 px-4">
-                  <div className="w-16 h-16 sm:w-24 sm:h-24 bg-gray-800/50 rounded-full flex items-center justify-center mx-auto mb-3 sm:mb-4">
-                    <svg xmlns="http://www.w3.org/2000/svg" className="h-8 w-8 sm:h-12 sm:w-12 text-gray-600" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                  <div className="w-16 h-16 sm:w-24 sm:h-24 bg-white rounded-full flex items-center justify-center mx-auto mb-3 sm:mb-4 shadow">
+                    <svg xmlns="http://www.w3.org/2000/svg" className="h-8 w-8 sm:h-12 sm:w-12 text-gray-500" fill="none" viewBox="0 0 24 24" stroke="currentColor">
                       <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z" />
                     </svg>
                   </div>
-                  <h3 className="text-lg sm:text-xl font-semibold text-gray-300 mb-2">No Rewards Claimed Yet</h3>
-                  <p className="text-sm sm:text-base text-gray-500 mb-4 px-2">Start earning points and claim your first reward!</p>
+                  <h3 className="text-lg sm:text-xl font-semibold text-gray-800 mb-2">No Rewards Claimed Yet</h3>
+                  <p className="text-sm sm:text-base text-gray-600 mb-4 px-2">Start earning points and claim your first reward!</p>
                   <button
                     onClick={() => setCurrentPage('rewards')}
                     className="px-4 sm:px-6 py-2 bg-blue-600 text-white text-sm sm:text-base rounded-lg hover:bg-blue-700 transition-colors"
@@ -1165,6 +1263,15 @@ export default function StudentPage() {
               <img src={logo} alt="Varda Food Group Logo" className="h-12 sm:h-16 md:h-20 mx-auto mb-4 sm:mb-6 md:mb-8" />
               <h2 className="text-xl sm:text-2xl md:text-3xl font-bold text-orange-400 mb-2">LIMA - Meal Registration</h2>
               <p className="text-sm sm:text-base text-gray-400 px-4">Select the meals you want to register for today</p>
+              {user.accountID && (
+                <div className="mt-4 mx-auto max-w-md">
+                  <div className="bg-gradient-to-r from-purple-600/20 to-indigo-600/20 border-2 border-purple-500/50 rounded-xl p-4">
+                    <p className="text-xs font-medium text-black uppercase tracking-wider mb-1">Your Account ID</p>
+                    <p className="text-2xl sm:text-3xl font-bold text-black font-mono tracking-wider">{user.accountID}</p>
+                    <p className="text-xs text-gray-400 mt-2">Show this to staff when confirming your meal</p>
+                  </div>
+                </div>
+              )}
             </div>
 
             <motion.div 
@@ -1193,75 +1300,144 @@ export default function StudentPage() {
                 
                 {/* Breakfast */}
                 <motion.label
-                  whileHover={{ scale: 1.02 }}
-                  whileTap={{ scale: 0.98 }}
-                  className="flex items-center p-4 sm:p-5 bg-gray-800/50 rounded-xl border-2 border-gray-700/50 cursor-pointer hover:border-orange-500/50 transition-all"
+                  whileHover={mealsAvailed.breakfast ? {} : { scale: 1.02 }}
+                  whileTap={mealsAvailed.breakfast ? {} : { scale: 0.98 }}
+                  className={`flex items-center p-4 sm:p-5 bg-gray-800/50 rounded-xl border-2 transition-all ${
+                    mealsAvailed.breakfast 
+                      ? 'border-green-500/50 bg-green-900/20 cursor-pointer hover:bg-green-900/30' 
+                      : mealRegistration.breakfast 
+                        ? 'border-orange-500/50 cursor-pointer hover:border-orange-500/50' 
+                        : 'border-gray-700/50 cursor-pointer hover:border-orange-500/50'
+                  }`}
+                  onClick={mealsAvailed.breakfast ? (e) => {
+                    e.preventDefault();
+                    showAvailNotificationForMeal('Breakfast');
+                  } : undefined}
                 >
                   <input
                     type="checkbox"
                     checked={mealRegistration.breakfast}
-                    onChange={(e) => setMealRegistration({ ...mealRegistration, breakfast: e.target.checked })}
-                    className="w-5 h-5 sm:w-6 sm:h-6 text-orange-500 bg-gray-700 border-gray-600 rounded focus:ring-orange-500 focus:ring-2"
+                    onChange={(e) => {
+                      hasLocalMealChangesRef.current = true; // Mark that user has unsaved changes
+                      setMealRegistration({ ...mealRegistration, breakfast: e.target.checked });
+                    }}
+                    disabled={mealsAvailed.breakfast}
+                    className="w-5 h-5 sm:w-6 sm:h-6 text-orange-500 bg-gray-700 border-gray-600 rounded focus:ring-orange-500 focus:ring-2 disabled:opacity-50 disabled:cursor-not-allowed"
                   />
                   <div className="ml-4 flex-1">
-                    <div className="flex items-center space-x-3">
-                      <svg xmlns="http://www.w3.org/2000/svg" className="h-6 w-6 sm:h-8 sm:w-8 text-yellow-400" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 3v1m0 16v1m9-9h-1M4 12H3m15.364 6.364l-.707-.707M6.343 6.343l-.707-.707m12.728 0l-.707.707M6.343 17.657l-.707.707M16 12a4 4 0 11-8 0 4 4 0 018 0z" />
-                      </svg>
-                      <div>
-                        <h4 className="text-base sm:text-lg font-bold text-white">Breakfast</h4>
-                        <p className="text-xs sm:text-sm text-gray-400">Start your day with a nutritious meal</p>
+                    <div className="flex items-center justify-between">
+                      <div className="flex items-center space-x-3">
+                        <svg xmlns="http://www.w3.org/2000/svg" className="h-6 w-6 sm:h-8 sm:w-8 text-yellow-400" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 3v1m0 16v1m9-9h-1M4 12H3m15.364 6.364l-.707-.707M6.343 6.343l-.707-.707m12.728 0l-.707.707M6.343 17.657l-.707.707M16 12a4 4 0 11-8 0 4 4 0 018 0z" />
+                        </svg>
+                        <div>
+                          <h4 className="text-base sm:text-lg font-bold text-white">Breakfast</h4>
+                        </div>
                       </div>
+                      {mealsAvailed.breakfast && (
+                        <div className="flex items-center space-x-2">
+                          <svg className="w-5 h-5 sm:w-6 sm:h-6 text-green-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="3" d="M5 13l4 4L19 7" />
+                          </svg>
+                          <span className="text-sm sm:text-base font-semibold text-green-400">Availed</span>
+                        </div>
+                      )}
                     </div>
                   </div>
                 </motion.label>
 
                 {/* Lunch */}
                 <motion.label
-                  whileHover={{ scale: 1.02 }}
-                  whileTap={{ scale: 0.98 }}
-                  className="flex items-center p-4 sm:p-5 bg-gray-800/50 rounded-xl border-2 border-gray-700/50 cursor-pointer hover:border-orange-500/50 transition-all"
+                  whileHover={mealsAvailed.lunch ? {} : { scale: 1.02 }}
+                  whileTap={mealsAvailed.lunch ? {} : { scale: 0.98 }}
+                  className={`flex items-center p-4 sm:p-5 bg-gray-800/50 rounded-xl border-2 transition-all ${
+                    mealsAvailed.lunch 
+                      ? 'border-green-500/50 bg-green-900/20 cursor-pointer hover:bg-green-900/30' 
+                      : mealRegistration.lunch 
+                        ? 'border-orange-500/50 cursor-pointer hover:border-orange-500/50' 
+                        : 'border-gray-700/50 cursor-pointer hover:border-orange-500/50'
+                  }`}
+                  onClick={mealsAvailed.lunch ? (e) => {
+                    e.preventDefault();
+                    showAvailNotificationForMeal('Lunch');
+                  } : undefined}
                 >
                   <input
                     type="checkbox"
                     checked={mealRegistration.lunch}
-                    onChange={(e) => setMealRegistration({ ...mealRegistration, lunch: e.target.checked })}
-                    className="w-5 h-5 sm:w-6 sm:h-6 text-orange-500 bg-gray-700 border-gray-600 rounded focus:ring-orange-500 focus:ring-2"
+                    onChange={(e) => {
+                      hasLocalMealChangesRef.current = true; // Mark that user has unsaved changes
+                      setMealRegistration({ ...mealRegistration, lunch: e.target.checked });
+                    }}
+                    disabled={mealsAvailed.lunch}
+                    className="w-5 h-5 sm:w-6 sm:h-6 text-orange-500 bg-gray-700 border-gray-600 rounded focus:ring-orange-500 focus:ring-2 disabled:opacity-50 disabled:cursor-not-allowed"
                   />
                   <div className="ml-4 flex-1">
-                    <div className="flex items-center space-x-3">
-                      <svg xmlns="http://www.w3.org/2000/svg" className="h-6 w-6 sm:h-8 sm:w-8 text-orange-400" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 8v4l3 3m6-3a9 9 0 11-18 0 9 9 0 0118 0z" />
-                      </svg>
-                      <div>
-                        <h4 className="text-base sm:text-lg font-bold text-white">Lunch</h4>
-                        <p className="text-xs sm:text-sm text-gray-400">Midday meal to keep you energized</p>
+                    <div className="flex items-center justify-between">
+                      <div className="flex items-center space-x-3">
+                        <svg xmlns="http://www.w3.org/2000/svg" className="h-6 w-6 sm:h-8 sm:w-8 text-orange-400" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 8v4l3 3m6-3a9 9 0 11-18 0 9 9 0 0118 0z" />
+                        </svg>
+                        <div>
+                          <h4 className="text-base sm:text-lg font-bold text-white">Lunch</h4>
+                        </div>
                       </div>
+                      {mealsAvailed.lunch && (
+                        <div className="flex items-center space-x-2">
+                          <svg className="w-5 h-5 sm:w-6 sm:h-6 text-green-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="3" d="M5 13l4 4L19 7" />
+                          </svg>
+                          <span className="text-sm sm:text-base font-semibold text-green-400">Availed</span>
+                        </div>
+                      )}
                     </div>
                   </div>
                 </motion.label>
 
                 {/* Dinner */}
                 <motion.label
-                  whileHover={{ scale: 1.02 }}
-                  whileTap={{ scale: 0.98 }}
-                  className="flex items-center p-4 sm:p-5 bg-gray-800/50 rounded-xl border-2 border-gray-700/50 cursor-pointer hover:border-orange-500/50 transition-all"
+                  whileHover={mealsAvailed.dinner ? {} : { scale: 1.02 }}
+                  whileTap={mealsAvailed.dinner ? {} : { scale: 0.98 }}
+                  className={`flex items-center p-4 sm:p-5 bg-gray-800/50 rounded-xl border-2 transition-all ${
+                    mealsAvailed.dinner 
+                      ? 'border-green-500/50 bg-green-900/20 cursor-pointer hover:bg-green-900/30' 
+                      : mealRegistration.dinner 
+                        ? 'border-orange-500/50 cursor-pointer hover:border-orange-500/50' 
+                        : 'border-gray-700/50 cursor-pointer hover:border-orange-500/50'
+                  }`}
+                  onClick={mealsAvailed.dinner ? (e) => {
+                    e.preventDefault();
+                    showAvailNotificationForMeal('Dinner');
+                  } : undefined}
                 >
                   <input
                     type="checkbox"
                     checked={mealRegistration.dinner}
-                    onChange={(e) => setMealRegistration({ ...mealRegistration, dinner: e.target.checked })}
-                    className="w-5 h-5 sm:w-6 sm:h-6 text-orange-500 bg-gray-700 border-gray-600 rounded focus:ring-orange-500 focus:ring-2"
+                    onChange={(e) => {
+                      hasLocalMealChangesRef.current = true; // Mark that user has unsaved changes
+                      setMealRegistration({ ...mealRegistration, dinner: e.target.checked });
+                    }}
+                    disabled={mealsAvailed.dinner}
+                    className="w-5 h-5 sm:w-6 sm:h-6 text-orange-500 bg-gray-700 border-gray-600 rounded focus:ring-orange-500 focus:ring-2 disabled:opacity-50 disabled:cursor-not-allowed"
                   />
                   <div className="ml-4 flex-1">
-                    <div className="flex items-center space-x-3">
-                      <svg xmlns="http://www.w3.org/2000/svg" className="h-6 w-6 sm:h-8 sm:w-8 text-purple-400" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M20.354 15.354A9 9 0 018.646 3.646 9.003 9.003 0 0012 21a9.003 9.003 0 008.354-5.646z" />
-                      </svg>
-                      <div>
-                        <h4 className="text-base sm:text-lg font-bold text-white">Dinner</h4>
-                        <p className="text-xs sm:text-sm text-gray-400">Evening meal to end your day</p>
+                    <div className="flex items-center justify-between">
+                      <div className="flex items-center space-x-3">
+                        <svg xmlns="http://www.w3.org/2000/svg" className="h-6 w-6 sm:h-8 sm:w-8 text-purple-400" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M20.354 15.354A9 9 0 018.646 3.646 9.003 9.003 0 0012 21a9.003 9.003 0 008.354-5.646z" />
+                        </svg>
+                        <div>
+                          <h4 className="text-base sm:text-lg font-bold text-white">Dinner</h4>
+                        </div>
                       </div>
+                      {mealsAvailed.dinner && (
+                        <div className="flex items-center space-x-2">
+                          <svg className="w-5 h-5 sm:w-6 sm:h-6 text-green-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="3" d="M5 13l4 4L19 7" />
+                          </svg>
+                          <span className="text-sm sm:text-base font-semibold text-green-400">Availed</span>
+                        </div>
+                      )}
                     </div>
                   </div>
                 </motion.label>
@@ -1269,18 +1445,26 @@ export default function StudentPage() {
 
               {/* Submit Button */}
               <div className="mt-6 sm:mt-8">
+                {mealsAvailed.breakfast && mealsAvailed.lunch && mealsAvailed.dinner && (
+                  <p className="mb-3 text-xs sm:text-sm text-green-300 text-center">
+                    All your meals for today have been availed. Please come back tomorrow to avail again.
+                  </p>
+                )}
                 <motion.button
                   whileHover={{ scale: 1.02 }}
                   whileTap={{ scale: 0.98 }}
                   onClick={handleMealRegistrationSubmit}
-                  disabled={isLoadingMealRegistration}
+                  disabled={
+                    isLoadingMealRegistration ||
+                    (mealsAvailed.breakfast && mealsAvailed.lunch && mealsAvailed.dinner)
+                  }
                   className="w-full bg-gradient-to-r from-orange-600 to-orange-700 hover:from-orange-700 hover:to-orange-800 text-white font-bold py-3 sm:py-4 rounded-xl shadow-lg transition-all disabled:opacity-50 disabled:cursor-not-allowed text-sm sm:text-base"
                 >
                   {isLoadingMealRegistration ? (
                     <div className="flex items-center justify-center space-x-2">
                       <svg className="animate-spin h-5 w-5" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24">
                         <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4"></circle>
-                        <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path>
+                        <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2-647z"></path>
                       </svg>
                       <span>Registering...</span>
                     </div>
@@ -1290,23 +1474,6 @@ export default function StudentPage() {
                 </motion.button>
               </div>
 
-              {/* Current Registration Info */}
-              {(mealRegistration.breakfast || mealRegistration.lunch || mealRegistration.dinner) && (
-                <div className="mt-4 sm:mt-6 p-3 sm:p-4 bg-blue-900/30 border border-blue-700/50 rounded-lg">
-                  <p className="text-xs sm:text-sm text-blue-300 font-medium mb-2">Selected Meals:</p>
-                  <div className="flex flex-wrap gap-2">
-                    {mealRegistration.breakfast && (
-                      <span className="px-2 sm:px-3 py-1 bg-blue-700/50 text-blue-200 rounded-full text-xs sm:text-sm">Breakfast</span>
-                    )}
-                    {mealRegistration.lunch && (
-                      <span className="px-2 sm:px-3 py-1 bg-blue-700/50 text-blue-200 rounded-full text-xs sm:text-sm">Lunch</span>
-                    )}
-                    {mealRegistration.dinner && (
-                      <span className="px-2 sm:px-3 py-1 bg-blue-700/50 text-blue-200 rounded-full text-xs sm:text-sm">Dinner</span>
-                    )}
-                  </div>
-                </div>
-              )}
             </motion.div>
           </motion.div>
         )}
@@ -1713,6 +1880,58 @@ export default function StudentPage() {
           onSubmit={handleFeedbackSubmit}
           onClose={() => setShowFeedbackForm(false)}
         />
+      )}
+
+      {/* Meal Avail Notification Modal */}
+      {showAvailNotification && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 backdrop-blur-sm">
+          <motion.div
+            initial={{ scale: 0.8, opacity: 0 }}
+            animate={{ scale: 1, opacity: 1 }}
+            exit={{ scale: 0.8, opacity: 0 }}
+            className="bg-[#1e293b] rounded-2xl p-6 sm:p-8 max-w-sm w-full mx-4 shadow-xl border-2 border-green-500/50"
+          >
+            <div className="text-center space-y-6">
+              {/* Success Icon */}
+              <motion.div
+                initial={{ scale: 0 }}
+                animate={{ scale: 1 }}
+                transition={{ type: "spring", damping: 15 }}
+                className="w-20 h-20 bg-green-500/20 rounded-full flex items-center justify-center mx-auto"
+              >
+                <svg xmlns="http://www.w3.org/2000/svg" className="h-12 w-12 text-green-400" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M5 13l4 4L19 7" />
+                </svg>
+              </motion.div>
+
+              {/* Message */}
+              <div>
+                <h3 className="text-2xl sm:text-3xl font-bold text-green-400 mb-2">
+                  Your avail for {availedMealType} has been confirmed!
+                </h3>
+              </div>
+
+              {/* Account ID Display */}
+              {user.accountID && (
+                <div className="bg-gradient-to-r from-purple-600/20 to-indigo-600/20 border-2 border-purple-500/50 rounded-xl p-4">
+                  <p className="text-xs font-medium text-purple-300 uppercase tracking-wider mb-2">Your Account ID</p>
+                  <p className="text-3xl sm:text-4xl font-bold text-white font-mono tracking-wider">{user.accountID}</p>
+                </div>
+              )}
+
+              {/* Close Button */}
+              <button
+                onClick={() => {
+                  setShowAvailNotification(false);
+                  setAvailedMealType('');
+                }}
+                className="w-full py-3 bg-green-600 text-white rounded-xl font-bold hover:bg-green-700 transition-all"
+              >
+                OK
+              </button>
+            </div>
+          </motion.div>
+        </div>
       )}
 
       {/* Level Details Modal */}
@@ -2339,20 +2558,39 @@ function SettingsPage({ user, onBack }) {
               animate={{ opacity: 1, y: 0 }}
               transition={{ duration: 0.3, delay: 0.1 }}
             >
-              <div className="flex items-center space-x-3">
-                <div className="flex-shrink-0">
-                  <div className="h-10 w-10 rounded-full bg-indigo-100 flex items-center justify-center">
-                    <svg xmlns="http://www.w3.org/2000/svg" className="h-5 w-5 text-indigo-600" viewBox="0 0 20 20" fill="currentColor">
-                      <path fillRule="evenodd" d="M10 9a3 3 0 100-6 3 3 0 000 6zm-7 9a7 7 0 1114 0H3z" clipRule="evenodd" />
-                    </svg>
+              <div className="space-y-4">
+                <div className="flex items-center space-x-3">
+                  <div className="flex-shrink-0">
+                    <div className="h-10 w-10 rounded-full bg-indigo-100 flex items-center justify-center">
+                      <svg xmlns="http://www.w3.org/2000/svg" className="h-5 w-5 text-indigo-600" viewBox="0 0 20 20" fill="currentColor">
+                        <path fillRule="evenodd" d="M10 9a3 3 0 100-6 3 3 0 000 6zm-7 9a7 7 0 1114 0H3z" clipRule="evenodd" />
+                      </svg>
+                    </div>
+                  </div>
+                  <div>
+                    <p className="text-xs font-medium text-indigo-600 uppercase tracking-wider mb-1">Student ID</p>
+                    <div className="flex items-center">
+                      <span className="text-xl font-bold text-gray-900 font-mono tracking-tight">{user.idNumber}</span>
+                    </div>
                   </div>
                 </div>
-                <div>
-                  <p className="text-xs font-medium text-indigo-600 uppercase tracking-wider mb-1">Student ID</p>
-                  <div className="flex items-center">
-                    <span className="text-xl font-bold text-gray-900 font-mono tracking-tight">{user.idNumber}</span>
+                {user.accountID && (
+                  <div className="flex items-center space-x-3">
+                    <div className="flex-shrink-0">
+                      <div className="h-10 w-10 rounded-full bg-purple-100 flex items-center justify-center">
+                        <svg xmlns="http://www.w3.org/2000/svg" className="h-5 w-5 text-purple-600" viewBox="0 0 20 20" fill="currentColor">
+                          <path fillRule="evenodd" d="M6 2a1 1 0 00-1 1v1H4a2 2 0 00-2 2v10a2 2 0 002 2h12a2 2 0 002-2V6a2 2 0 00-2-2h-1V3a1 1 0 10-2 0v1H7V3a1 1 0 00-1-1zm0 5a1 1 0 000 2h8a1 1 0 100-2H6z" clipRule="evenodd" />
+                        </svg>
+                      </div>
+                    </div>
+                    <div>
+                      <p className="text-xs font-medium text-purple-600 uppercase tracking-wider mb-1">Account ID</p>
+                      <div className="flex items-center">
+                        <span className="text-xl font-bold text-gray-900 font-mono tracking-tight">{user.accountID}</span>
+                      </div>
+                    </div>
                   </div>
-                </div>
+                )}
               </div>
             </motion.div>
           </div>
@@ -2547,14 +2785,14 @@ function SettingsPage({ user, onBack }) {
               </svg>
             </div>
             <h2 className="text-2xl font-bold bg-gradient-to-r from-purple-600 to-indigo-600 bg-clip-text text-transparent">
-              About Varda Food Group
+              About Varda Group
             </h2>
           </div>
           
           <div className="space-y-5">
             <div className="p-5 bg-purple-50 rounded-xl border border-purple-100">
               <p className="text-gray-700 leading-relaxed">
-                Varda Food Group Web Application is a loyalty reward system designed to promote sustainable practices among students by encouraging the borrowing and proper return of reusable items.
+                Varda Group Web Application is a loyalty reward system designed to promote sustainable practices among students by encouraging the borrowing and proper return of reusable items.
               </p>
             </div>
             

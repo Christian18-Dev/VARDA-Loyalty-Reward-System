@@ -9,7 +9,9 @@ import {
   ExclamationIcon,
   ClipboardCopyIcon,
   CheckIcon,
-  PrinterIcon
+  PrinterIcon,
+  ClipboardListIcon,
+  ClockIcon
 } from '@heroicons/react/outline';
 import { motion, AnimatePresence } from 'framer-motion';
 
@@ -33,6 +35,23 @@ export default function CashierPage() {
   const printerDevice = useRef(null);
   const [generatedCodes, setGeneratedCodes] = useState([]);
   const [showCodesModal, setShowCodesModal] = useState(false);
+  const [mealRegistrations, setMealRegistrations] = useState([]);
+  const [isLoadingMealRegistrations, setIsLoadingMealRegistrations] = useState(false);
+  const [currentMealRegistrationsPage, setCurrentMealRegistrationsPage] = useState(1);
+  const [mealRegistrationsSearchTerm, setMealRegistrationsSearchTerm] = useState('');
+  const [availingMeals, setAvailingMeals] = useState({}); // Track which meals are being availed
+  const [showAvailConfirmModal, setShowAvailConfirmModal] = useState(false);
+  const [pendingAvail, setPendingAvail] = useState(null); // { registrationId, mealType, studentName, accountID }
+  const [availHistory, setAvailHistory] = useState([]);
+  const [isLoadingAvailHistory, setIsLoadingAvailHistory] = useState(false);
+  const [currentAvailHistoryPage, setCurrentAvailHistoryPage] = useState(1);
+  const [availHistoryFilters, setAvailHistoryFilters] = useState({
+    startDate: '',
+    endDate: '',
+    mealType: '',
+    accountID: '',
+    search: ''
+  });
 
   const baseUrl = import.meta.env.VITE_API_BASE_URL;
   const token = user.token;
@@ -231,6 +250,73 @@ export default function CashierPage() {
       if (pollInterval) clearInterval(pollInterval);
     };
   }, [activeTab, token]);
+
+  // Fetch meal registrations for LIMA
+  const fetchMealRegistrations = async () => {
+    if (user.role !== 'cashierlima') return;
+    
+    try {
+      setIsLoadingMealRegistrations(true);
+      const res = await axios.get(`${baseUrl}/api/cashier/lima-meal-registrations`, {
+        headers: { Authorization: `Bearer ${token}` },
+      });
+      setMealRegistrations(res.data);
+    } catch (err) {
+      console.error('Error fetching meal registrations:', err);
+      setError('Error fetching meal registrations');
+    } finally {
+      setIsLoadingMealRegistrations(false);
+    }
+  };
+
+  // Set up polling for meal registrations tab
+  useEffect(() => {
+    let pollInterval;
+    if (activeTab === 'meal-registrations' && user.role === 'cashierlima') {
+      fetchMealRegistrations();
+      pollInterval = setInterval(fetchMealRegistrations, 60000); // Poll every minute
+    }
+    return () => {
+      if (pollInterval) clearInterval(pollInterval);
+    };
+  }, [activeTab, token, user.role]);
+
+  // Fetch avail history
+  const fetchAvailHistory = async () => {
+    if (user.role !== 'cashierlima') return;
+    
+    try {
+      setIsLoadingAvailHistory(true);
+      const params = new URLSearchParams();
+      if (availHistoryFilters.startDate) params.append('startDate', availHistoryFilters.startDate);
+      if (availHistoryFilters.endDate) params.append('endDate', availHistoryFilters.endDate);
+      if (availHistoryFilters.mealType) params.append('mealType', availHistoryFilters.mealType);
+      if (availHistoryFilters.accountID) params.append('accountID', availHistoryFilters.accountID);
+      if (availHistoryFilters.search) params.append('search', availHistoryFilters.search);
+
+      const res = await axios.get(`${baseUrl}/api/cashier/avail-history?${params.toString()}`, {
+        headers: { Authorization: `Bearer ${token}` },
+      });
+      setAvailHistory(res.data);
+    } catch (err) {
+      console.error('Error fetching avail history:', err);
+      setError('Error fetching avail history');
+    } finally {
+      setIsLoadingAvailHistory(false);
+    }
+  };
+
+  // Set up polling for avail history tab
+  useEffect(() => {
+    let pollInterval;
+    if (activeTab === 'avail-history' && user.role === 'cashierlima') {
+      fetchAvailHistory();
+      pollInterval = setInterval(fetchAvailHistory, 60000); // Poll every minute
+    }
+    return () => {
+      if (pollInterval) clearInterval(pollInterval);
+    };
+  }, [activeTab, token, user.role, availHistoryFilters]);
       
   // Filter rewards based on search term
   const filteredRewards = claimedRewards.filter(reward => 
@@ -254,6 +340,106 @@ export default function CashierPage() {
   const handleRewardsSearch = (e) => {
     setRewardsSearchTerm(e.target.value);
     setCurrentRewardsPage(1);
+  };
+
+  // Filter meal registrations based on search term
+  const filteredMealRegistrations = mealRegistrations.filter(registration => {
+    const searchTerm = mealRegistrationsSearchTerm.toLowerCase();
+    const accountIDStr = registration?.accountID?.toString() || '';
+    return (
+      accountIDStr.includes(searchTerm) ||
+      registration?.idNumber?.toLowerCase().includes(searchTerm) ||
+      registration?.firstName?.toLowerCase().includes(searchTerm) ||
+      registration?.lastName?.toLowerCase().includes(searchTerm)
+    );
+  });
+      
+  // Pagination calculations for meal registrations
+  const totalMealRegistrationsPages = Math.ceil(filteredMealRegistrations.length / itemsPerPage);
+  const paginatedMealRegistrations = filteredMealRegistrations.slice(
+    (currentMealRegistrationsPage - 1) * itemsPerPage,
+    currentMealRegistrationsPage * itemsPerPage
+  );
+
+  // Handle meal registrations page change
+  const handleMealRegistrationsPageChange = (page) => {
+    setCurrentMealRegistrationsPage(page);
+  };
+
+  // Handle meal registrations search
+  const handleMealRegistrationsSearch = (e) => {
+    setMealRegistrationsSearchTerm(e.target.value);
+    setCurrentMealRegistrationsPage(1);
+  };
+
+  // Handle clicking Avail button - show confirmation modal
+  const handleAvailMealClick = (registrationId, mealType) => {
+    const registration = mealRegistrations.find(reg => reg._id === registrationId);
+    if (registration) {
+      setPendingAvail({
+        registrationId,
+        mealType,
+        studentName: `${registration.firstName} ${registration.lastName}`,
+        accountID: registration.accountID || 'N/A'
+      });
+      setShowAvailConfirmModal(true);
+    }
+  };
+
+  // Handle confirming and availing a meal
+  const handleConfirmAvailMeal = async () => {
+    if (!pendingAvail) return;
+
+    const { registrationId, mealType } = pendingAvail;
+    const key = `${registrationId}-${mealType}`;
+    
+    try {
+      setShowAvailConfirmModal(false);
+      setAvailingMeals(prev => ({ ...prev, [key]: true }));
+      setError('');
+      setSuccess('');
+
+      const res = await axios.post(
+        `${baseUrl}/api/cashier/avail-meal`,
+        { registrationId, mealType },
+        { headers: { Authorization: `Bearer ${token}` } }
+      );
+
+      if (res.data.success) {
+        setSuccess(res.data.message);
+        // Update the local state to reflect the availed meal
+        setMealRegistrations(prev => 
+          prev.map(reg => 
+            reg._id === registrationId 
+              ? { ...reg, mealsAvailed: { ...reg.mealsAvailed, [mealType]: true } }
+              : reg
+          )
+        );
+        // Refresh history if on history tab
+        if (activeTab === 'avail-history') {
+          fetchAvailHistory();
+        }
+        // Clear success message after 3 seconds
+        setTimeout(() => setSuccess(''), 3000);
+      }
+    } catch (err) {
+      console.error('Error availing meal:', err);
+      setError(err.response?.data?.message || 'Error availing meal');
+      setTimeout(() => setError(''), 5000);
+    } finally {
+      setAvailingMeals(prev => {
+        const newState = { ...prev };
+        delete newState[key];
+        return newState;
+      });
+      setPendingAvail(null);
+    }
+  };
+
+  // Handle canceling avail confirmation
+  const handleCancelAvailMeal = () => {
+    setShowAvailConfirmModal(false);
+    setPendingAvail(null);
   };
 
   const handleLogoutClick = () => {
@@ -471,7 +657,11 @@ export default function CashierPage() {
         <div className="flex space-x-2 overflow-x-auto pb-2 scrollbar-hide">
           {[
             { id: 'generator', icon: KeyIcon, label: 'Generate Code' },
-            { id: 'rewards', icon: GiftIcon, label: 'Rewards' }
+            { id: 'rewards', icon: GiftIcon, label: 'Rewards' },
+            ...(user.role === 'cashierlima' ? [
+              { id: 'meal-registrations', icon: ClipboardListIcon, label: 'LIMA Meal Registrations' },
+              { id: 'avail-history', icon: ClockIcon, label: 'Avail History' }
+            ] : [])
           ].map(({ id, icon: Icon, label }) => (
             <button
               key={id}
@@ -777,7 +967,570 @@ export default function CashierPage() {
             )}
           </motion.div>
         )}
+
+        {/* Meal Registrations Tab - Only visible to cashierlima */}
+        {activeTab === 'meal-registrations' && user.role === 'cashierlima' && (
+          <motion.div
+            initial={{ opacity: 0, y: 20 }}
+            animate={{ opacity: 1, y: 0 }}
+            className="bg-white rounded-2xl shadow-lg p-4 sm:p-6"
+          >
+            <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center mb-6 space-y-4 sm:space-y-0">
+              <div className="flex items-center space-x-3">
+                <div className="p-2 bg-blue-100 rounded-lg">
+                  <ClipboardListIcon className="w-6 h-6 text-blue-600" />
+                </div>
+                <div>
+                  <h2 className="text-2xl font-bold text-gray-800">LIMA Meal Registrations</h2>
+                  <p className="text-gray-600 mt-1">
+                    View meal registrations from Lyceum International Maritime Academy students
+                  </p>
+                </div>
+              </div>
+              <div className="w-full sm:w-64">
+                <div className="relative">
+                  <input
+                    type="text"
+                    placeholder="Search by AccountID, name..."
+                    value={mealRegistrationsSearchTerm}
+                    onChange={handleMealRegistrationsSearch}
+                    className="w-full px-4 py-2 pl-10 border border-gray-300 rounded-xl focus:ring-2 focus:ring-purple-500 focus:border-transparent"
+                  />
+                  <svg className="w-5 h-5 text-gray-400 absolute left-3 top-2.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z" />
+                  </svg>
+                </div>
+              </div>
+            </div>
+            {(error || success) && (
+              <div className={`mb-4 p-4 rounded-xl border ${
+                error ? 'bg-red-50 text-red-700 border-red-200' : 'bg-green-50 text-green-700 border-green-200'
+              }`}>
+                {error || success}
+              </div>
+            )}
+            {isLoadingMealRegistrations ? (
+              <div className="text-center py-12">
+                <svg className="animate-spin h-8 w-8 text-purple-600 mx-auto" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24">
+                  <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4"></circle>
+                  <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path>
+                </svg>
+                <p className="text-gray-500 mt-4">Loading meal registrations...</p>
+              </div>
+            ) : (
+              <>
+                <div className="overflow-x-auto rounded-xl border border-gray-200">
+                  <table className="min-w-full table-auto">
+                    <thead>
+                      <tr className="bg-gray-50">
+                        <th className="px-4 sm:px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">AccountID</th>
+                        <th className="px-4 sm:px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Name</th>
+                        <th className="px-4 sm:px-6 py-3 text-center text-xs font-medium text-gray-500 uppercase tracking-wider">Breakfast</th>
+                        <th className="px-4 sm:px-6 py-3 text-center text-xs font-medium text-gray-500 uppercase tracking-wider">Lunch</th>
+                        <th className="px-4 sm:px-6 py-3 text-center text-xs font-medium text-gray-500 uppercase tracking-wider">Dinner</th>
+                        <th className="px-4 sm:px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Registration Date</th>
+                      </tr>
+                    </thead>
+                    <tbody className="divide-y divide-gray-200">
+                      {paginatedMealRegistrations.map((registration) => (
+                        <tr key={registration._id} className="hover:bg-gray-50 transition-colors">
+                          <td className="px-4 sm:px-6 py-4 whitespace-nowrap">
+                            <div className="text-sm font-medium text-gray-900">
+                              {registration.accountID || '-'}
+                            </div>
+                          </td>
+                          <td className="px-4 sm:px-6 py-4">
+                            <div className="text-sm text-gray-900">{registration.firstName} {registration.lastName}</div>
+                          </td>
+                          <td className="px-4 sm:px-6 py-4 whitespace-nowrap">
+                            <div className="flex flex-col items-center space-y-2">
+                              {registration.meals?.breakfast ? (
+                                <>
+                                  {registration.mealsAvailed?.breakfast ? (
+                                    <div className="flex items-center justify-center w-10 h-10 rounded-full bg-green-100 border-2 border-green-500">
+                                      <svg className="w-6 h-6 text-green-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="3" d="M5 13l4 4L19 7" />
+                                      </svg>
+                                    </div>
+                                  ) : (
+                                    <>
+                                      <div className="flex items-center justify-center w-10 h-10 rounded-full bg-amber-100 border-2 border-amber-500">
+                                        <svg className="w-6 h-6 text-amber-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M12 8v4l3 3m6-3a9 9 0 11-18 0 9 9 0 0118 0z" />
+                                        </svg>
+                                      </div>
+                                      <button
+                                        onClick={() => handleAvailMealClick(registration._id, 'breakfast')}
+                                        disabled={availingMeals[`${registration._id}-breakfast`]}
+                                        className={`px-4 py-2 text-sm font-semibold rounded-lg transition-all transform hover:scale-105 active:scale-95 shadow-md ${
+                                          availingMeals[`${registration._id}-breakfast`]
+                                            ? 'bg-gray-300 text-gray-600 cursor-not-allowed shadow-none'
+                                            : 'bg-gradient-to-r from-purple-600 to-indigo-600 text-white hover:from-purple-700 hover:to-indigo-700 shadow-purple-200'
+                                        }`}
+                                      >
+                                        {availingMeals[`${registration._id}-breakfast`] ? (
+                                          <span className="flex items-center">
+                                            <svg className="animate-spin -ml-1 mr-2 h-4 w-4 text-white" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24">
+                                              <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4"></circle>
+                                              <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path>
+                                            </svg>
+                                            Processing...
+                                          </span>
+                                        ) : (
+                                          'Avail'
+                                        )}
+                                      </button>
+                                    </>
+                                  )}
+                                </>
+                              ) : (
+                                <div className="flex items-center justify-center w-10 h-10 rounded-full bg-gray-100 border-2 border-gray-300">
+                                  <span className="text-gray-400 text-xs">-</span>
+                                </div>
+                              )}
+                            </div>
+                          </td>
+                          <td className="px-4 sm:px-6 py-4 whitespace-nowrap">
+                            <div className="flex flex-col items-center space-y-2">
+                              {registration.meals?.lunch ? (
+                                <>
+                                  {registration.mealsAvailed?.lunch ? (
+                                    <div className="flex items-center justify-center w-10 h-10 rounded-full bg-green-100 border-2 border-green-500">
+                                      <svg className="w-6 h-6 text-green-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="3" d="M5 13l4 4L19 7" />
+                                      </svg>
+                                    </div>
+                                  ) : (
+                                    <>
+                                      <div className="flex items-center justify-center w-10 h-10 rounded-full bg-amber-100 border-2 border-amber-500">
+                                        <svg className="w-6 h-6 text-amber-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M12 8v4l3 3m6-3a9 9 0 11-18 0 9 9 0 0118 0z" />
+                                        </svg>
+                                      </div>
+                                      <button
+                                        onClick={() => handleAvailMealClick(registration._id, 'lunch')}
+                                        disabled={availingMeals[`${registration._id}-lunch`]}
+                                        className={`px-4 py-2 text-sm font-semibold rounded-lg transition-all transform hover:scale-105 active:scale-95 shadow-md ${
+                                          availingMeals[`${registration._id}-lunch`]
+                                            ? 'bg-gray-300 text-gray-600 cursor-not-allowed shadow-none'
+                                            : 'bg-gradient-to-r from-purple-600 to-indigo-600 text-white hover:from-purple-700 hover:to-indigo-700 shadow-purple-200'
+                                        }`}
+                                      >
+                                        {availingMeals[`${registration._id}-lunch`] ? (
+                                          <span className="flex items-center">
+                                            <svg className="animate-spin -ml-1 mr-2 h-4 w-4 text-white" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24">
+                                              <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4"></circle>
+                                              <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path>
+                                            </svg>
+                                            Processing...
+                                          </span>
+                                        ) : (
+                                          'Avail'
+                                        )}
+                                      </button>
+                                    </>
+                                  )}
+                                </>
+                              ) : (
+                                <div className="flex items-center justify-center w-10 h-10 rounded-full bg-gray-100 border-2 border-gray-300">
+                                  <span className="text-gray-400 text-xs">-</span>
+                                </div>
+                              )}
+                            </div>
+                          </td>
+                          <td className="px-4 sm:px-6 py-4 whitespace-nowrap">
+                            <div className="flex flex-col items-center space-y-2">
+                              {registration.meals?.dinner ? (
+                                <>
+                                  {registration.mealsAvailed?.dinner ? (
+                                    <div className="flex items-center justify-center w-10 h-10 rounded-full bg-green-100 border-2 border-green-500">
+                                      <svg className="w-6 h-6 text-green-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="3" d="M5 13l4 4L19 7" />
+                                      </svg>
+                                    </div>
+                                  ) : (
+                                    <>
+                                      <div className="flex items-center justify-center w-10 h-10 rounded-full bg-amber-100 border-2 border-amber-500">
+                                        <svg className="w-6 h-6 text-amber-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M12 8v4l3 3m6-3a9 9 0 11-18 0 9 9 0 0118 0z" />
+                                        </svg>
+                                      </div>
+                                      <button
+                                        onClick={() => handleAvailMealClick(registration._id, 'dinner')}
+                                        disabled={availingMeals[`${registration._id}-dinner`]}
+                                        className={`px-4 py-2 text-sm font-semibold rounded-lg transition-all transform hover:scale-105 active:scale-95 shadow-md ${
+                                          availingMeals[`${registration._id}-dinner`]
+                                            ? 'bg-gray-300 text-gray-600 cursor-not-allowed shadow-none'
+                                            : 'bg-gradient-to-r from-purple-600 to-indigo-600 text-white hover:from-purple-700 hover:to-indigo-700 shadow-purple-200'
+                                        }`}
+                                      >
+                                        {availingMeals[`${registration._id}-dinner`] ? (
+                                          <span className="flex items-center">
+                                            <svg className="animate-spin -ml-1 mr-2 h-4 w-4 text-white" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24">
+                                              <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4"></circle>
+                                              <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path>
+                                            </svg>
+                                            Processing...
+                                          </span>
+                                        ) : (
+                                          'Avail'
+                                        )}
+                                      </button>
+                                    </>
+                                  )}
+                                </>
+                              ) : (
+                                <div className="flex items-center justify-center w-10 h-10 rounded-full bg-gray-100 border-2 border-gray-300">
+                                  <span className="text-gray-400 text-xs">-</span>
+                                </div>
+                              )}
+                            </div>
+                          </td>
+                          <td className="px-4 sm:px-6 py-4 whitespace-nowrap">
+                            <div className="text-sm text-gray-900">
+                              {new Date(registration.registrationDate).toLocaleString()}
+                            </div>
+                          </td>
+                        </tr>
+                      ))}
+                    </tbody>
+                  </table>
+                  {paginatedMealRegistrations.length === 0 && (
+                    <div className="text-center py-12">
+                      <p className="text-gray-500">No meal registrations found.</p>
+                    </div>
+                  )}
+                </div>
+                
+                {/* Pagination for Meal Registrations */}
+                {totalMealRegistrationsPages > 1 && (
+                  <div className="flex justify-center items-center mt-6 space-x-4">
+                    <button
+                      onClick={() => handleMealRegistrationsPageChange(Math.max(1, currentMealRegistrationsPage - 1))}
+                      disabled={currentMealRegistrationsPage === 1}
+                      className={`p-2 rounded-lg transition-colors ${
+                        currentMealRegistrationsPage === 1
+                          ? 'text-gray-400 cursor-not-allowed'
+                          : 'text-gray-700 hover:bg-gray-100'
+                      }`}
+                    >
+                      <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M15 19l-7-7 7-7" />
+                      </svg>
+                    </button>
+                    <span className="text-gray-700 font-medium">
+                      Page {currentMealRegistrationsPage} of {totalMealRegistrationsPages}
+                    </span>
+                    <button
+                      onClick={() => handleMealRegistrationsPageChange(Math.min(totalMealRegistrationsPages, currentMealRegistrationsPage + 1))}
+                      disabled={currentMealRegistrationsPage === totalMealRegistrationsPages}
+                      className={`p-2 rounded-lg transition-colors ${
+                        currentMealRegistrationsPage === totalMealRegistrationsPages
+                          ? 'text-gray-400 cursor-not-allowed'
+                          : 'text-gray-700 hover:bg-gray-100'
+                      }`}
+                    >
+                      <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M9 5l7 7-7 7" />
+                      </svg>
+                    </button>
+                  </div>
+                )}
+              </>
+            )}
+          </motion.div>
+        )}
+
+        {/* Avail History Tab - Only visible to cashierlima */}
+        {activeTab === 'avail-history' && user.role === 'cashierlima' && (
+          <motion.div
+            initial={{ opacity: 0, y: 20 }}
+            animate={{ opacity: 1, y: 0 }}
+            className="bg-white rounded-2xl shadow-lg p-4 sm:p-6"
+          >
+            <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center mb-6 space-y-4 sm:space-y-0">
+              <div className="flex items-center space-x-3">
+                <div className="p-2 bg-indigo-100 rounded-lg">
+                  <ClockIcon className="w-6 h-6 text-indigo-600" />
+                </div>
+                <div>
+                  <h2 className="text-2xl font-bold text-gray-800">Avail History</h2>
+                  <p className="text-gray-600 mt-1">
+                    View history of all availed meals
+                  </p>
+                </div>
+              </div>
+            </div>
+
+            {/* Filters */}
+            <div className="mb-6 grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-5 gap-4">
+              <div>
+                <label className="block text-xs font-medium text-gray-700 mb-1">Start Date</label>
+                <input
+                  type="date"
+                  value={availHistoryFilters.startDate}
+                  onChange={(e) => {
+                    setAvailHistoryFilters(prev => ({ ...prev, startDate: e.target.value }));
+                    setCurrentAvailHistoryPage(1);
+                  }}
+                  className="w-full px-3 py-2 border border-gray-300 rounded-lg text-sm focus:ring-2 focus:ring-purple-500 focus:border-transparent"
+                />
+              </div>
+              <div>
+                <label className="block text-xs font-medium text-gray-700 mb-1">End Date</label>
+                <input
+                  type="date"
+                  value={availHistoryFilters.endDate}
+                  onChange={(e) => {
+                    setAvailHistoryFilters(prev => ({ ...prev, endDate: e.target.value }));
+                    setCurrentAvailHistoryPage(1);
+                  }}
+                  className="w-full px-3 py-2 border border-gray-300 rounded-lg text-sm focus:ring-2 focus:ring-purple-500 focus:border-transparent"
+                />
+              </div>
+              <div>
+                <label className="block text-xs font-medium text-gray-700 mb-1">Meal Type</label>
+                <select
+                  value={availHistoryFilters.mealType}
+                  onChange={(e) => {
+                    setAvailHistoryFilters(prev => ({ ...prev, mealType: e.target.value }));
+                    setCurrentAvailHistoryPage(1);
+                  }}
+                  className="w-full px-3 py-2 border border-gray-300 rounded-lg text-sm focus:ring-2 focus:ring-purple-500 focus:border-transparent"
+                >
+                  <option value="">All Meals</option>
+                  <option value="breakfast">Breakfast</option>
+                  <option value="lunch">Lunch</option>
+                  <option value="dinner">Dinner</option>
+                </select>
+              </div>
+              <div>
+                <label className="block text-xs font-medium text-gray-700 mb-1">AccountID</label>
+                <input
+                  type="number"
+                  placeholder="Search AccountID"
+                  value={availHistoryFilters.accountID}
+                  onChange={(e) => {
+                    setAvailHistoryFilters(prev => ({ ...prev, accountID: e.target.value }));
+                    setCurrentAvailHistoryPage(1);
+                  }}
+                  className="w-full px-3 py-2 border border-gray-300 rounded-lg text-sm focus:ring-2 focus:ring-purple-500 focus:border-transparent"
+                />
+              </div>
+              <div>
+                <label className="block text-xs font-medium text-gray-700 mb-1">Search Name/ID</label>
+                <input
+                  type="text"
+                  placeholder="Search..."
+                  value={availHistoryFilters.search}
+                  onChange={(e) => {
+                    setAvailHistoryFilters(prev => ({ ...prev, search: e.target.value }));
+                    setCurrentAvailHistoryPage(1);
+                  }}
+                  className="w-full px-3 py-2 border border-gray-300 rounded-lg text-sm focus:ring-2 focus:ring-purple-500 focus:border-transparent"
+                />
+              </div>
+            </div>
+
+            {/* Clear Filters Button */}
+            {(availHistoryFilters.startDate || availHistoryFilters.endDate || availHistoryFilters.mealType || availHistoryFilters.accountID || availHistoryFilters.search) && (
+              <div className="mb-4">
+                <button
+                  onClick={() => {
+                    setAvailHistoryFilters({
+                      startDate: '',
+                      endDate: '',
+                      mealType: '',
+                      accountID: '',
+                      search: ''
+                    });
+                    setCurrentAvailHistoryPage(1);
+                  }}
+                  className="text-sm text-purple-600 hover:text-purple-700 font-medium"
+                >
+                  Clear Filters
+                </button>
+              </div>
+            )}
+
+            {isLoadingAvailHistory ? (
+              <div className="text-center py-12">
+                <svg className="animate-spin h-8 w-8 text-purple-600 mx-auto" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24">
+                  <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4"></circle>
+                  <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path>
+                </svg>
+                <p className="text-gray-500 mt-4">Loading history...</p>
+              </div>
+            ) : (
+              <>
+                <div className="overflow-x-auto rounded-xl border border-gray-200">
+                  <table className="min-w-full table-auto">
+                    <thead>
+                      <tr className="bg-gray-50">
+                        <th className="px-4 sm:px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">AccountID</th>
+                        <th className="px-4 sm:px-6 py-3 text-center text-xs font-medium text-gray-500 uppercase tracking-wider">Meal Type</th>
+                        <th className="px-4 sm:px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Availed By</th>
+                        <th className="px-4 sm:px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Availed At</th>
+                        <th className="px-4 sm:px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Registration Date</th>
+                      </tr>
+                    </thead>
+                    <tbody className="divide-y divide-gray-200">
+                      {availHistory
+                        .slice((currentAvailHistoryPage - 1) * itemsPerPage, currentAvailHistoryPage * itemsPerPage)
+                        .map((history) => (
+                        <tr key={history._id} className="hover:bg-gray-50 transition-colors">
+                          <td className="px-4 sm:px-6 py-4 whitespace-nowrap">
+                            <div className="text-sm font-medium text-gray-900">
+                              {history.accountID || '-'}
+                            </div>
+                          </td>
+                          <td className="px-4 sm:px-6 py-4 whitespace-nowrap text-center">
+                            <span className={`px-3 py-1 inline-flex text-xs leading-5 font-semibold rounded-full ${
+                              history.mealType === 'breakfast' ? 'bg-yellow-100 text-yellow-800' :
+                              history.mealType === 'lunch' ? 'bg-blue-100 text-blue-800' :
+                              'bg-purple-100 text-purple-800'
+                            }`}>
+                              {history.mealType.charAt(0).toUpperCase() + history.mealType.slice(1)}
+                            </span>
+                          </td>
+                          <td className="px-4 sm:px-6 py-4">
+                            <div className="text-sm text-gray-900">{history.availedBy?.name || 'Unknown'}</div>
+                          </td>
+                          <td className="px-4 sm:px-6 py-4 whitespace-nowrap">
+                            <div className="text-sm text-gray-900">
+                              {new Date(history.availedAt).toLocaleString()}
+                            </div>
+                          </td>
+                          <td className="px-4 sm:px-6 py-4 whitespace-nowrap">
+                            <div className="text-sm text-gray-900">
+                              {new Date(history.registrationDate).toLocaleDateString()}
+                            </div>
+                          </td>
+                        </tr>
+                      ))}
+                    </tbody>
+                  </table>
+                  {availHistory.length === 0 && (
+                    <div className="text-center py-12">
+                      <p className="text-gray-500">No avail history found.</p>
+                    </div>
+                  )}
+                </div>
+                
+                {/* Pagination for Avail History */}
+                {Math.ceil(availHistory.length / itemsPerPage) > 1 && (
+                  <div className="flex justify-center items-center mt-6 space-x-4">
+                    <button
+                      onClick={() => setCurrentAvailHistoryPage(Math.max(1, currentAvailHistoryPage - 1))}
+                      disabled={currentAvailHistoryPage === 1}
+                      className={`p-2 rounded-lg transition-colors ${
+                        currentAvailHistoryPage === 1
+                          ? 'text-gray-400 cursor-not-allowed'
+                          : 'text-gray-700 hover:bg-gray-100'
+                      }`}
+                    >
+                      <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M15 19l-7-7 7-7" />
+                      </svg>
+                    </button>
+                    <span className="text-gray-700 font-medium">
+                      Page {currentAvailHistoryPage} of {Math.ceil(availHistory.length / itemsPerPage)}
+                    </span>
+                    <button
+                      onClick={() => setCurrentAvailHistoryPage(Math.min(Math.ceil(availHistory.length / itemsPerPage), currentAvailHistoryPage + 1))}
+                      disabled={currentAvailHistoryPage === Math.ceil(availHistory.length / itemsPerPage)}
+                      className={`p-2 rounded-lg transition-colors ${
+                        currentAvailHistoryPage === Math.ceil(availHistory.length / itemsPerPage)
+                          ? 'text-gray-400 cursor-not-allowed'
+                          : 'text-gray-700 hover:bg-gray-100'
+                      }`}
+                    >
+                      <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M9 5l7 7-7 7" />
+                      </svg>
+                    </button>
+                  </div>
+                )}
+              </>
+            )}
+          </motion.div>
+        )}
       </div>
+
+      {/* Avail Meal Confirmation Modal */}
+      <AnimatePresence>
+        {showAvailConfirmModal && pendingAvail && (
+          <div className="fixed inset-0 z-[100] overflow-y-auto">
+            <div className="flex items-center justify-center min-h-screen px-4 pt-4 pb-20 text-center sm:block sm:p-0">
+              <motion.div
+                initial={{ opacity: 0 }}
+                animate={{ opacity: 1 }}
+                exit={{ opacity: 0 }}
+                className="fixed inset-0 backdrop-blur-sm bg-white/30 transition-opacity"
+                aria-hidden="true"
+                onClick={handleCancelAvailMeal}
+              />
+
+              <span className="hidden sm:inline-block sm:align-middle sm:h-screen" aria-hidden="true">&#8203;</span>
+
+              <motion.div
+                initial={{ opacity: 0, scale: 0.95 }}
+                animate={{ opacity: 1, scale: 1 }}
+                exit={{ opacity: 0, scale: 0.95 }}
+                className="relative inline-block align-bottom bg-white rounded-lg text-left overflow-hidden shadow-xl transform transition-all sm:my-8 sm:align-middle sm:max-w-lg sm:w-full"
+                role="dialog"
+                aria-modal="true"
+                aria-labelledby="modal-headline"
+              >
+                <div className="bg-white px-4 pt-5 pb-4 sm:p-6 sm:pb-4">
+                  <div className="sm:flex sm:items-start">
+                    <div className="mx-auto flex-shrink-0 flex items-center justify-center h-12 w-12 rounded-full bg-purple-100 sm:mx-0 sm:h-10 sm:w-10">
+                      <ExclamationIcon className="h-6 w-6 text-purple-600" aria-hidden="true" />
+                    </div>
+                    <div className="mt-3 text-center sm:mt-0 sm:ml-4 sm:text-left">
+                      <h3 className="text-lg leading-6 font-medium text-gray-900" id="modal-headline">
+                        Confirm Meal Avail
+                      </h3>
+                      <div className="mt-2">
+                        <p className="text-sm text-gray-500">
+                          Are you sure you want to mark <span className="font-semibold text-gray-900">{pendingAvail.mealType.charAt(0).toUpperCase() + pendingAvail.mealType.slice(1)}</span> as availed for:
+                        </p>
+                        <div className="mt-3 p-3 bg-gray-50 rounded-lg">
+                          <p className="text-sm font-medium text-gray-900">
+                            AccountID: <span className="text-purple-600">{pendingAvail.accountID}</span>
+                          </p>
+                          <p className="text-sm text-gray-600 mt-1">
+                            {pendingAvail.studentName}
+                          </p>
+                        </div>
+                        <p className="text-sm text-gray-500 mt-3">
+                          This action cannot be undone.
+                        </p>
+                      </div>
+                    </div>
+                  </div>
+                </div>
+                <div className="bg-gray-50 px-4 py-3 sm:px-6 sm:flex sm:flex-row-reverse">
+                  <button
+                    type="button"
+                    onClick={handleConfirmAvailMeal}
+                    className="w-full inline-flex justify-center rounded-md border border-transparent shadow-sm px-4 py-2 bg-purple-600 text-base font-medium text-white hover:bg-purple-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-purple-500 sm:ml-3 sm:w-auto sm:text-sm"
+                  >
+                    Confirm Avail
+                  </button>
+                  <button
+                    type="button"
+                    onClick={handleCancelAvailMeal}
+                    className="mt-3 w-full inline-flex justify-center rounded-md border border-gray-300 shadow-sm px-4 py-2 bg-white text-base font-medium text-gray-700 hover:bg-gray-50 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-purple-500 sm:mt-0 sm:ml-3 sm:w-auto sm:text-sm"
+                  >
+                    Cancel
+                  </button>
+                </div>
+              </motion.div>
+            </div>
+          </div>
+        )}
+      </AnimatePresence>
     </div>
   );
 }

@@ -3,6 +3,7 @@ import { useNavigate, Link } from 'react-router-dom';
 import { useAuth } from '../../context/AuthContext';
 import axios from 'axios';
 import logo from '../../assets/varda.svg';
+import bgImage from '../../assets/vardabg.png';
 
 const API_BASE_URL = import.meta.env.VITE_API_BASE_URL;
 
@@ -118,7 +119,17 @@ export default function Register() {
 
       login(data);
       // Navigate based on role
-      if (data.role === 'cashier') {
+      const storeRoles = [
+        'cashier',
+        'cashierlima',
+        'varda',
+        'blueCafe',
+        'colonelsCurry',
+        'chillers',
+        'luckyShawarma',
+        'yumdimdum'
+      ];
+      if (storeRoles.includes(data.role)) {
         navigate('/cashier');
       } else if (data.role === 'concierge') {
         navigate('/concierge');
@@ -139,10 +150,10 @@ export default function Register() {
 
     return (
       <div className="fixed inset-0 backdrop-blur-md bg-black/20 flex items-center justify-center p-4 z-50">
-        <div className="max-w-md w-full bg-gradient-to-br from-[#1e293b] to-[#334155] rounded-3xl shadow-xl p-8 space-y-6 border border-gray-700/50">
+        <div className="max-w-md w-full bg-gradient-to-br from-orange-100 via-orange-200 to-orange-100 rounded-3xl shadow-xl p-8 space-y-6 border border-gray-100">
           <div className="flex flex-col items-center">
-            <img src={logo} alt="Varda Food Group Logo" className="w-32 h-32 rounded-full bg-gray-200 object-contain p-2"/>
-            <p className="text-gray-400 mt-2 text-lg">Choose to register</p>
+            <img src={logo} alt="Varda Food Group Logo" className="w-32 h-32 rounded-full object-contain" />
+            <p className="text-gray-800 mt-2 text-lg font-semibold">Choose to register</p>
           </div>
           <div className="space-y-4">
             <button
@@ -205,18 +216,21 @@ export default function Register() {
   };
 
   return (
-    <div className="min-h-screen flex items-center justify-center bg-gradient-to-br from-[#0f172a] to-[#1e293b] p-4">
+    <div
+      className="min-h-screen flex items-center justify-center bg-center bg-cover p-4"
+      style={{ backgroundImage: `url(${bgImage})` }}
+    >
       <UserTypeModal />
       {!showUserTypeModal && (
-        <div className="max-w-md w-full bg-gradient-to-br from-[#1e293b] to-[#334155] rounded-3xl shadow-xl p-8 space-y-6 border border-gray-700/50">
+        <div className="max-w-md w-full bg-gradient-to-br from-orange-100 via-orange-200 to-orange-100 rounded-3xl shadow-xl p-8 space-y-6 border border-gray-100">
           <div className="flex flex-col items-center">
-            <img src={logo} alt="Varda Food Group Logo" className="w-32 h-32 rounded-full bg-gray-200 object-contain p-2"/>
+            <img src={logo} alt="Varda Food Group Logo" className="w-32 h-32 rounded-full object-contain" />
           </div>
           <form onSubmit={handleSubmit} className="space-y-5">
             <div>
-              <label className="block mb-1 text-sm font-medium text-gray-200">First Name</label>
+              <label className="block mb-1 text-sm font-bold text-black">First Name</label>
               <input
-                className="w-full px-4 py-2 bg-gray-800/50 border border-gray-700 rounded-xl focus:ring-2 focus:ring-blue-500 focus:outline-none transition text-white placeholder-gray-400"
+                className="w-full px-4 py-2 bg-white border-gray-200 border rounded-xl focus:ring-2 focus:ring-rose-400 focus:outline-none transition text-black placeholder-gray-400"
                 placeholder="Enter your first name"
                 value={firstName}
                 onChange={(e) => {
@@ -227,9 +241,9 @@ export default function Register() {
               />
             </div>
             <div>
-              <label className="block mb-1 text-sm font-medium text-gray-200">Last Name</label>
+              <label className="block mb-1 text-sm font-bold text-black">Last Name</label>
               <input
-                className="w-full px-4 py-2 bg-gray-800/50 border border-gray-700 rounded-xl focus:ring-2 focus:ring-blue-500 focus:outline-none transition text-white placeholder-gray-400"
+                className="w-full px-4 py-2 bg-white border-gray-200 border rounded-xl focus:ring-2 focus:ring-rose-400 focus:outline-none transition text-black placeholder-gray-400"
                 placeholder="Enter your last name"
                 value={lastName}
                 onChange={(e) => {
@@ -240,10 +254,10 @@ export default function Register() {
               />
             </div>
             <div>
-              <label className="block mb-1 text-sm font-medium text-gray-200">Email</label>
+              <label className="block mb-1 text-sm font-bold text-black">Email</label>
               <input
                 type="email"
-                className="w-full px-4 py-2 bg-gray-800/50 border border-gray-700 rounded-xl focus:ring-2 focus:ring-blue-500 focus:outline-none transition text-white placeholder-gray-400"
+                className="w-full px-4 py-2 bg-white border-gray-200 border rounded-xl focus:ring-2 focus:ring-rose-400 focus:outline-none transition text-black placeholder-gray-400"
                 placeholder="Enter your email"
                 value={email}
                 onChange={(e) => {
@@ -254,9 +268,9 @@ export default function Register() {
               />
             </div>
              <div>
-               <label className="block mb-1 text-sm font-medium text-gray-200">University</label>
+               <label className="block mb-1 text-sm font-bold text-black">University</label>
                <select
-                 className="w-full px-4 py-2 bg-gray-800/50 border border-gray-700 rounded-xl focus:ring-2 focus:ring-blue-500 focus:outline-none transition text-white"
+                 className="w-full px-4 py-2 bg-white border-gray-200 border rounded-xl focus:ring-2 focus:ring-rose-400 focus:outline-none transition text-black"
                  value={university}
                  onChange={(e) => {
                    setUniversity(e.target.value);
@@ -274,14 +288,14 @@ export default function Register() {
                </select>
              </div>
             <div>
-              <label className="block mb-1 text-sm font-medium text-gray-200">
+              <label className="block mb-1 text-sm font-bold text-black">
                 {userType === 'guest' ? 'Phone Number' : 'ID Number'}
               </label>
               <input
                 type="text"
                 inputMode="numeric"
                 pattern="[0-9]*"
-                className="w-full px-4 py-2 bg-gray-800/50 border border-gray-700 rounded-xl focus:ring-2 focus:ring-blue-500 focus:outline-none transition text-white placeholder-gray-400"
+                className="w-full px-4 py-2 bg-white border-gray-200 border rounded-xl focus:ring-2 focus:ring-rose-400 focus:outline-none transition text-black placeholder-gray-400"
                 placeholder={`Enter your ${userType === 'guest' ? 'Phone Number' : 'ID Number'}`}
                 value={idNumber}
                 onChange={handleIdNumberChange}
@@ -290,11 +304,11 @@ export default function Register() {
               />
             </div>
             <div>
-              <label className="block mb-1 text-sm font-medium text-gray-200">Password</label>
+              <label className="block mb-1 text-sm font-bold text-black">Password</label>
               <div className="relative">
                 <input
                   type={showPassword ? "text" : "password"}
-                  className="w-full px-4 py-2 bg-gray-800/50 border border-gray-700 rounded-xl focus:ring-2 focus:ring-blue-500 focus:outline-none transition text-white placeholder-gray-400"
+                  className="w-full px-4 py-2 bg-white border-gray-200 border rounded-xl focus:ring-2 focus:ring-rose-400 focus:outline-none transition text-black placeholder-gray-400"
                   placeholder="Enter password"
                   value={password}
                   onChange={(e) => {
@@ -323,11 +337,11 @@ export default function Register() {
               </div>
             </div>
             <div>
-              <label className="block mb-1 text-sm font-medium text-gray-200">Confirm Password</label>
+              <label className="block mb-1 text-sm font-bold text-black">Confirm Password</label>
               <div className="relative">
                 <input
                   type={showConfirmPassword ? "text" : "password"}
-                  className="w-full px-4 py-2 bg-gray-800/50 border border-gray-700 rounded-xl focus:ring-2 focus:ring-blue-500 focus:outline-none transition text-white placeholder-gray-400"
+                  className="w-full px-4 py-2 bg-white border-gray-200 border rounded-xl focus:ring-2 focus:ring-rose-400 focus:outline-none transition text-black placeholder-gray-400"
                   placeholder="Confirm password"
                   value={confirmPassword}
                   onChange={(e) => {
@@ -361,9 +375,9 @@ export default function Register() {
                 id="terms"
                 checked={termsAccepted}
                 onChange={(e) => setTermsAccepted(e.target.checked)}
-                className="w-4 h-4 text-blue-500 border-gray-600 rounded focus:ring-blue-500 bg-gray-700"
+                className="w-4 h-4 text-blue-600 border-gray-300 rounded focus:ring-blue-500 bg-white"
               />
-              <label htmlFor="terms" className="text-sm text-gray-300">
+              <label htmlFor="terms" className="text-sm text-gray-700">
                 I accept the{' '}
                 <button
                   type="button"
@@ -485,7 +499,7 @@ export default function Register() {
           At Varda Group, we are committed to protecting your privacy. This Privacy Policy outlines our practices regarding the collection, use, and disclosure of information that we may collect from you or receive from your use of our services.
         </p>
 
-        <p><em><strong>Disclaimer:</strong> Varda Group is a concessionaire operating the canteen on the 2nd floor of the Gonzaga Building at Ateneo de Manila University. The "Varda Food Group Website Privacy Act" is an internal policy, initiated and implemented solely by Varda Group, and is not an Ateneo de Manila University policy or initiative.</em></p>
+        <p><em><strong>Disclaimer:</strong> Varda Group is a concessionaire operating the canteen on the 2nd floor of the Gonzaga Building at Ateneo de Manila University. The "Varda Group Website Privacy Act" is an internal policy, initiated and implemented solely by Varda Group, and is not an Ateneo de Manila University policy or initiative.</em></p>
 
         <h2>1. Information We Collect</h2>
         <p>We may collect the following types of information:</p>

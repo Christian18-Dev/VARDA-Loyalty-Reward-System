@@ -36,11 +36,11 @@ export const sendPasswordResetEmail = async (email, resetToken, resetUrl) => {
     const mailOptions = {
       from: process.env.EMAIL_USER,
       to: email,
-      subject: 'Varda Food Group - Password Reset Request',
+      subject: 'Varda Group - Password Reset Request',
       html: `
         <div style="font-family: Arial, sans-serif; max-width: 600px; margin: 0 auto; padding: 20px;">
           <div style="background: linear-gradient(135deg, #0f172a 0%, #1e293b 100%); color: white; padding: 30px; border-radius: 10px; text-align: center;">
-            <h1 style="margin: 0 0 20px 0; color: #3b82f6;">Varda Food Group</h1>
+            <h1 style="margin: 0 0 20px 0; color: #3b82f6;">Varda Group</h1>
             <h2 style="margin: 0 0 20px 0; color: #e2e8f0;">Password Reset Request</h2>
           </div>
           
@@ -71,7 +71,7 @@ export const sendPasswordResetEmail = async (email, resetToken, resetUrl) => {
           </div>
           
           <div style="text-align: center; margin-top: 20px; color: #64748b; font-size: 12px;">
-            <p>This is an automated message from Varda Food Group. Please do not reply to this email.</p>
+            <p>This is an automated message from Varda Group. Please do not reply to this email.</p>
           </div>
         </div>
       `
@@ -112,11 +112,11 @@ export const sendPasswordResetConfirmation = async (email, firstName) => {
     const mailOptions = {
       from: process.env.EMAIL_USER,
       to: email,
-      subject: 'Varda Food Group - Password Successfully Reset',
+      subject: 'Varda Group - Password Successfully Reset',
       html: `
         <div style="font-family: Arial, sans-serif; max-width: 600px; margin: 0 auto; padding: 20px;">
           <div style="background: linear-gradient(135deg, #059669 0%, #10b981 100%); color: white; padding: 30px; border-radius: 10px; text-align: center;">
-            <h1 style="margin: 0 0 20px 0; color: white;">Varda Food Group</h1>
+            <h1 style="margin: 0 0 20px 0; color: white;">Varda Group</h1>
             <h2 style="margin: 0 0 20px 0; color: #d1fae5;">Password Reset Successful</h2>
           </div>
           
@@ -126,7 +126,7 @@ export const sendPasswordResetConfirmation = async (email, firstName) => {
             </p>
             
             <p style="color: #334155; font-size: 16px; line-height: 1.6; margin-bottom: 20px;">
-              Your password has been successfully reset. You can now log in to your Varda Food Group account with your new password.
+              Your password has been successfully reset. You can now log in to your Varda Group account with your new password.
             </p>
             
             <div style="background: #ecfdf5; border-left: 4px solid #10b981; padding: 15px; margin: 20px 0; border-radius: 4px;">
@@ -137,7 +137,7 @@ export const sendPasswordResetConfirmation = async (email, firstName) => {
           </div>
           
           <div style="text-align: center; margin-top: 20px; color: #64748b; font-size: 12px;">
-            <p>This is an automated message from Varda Food Group. Please do not reply to this email.</p>
+            <p>This is an automated message from Varda Group. Please do not reply to this email.</p>
           </div>
         </div>
       `

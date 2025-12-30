@@ -57,6 +57,7 @@ export const adminOnly = (req, res, next) => {
 export const cashierOnly = (req, res, next) => {
   const allowedRoles = [
     'cashier',
+    'cashierlima',
     'varda',
     'blueCafe',
     'colonelsCurry',

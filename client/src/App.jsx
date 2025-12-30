@@ -22,6 +22,7 @@ function ProtectedRoute({ children, role }) {
   // For cashier page, allow access to all store roles
   if (role === 'cashier' && [
     'cashier',
+    'cashierlima',
     'varda',
     'blueCafe',
     'colonelsCurry',

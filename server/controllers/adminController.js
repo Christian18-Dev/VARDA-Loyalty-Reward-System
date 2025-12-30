@@ -140,7 +140,8 @@ export const updateUserRole = async (req, res) => {
       'student', 
       'teacher', 
       'ateneoStaff', 
-      'cashier', 
+      'cashier',
+      'cashierlima', 
       'concierge',
       'guest'
     ];
