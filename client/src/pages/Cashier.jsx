@@ -14,6 +14,9 @@ import {
   ClockIcon
 } from '@heroicons/react/outline';
 import { motion, AnimatePresence } from 'framer-motion';
+import ExcelJS from 'exceljs';
+import { Document, Page, Text, View, StyleSheet } from '@react-pdf/renderer';
+import { pdf } from '@react-pdf/renderer';
 
 export default function CashierPage() {
   const { user, logout } = useAuth();
@@ -52,6 +55,8 @@ export default function CashierPage() {
     accountID: '',
     search: ''
   });
+  const [isExportingExcel, setIsExportingExcel] = useState(false);
+  const [isExportingPDF, setIsExportingPDF] = useState(false);
 
   const baseUrl = import.meta.env.VITE_API_BASE_URL;
   const token = user.token;
@@ -440,6 +445,315 @@ export default function CashierPage() {
   const handleCancelAvailMeal = () => {
     setShowAvailConfirmModal(false);
     setPendingAvail(null);
+  };
+
+  // PDF Styles for Avail History Export
+  const availHistoryPDFStyles = StyleSheet.create({
+    page: { padding: 10 },
+    header: { 
+      marginTop: 5,
+      fontSize: 20, 
+      marginBottom: 5, 
+      textAlign: 'center',
+      display: 'flex',
+      flexDirection: 'column',
+      alignItems: 'center',
+      gap: 2
+    },
+    table: { display: 'table', width: 'auto', borderStyle: 'solid', borderWidth: 1, borderColor: '#bfbfbf', marginTop: 5 },
+    tableRow: { flexDirection: 'row' },
+    tableCol: { borderStyle: 'solid', borderWidth: 1, borderColor: '#bfbfbf' },
+    tableCell: { padding: 5, fontSize: 10, fontFamily: 'Helvetica' },
+    headerCell: { padding: 5, fontSize: 12, fontWeight: 'bold', backgroundColor: '#f0f0f0', fontFamily: 'Helvetica-Bold' },
+    title: {
+      fontSize: 18,
+      fontFamily: 'Helvetica-Bold',
+      color: '#1a1a1a',
+      marginTop: 2
+    },
+    subtitle: {
+      fontSize: 12,
+      fontFamily: 'Helvetica',
+      color: '#666666',
+      marginTop: 1
+    }
+  });
+
+  // PDF Document Component for Avail History
+  const AvailHistoryPDFDocument = ({ data, filters }) => {
+    if (!data || data.length === 0) {
+      return (
+        <Document>
+          <Page size="A4" style={availHistoryPDFStyles.page}>
+            <Text style={availHistoryPDFStyles.header}>No data available</Text>
+          </Page>
+        </Document>
+      );
+    }
+
+    const formatDate = (dateString) => {
+      if (!dateString) return 'N/A';
+      const date = new Date(dateString);
+      return date.toLocaleDateString('en-US', { 
+        year: 'numeric', 
+        month: 'long', 
+        day: 'numeric',
+        timeZone: 'Asia/Manila'
+      });
+    };
+
+    const formatDateTime = (dateString) => {
+      if (!dateString) return 'N/A';
+      const date = new Date(dateString);
+      return date.toLocaleString('en-US', { 
+        year: 'numeric', 
+        month: 'long', 
+        day: 'numeric',
+        hour: '2-digit',
+        minute: '2-digit',
+        timeZone: 'Asia/Manila'
+      });
+    };
+
+    const getFilterText = () => {
+      const parts = [];
+      if (filters.startDate && filters.endDate) {
+        parts.push(`From ${formatDate(filters.startDate)} to ${formatDate(filters.endDate)}`);
+      } else if (filters.startDate) {
+        parts.push(`From ${formatDate(filters.startDate)}`);
+      } else if (filters.endDate) {
+        parts.push(`Until ${formatDate(filters.endDate)}`);
+      }
+      if (filters.mealType) {
+        parts.push(`Meal Type: ${filters.mealType.charAt(0).toUpperCase() + filters.mealType.slice(1)}`);
+      }
+      if (filters.accountID) {
+        parts.push(`AccountID: ${filters.accountID}`);
+      }
+      return parts.length > 0 ? parts.join(' | ') : 'All Records';
+    };
+
+    return (
+      <Document>
+        <Page size="A4" style={availHistoryPDFStyles.page}>
+          <View style={availHistoryPDFStyles.header}>
+            <Text style={availHistoryPDFStyles.title}>Avail History Report</Text>
+            <Text style={availHistoryPDFStyles.subtitle}>{getFilterText()}</Text>
+            <Text style={availHistoryPDFStyles.subtitle}>
+              Generated on {new Date().toLocaleDateString('en-US', { timeZone: 'Asia/Manila' })}
+            </Text>
+          </View>
+          <View style={availHistoryPDFStyles.table}>
+            <View style={availHistoryPDFStyles.tableRow}>
+              <View style={[availHistoryPDFStyles.tableCol, { width: '15%' }]}>
+                <Text style={availHistoryPDFStyles.headerCell}>AccountID</Text>
+              </View>
+              <View style={[availHistoryPDFStyles.tableCol, { width: '15%' }]}>
+                <Text style={availHistoryPDFStyles.headerCell}>Meal Type</Text>
+              </View>
+              <View style={[availHistoryPDFStyles.tableCol, { width: '30%' }]}>
+                <Text style={availHistoryPDFStyles.headerCell}>Availed By</Text>
+              </View>
+              <View style={[availHistoryPDFStyles.tableCol, { width: '20%' }]}>
+                <Text style={availHistoryPDFStyles.headerCell}>Availed At</Text>
+              </View>
+              <View style={[availHistoryPDFStyles.tableCol, { width: '20%' }]}>
+                <Text style={availHistoryPDFStyles.headerCell}>Registration Date</Text>
+              </View>
+            </View>
+            {data.map((item, index) => (
+              <View key={index} style={availHistoryPDFStyles.tableRow}>
+                <View style={[availHistoryPDFStyles.tableCol, { width: '15%' }]}>
+                  <Text style={availHistoryPDFStyles.tableCell}>{item.accountID || '-'}</Text>
+                </View>
+                <View style={[availHistoryPDFStyles.tableCol, { width: '15%' }]}>
+                  <Text style={availHistoryPDFStyles.tableCell}>
+                    {item.mealType ? item.mealType.charAt(0).toUpperCase() + item.mealType.slice(1) : '-'}
+                  </Text>
+                </View>
+                <View style={[availHistoryPDFStyles.tableCol, { width: '30%' }]}>
+                  <Text style={availHistoryPDFStyles.tableCell}>{item.availedBy?.name || 'Unknown'}</Text>
+                </View>
+                <View style={[availHistoryPDFStyles.tableCol, { width: '20%' }]}>
+                  <Text style={availHistoryPDFStyles.tableCell}>{formatDateTime(item.availedAt)}</Text>
+                </View>
+                <View style={[availHistoryPDFStyles.tableCol, { width: '20%' }]}>
+                  <Text style={availHistoryPDFStyles.tableCell}>{formatDate(item.registrationDate)}</Text>
+                </View>
+              </View>
+            ))}
+          </View>
+        </Page>
+      </Document>
+    );
+  };
+
+  // Export to Excel
+  const handleExportToExcel = async () => {
+    if (!availHistory || availHistory.length === 0) {
+      setError('No data to export');
+      setTimeout(() => setError(''), 3000);
+      return;
+    }
+
+    setIsExportingExcel(true);
+    try {
+      const workbook = new ExcelJS.Workbook();
+      const worksheet = workbook.addWorksheet('Avail History');
+
+      // Define columns
+      worksheet.columns = [
+        { header: 'AccountID', key: 'accountID', width: 15 },
+        { header: 'Meal Type', key: 'mealType', width: 15 },
+        { header: 'Availed By', key: 'availedBy', width: 30 },
+        { header: 'Availed At', key: 'availedAt', width: 25 },
+        { header: 'Registration Date', key: 'registrationDate', width: 20 }
+      ];
+
+      // Style the header row
+      const headerRow = worksheet.getRow(1);
+      headerRow.height = 25;
+      headerRow.eachCell((cell) => {
+        cell.font = { 
+          bold: true,
+          size: 12,
+          color: { argb: '1a1a1a' },
+          name: 'Helvetica-Bold'
+        };
+        cell.fill = {
+          type: 'pattern',
+          pattern: 'solid',
+          fgColor: { argb: 'f0f0f0' }
+        };
+        cell.alignment = {
+          vertical: 'middle',
+          horizontal: 'center'
+        };
+        cell.border = {
+          top: { style: 'thin', color: { argb: 'bfbfbf' } },
+          left: { style: 'thin', color: { argb: 'bfbfbf' } },
+          bottom: { style: 'thin', color: { argb: 'bfbfbf' } },
+          right: { style: 'thin', color: { argb: 'bfbfbf' } }
+        };
+      });
+
+      // Add data rows
+      availHistory.forEach(item => {
+        worksheet.addRow({
+          accountID: item.accountID || '-',
+          mealType: item.mealType ? item.mealType.charAt(0).toUpperCase() + item.mealType.slice(1) : '-',
+          availedBy: item.availedBy?.name || 'Unknown',
+          availedAt: item.availedAt ? new Date(item.availedAt).toLocaleString('en-US', { timeZone: 'Asia/Manila' }) : '-',
+          registrationDate: item.registrationDate ? new Date(item.registrationDate).toLocaleDateString('en-US', { timeZone: 'Asia/Manila' }) : '-'
+        });
+      });
+
+      // Style data rows
+      worksheet.eachRow((row, rowNumber) => {
+        if (rowNumber > 1) {
+          row.eachCell((cell) => {
+            cell.border = {
+              top: { style: 'thin', color: { argb: 'bfbfbf' } },
+              left: { style: 'thin', color: { argb: 'bfbfbf' } },
+              bottom: { style: 'thin', color: { argb: 'bfbfbf' } },
+              right: { style: 'thin', color: { argb: 'bfbfbf' } }
+            };
+            cell.alignment = {
+              vertical: 'middle',
+              horizontal: 'left'
+            };
+          });
+        }
+      });
+
+      // Generate filename with filter info
+      const filterParts = [];
+      if (availHistoryFilters.startDate && availHistoryFilters.endDate) {
+        filterParts.push(`${availHistoryFilters.startDate}_to_${availHistoryFilters.endDate}`);
+      } else if (availHistoryFilters.startDate) {
+        filterParts.push(`from_${availHistoryFilters.startDate}`);
+      } else if (availHistoryFilters.endDate) {
+        filterParts.push(`until_${availHistoryFilters.endDate}`);
+      }
+      const filename = `avail_history${filterParts.length > 0 ? '_' + filterParts.join('_') : ''}_${new Date().toISOString().split('T')[0]}.xlsx`;
+
+      // Generate buffer and download
+      const buffer = await workbook.xlsx.writeBuffer();
+      const blob = new Blob([buffer], { type: 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet' });
+      const url = window.URL.createObjectURL(blob);
+      const a = document.createElement('a');
+      a.href = url;
+      a.download = filename;
+      document.body.appendChild(a);
+      a.click();
+      window.URL.revokeObjectURL(url);
+      document.body.removeChild(a);
+
+      setSuccess(`Successfully exported ${availHistory.length} records to Excel`);
+      setTimeout(() => setSuccess(''), 3000);
+    } catch (error) {
+      console.error('Error exporting to Excel:', error);
+      setError('Error exporting to Excel');
+      setTimeout(() => setError(''), 3000);
+    } finally {
+      setIsExportingExcel(false);
+    }
+  };
+
+  // Export to PDF
+  const handleExportToPDF = async () => {
+    if (!availHistory || availHistory.length === 0) {
+      setError('No data to export');
+      setTimeout(() => setError(''), 3000);
+      return;
+    }
+
+    setIsExportingPDF(true);
+    try {
+      // Limit data size for PDF generation
+      const MAX_PDF_ITEMS = 1000;
+      const dataToExport = availHistory.slice(0, MAX_PDF_ITEMS);
+      
+      if (availHistory.length > MAX_PDF_ITEMS) {
+        setError(`Too many items (${availHistory.length}) for PDF export. Exporting first ${MAX_PDF_ITEMS} items. Please use Excel format for complete data.`);
+        setTimeout(() => setError(''), 5000);
+      }
+
+      const pdfDocument = (
+        <AvailHistoryPDFDocument data={dataToExport} filters={availHistoryFilters} />
+      );
+
+      const blob = await pdf(pdfDocument).toBlob();
+      
+      // Generate filename with filter info
+      const filterParts = [];
+      if (availHistoryFilters.startDate && availHistoryFilters.endDate) {
+        filterParts.push(`${availHistoryFilters.startDate}_to_${availHistoryFilters.endDate}`);
+      } else if (availHistoryFilters.startDate) {
+        filterParts.push(`from_${availHistoryFilters.startDate}`);
+      } else if (availHistoryFilters.endDate) {
+        filterParts.push(`until_${availHistoryFilters.endDate}`);
+      }
+      const filename = `avail_history${filterParts.length > 0 ? '_' + filterParts.join('_') : ''}_${new Date().toISOString().split('T')[0]}.pdf`;
+
+      const url = window.URL.createObjectURL(blob);
+      const a = document.createElement('a');
+      a.href = url;
+      a.download = filename;
+      document.body.appendChild(a);
+      a.click();
+      window.URL.revokeObjectURL(url);
+      document.body.removeChild(a);
+
+      setSuccess(`Successfully exported ${dataToExport.length} records to PDF`);
+      setTimeout(() => setSuccess(''), 3000);
+    } catch (error) {
+      console.error('Error exporting to PDF:', error);
+      setError('Error exporting to PDF');
+      setTimeout(() => setError(''), 3000);
+    } finally {
+      setIsExportingPDF(false);
+    }
   };
 
   const handleLogoutClick = () => {
@@ -1260,6 +1574,60 @@ export default function CashierPage() {
                   </p>
                 </div>
               </div>
+              <div className="flex space-x-2">
+                <button
+                  onClick={handleExportToExcel}
+                  disabled={isExportingExcel || isLoadingAvailHistory || availHistory.length === 0}
+                  className={`flex items-center space-x-2 px-4 py-2 rounded-lg transition-all ${
+                    isExportingExcel || isLoadingAvailHistory || availHistory.length === 0
+                      ? 'bg-gray-300 text-gray-500 cursor-not-allowed'
+                      : 'bg-green-600 text-white hover:bg-green-700 shadow-md hover:shadow-lg'
+                  }`}
+                >
+                  {isExportingExcel ? (
+                    <>
+                      <svg className="animate-spin h-5 w-5" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24">
+                        <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4"></circle>
+                        <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path>
+                      </svg>
+                      <span>Exporting...</span>
+                    </>
+                  ) : (
+                    <>
+                      <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M12 10v6m0 0l-3-3m3 3l3-3m2 8H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z" />
+                      </svg>
+                      <span>Export Excel</span>
+                    </>
+                  )}
+                </button>
+                <button
+                  onClick={handleExportToPDF}
+                  disabled={isExportingPDF || isLoadingAvailHistory || availHistory.length === 0}
+                  className={`flex items-center space-x-2 px-4 py-2 rounded-lg transition-all ${
+                    isExportingPDF || isLoadingAvailHistory || availHistory.length === 0
+                      ? 'bg-gray-300 text-gray-500 cursor-not-allowed'
+                      : 'bg-red-600 text-white hover:bg-red-700 shadow-md hover:shadow-lg'
+                  }`}
+                >
+                  {isExportingPDF ? (
+                    <>
+                      <svg className="animate-spin h-5 w-5" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24">
+                        <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4"></circle>
+                        <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path>
+                      </svg>
+                      <span>Exporting...</span>
+                    </>
+                  ) : (
+                    <>
+                      <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M7 21h10a2 2 0 002-2V9.414a1 1 0 00-.293-.707l-5.414-5.414A1 1 0 0012.586 3H7a2 2 0 00-2 2v14a2 2 0 002 2z" />
+                      </svg>
+                      <span>Export PDF</span>
+                    </>
+                  )}
+                </button>
+              </div>
             </div>
 
             {/* Filters */}
@@ -1350,6 +1718,15 @@ export default function CashierPage() {
                 >
                   Clear Filters
                 </button>
+              </div>
+            )}
+
+            {/* Success/Error Messages */}
+            {(error || success) && (
+              <div className={`mb-4 p-4 rounded-xl border ${
+                error ? 'bg-red-50 text-red-700 border-red-200' : 'bg-green-50 text-green-700 border-green-200'
+              }`}>
+                {error || success}
               </div>
             )}
 
