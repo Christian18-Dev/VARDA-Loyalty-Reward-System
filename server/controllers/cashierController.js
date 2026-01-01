@@ -174,8 +174,8 @@ export const availMeal = async (req, res) => {
       lastName: registration.lastName,
       mealType: mealType,
       availedBy: {
-        idNumber: req.user.idNumber,
-        name: `${req.user.firstName} ${req.user.lastName}`
+        idNumber: registration.idNumber,
+        name: `${registration.firstName} ${registration.lastName}`
       },
       registrationDate: registration.registrationDate
     });
