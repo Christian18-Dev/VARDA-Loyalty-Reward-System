@@ -281,7 +281,7 @@ export default function Register() {
                  <option value="" disabled>Select your University</option>
                  <option value="ateneo">Ateneo de Manila University</option>
                  <option value="lpudavao">Lyceum of the Philippines - Davao</option>
-                 <option value="lima">Lyceum International Maritime Academy</option>
+                 <option value="lima">LPU Batangas - Lyceum International Maritime Academy</option>
                  <option value="mapuadavao">Mapúa Malayan Colleges Mindanao</option>
                  <option value="mapuamakati">Mapúa University Makati</option>
                  <option value="dlsulipa">De La Salle Lipa</option>
