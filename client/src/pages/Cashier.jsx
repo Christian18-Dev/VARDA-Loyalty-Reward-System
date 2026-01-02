@@ -175,7 +175,7 @@ export default function CashierPage() {
       `    Code: ${generatedCode}\n` +
       `    ${new Date().toLocaleString()}\n\n` +
       '    HOW TO REDEEM:\n' +
-      '    1. Visit: www.2gonz.com\n' +
+      '    1. Visit: www.vgconcierge.com\n' +
       '    2. Log in or register\n' +
       '       if you havent\n' +
       '    3. Go to Redeem Page\n' +
@@ -829,7 +829,7 @@ export default function CashierPage() {
         `    Code: ${generatedCode}\n` +
         `    ${new Date().toLocaleString()}\n\n` +
         '    HOW TO REDEEM:\n' +
-        '    1. Visit: www.2gonz.com\n' +
+        '    1. Visit: www.vgconcierge.com\n' +
         '    2. Log in or register\n' +
         '       if you havent\n' +
         '    3. Go to Redeem Page\n' +

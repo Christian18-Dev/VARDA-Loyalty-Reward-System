@@ -208,7 +208,7 @@ export const forgotPassword = async (req, res) => {
     await user.save();
 
     // Create reset URL
-    const resetUrl = `${process.env.CLIENT_URL || 'www.2gonz.com'}/#/reset-password/${resetToken}`;
+    const resetUrl = `${process.env.CLIENT_URL || 'www.vgconcierge.com'}/#/reset-password/${resetToken}`;
 
     // Send email
     const emailSent = await sendPasswordResetEmail(user.email, resetToken, resetUrl);
