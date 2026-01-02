@@ -400,7 +400,7 @@ Add a <Suspense fallback=...> component higher in the tree to provide a loading 
     ${new Date().toLocaleString()}
 
     HOW TO REDEEM:
-    1. Visit: www.2gonz.com
+    1. Visit: www.vgconcierge.com
     2. Log in or register
        if you havent
     3. Go to Redeem Page
@@ -424,7 +424,7 @@ Add a <Suspense fallback=...> component higher in the tree to provide a loading 
     ${new Date().toLocaleString()}
 
     HOW TO REDEEM:
-    1. Visit: www.2gonz.com
+    1. Visit: www.vgconcierge.com
     2. Log in or register
        if you havent
     3. Go to Redeem Page
