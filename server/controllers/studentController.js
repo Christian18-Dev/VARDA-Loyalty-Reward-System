@@ -331,22 +331,14 @@ export const registerMeals = async (req, res) => {
       });
     }
 
-    // Use timezone-independent approach for Philippine time (UTC+8)
+    // Use proper timezone handling with Asia/Manila timezone
     const now = new Date();
     
-    // Get UTC time and add 8 hours for Philippine time
-    const utcTime = now.getTime() + (now.getTimezoneOffset() * 60000);
-    const philNow = new Date(utcTime + (8 * 3600000));
+    // Convert to Asia/Manila timezone (UTC+8)
+    const philTime = new Date(now.toLocaleString("en-US", {timeZone: "Asia/Manila"}));
     
-    // Debug logging to verify timezone handling
-    console.log(`🕐 Timezone Debug:`);
-    console.log(`  Server time: ${now.toISOString()}`);
-    console.log(`  Server local: ${now.toString()}`);
-    console.log(`  Timezone offset: ${now.getTimezoneOffset()} minutes`);
-    console.log(`  UTC time: ${new Date(utcTime).toISOString()}`);
-    console.log(`  PH time: ${philNow.toISOString()}`);
-    console.log(`  PH local: ${philNow.toString()}`);
-    console.log(`  PH hours: ${philNow.getHours()}`);
+    // Create a copy for date calculations in PH time
+    const philNow = new Date(philTime);
     
     // Compute the start of the current 5 AM–5 AM window in PH time
     const windowStart = new Date(philNow);
@@ -360,9 +352,6 @@ export const registerMeals = async (req, res) => {
     // End of window is 24 hours after start (next day's 5 AM)
     const windowEnd = new Date(windowStart);
     windowEnd.setDate(windowEnd.getDate() + 1);
-    
-    console.log(`  Window start: ${windowStart.toISOString()}`);
-    console.log(`  Window end: ${windowEnd.toISOString()}`);
 
     // Check if there's an active registration in the current 5 AM–5 AM PH window
     const existingRegistration = await MealRegistration.findOne({
@@ -390,7 +379,7 @@ export const registerMeals = async (req, res) => {
       });
     }
 
-    // Create new registration with PH time
+    // Create new registration
     const registration = await MealRegistration.create({
       idNumber: user.idNumber,
       firstName: user.firstName,
@@ -400,8 +389,7 @@ export const registerMeals = async (req, res) => {
         breakfast: meals.breakfast || false,
         lunch: meals.lunch || false,
         dinner: meals.dinner || false
-      },
-      registrationDate: philNow // Use PH time instead of default Date.now()
+      }
     });
 
     res.json({
@@ -426,22 +414,14 @@ export const getMealRegistration = async (req, res) => {
       });
     }
 
-    // Use timezone-independent approach for Philippine time (UTC+8)
+    // Use proper timezone handling with Asia/Manila timezone
     const now = new Date();
     
-    // Get UTC time and add 8 hours for Philippine time
-    const utcTime = now.getTime() + (now.getTimezoneOffset() * 60000);
-    const philNow = new Date(utcTime + (8 * 3600000));
+    // Convert to Asia/Manila timezone (UTC+8)
+    const philTime = new Date(now.toLocaleString("en-US", {timeZone: "Asia/Manila"}));
     
-    // Debug logging to verify timezone handling
-    console.log(`🕐 Timezone Debug:`);
-    console.log(`  Server time: ${now.toISOString()}`);
-    console.log(`  Server local: ${now.toString()}`);
-    console.log(`  Timezone offset: ${now.getTimezoneOffset()} minutes`);
-    console.log(`  UTC time: ${new Date(utcTime).toISOString()}`);
-    console.log(`  PH time: ${philNow.toISOString()}`);
-    console.log(`  PH local: ${philNow.toString()}`);
-    console.log(`  PH hours: ${philNow.getHours()}`);
+    // Create a copy for date calculations in PH time
+    const philNow = new Date(philTime);
     
     // Compute the start of the current 5 AM–5 AM window in PH time
     const windowStart = new Date(philNow);
@@ -455,9 +435,6 @@ export const getMealRegistration = async (req, res) => {
     // End of window is 24 hours after start (next day's 5 AM)
     const windowEnd = new Date(windowStart);
     windowEnd.setDate(windowEnd.getDate() + 1);
-    
-    console.log(`  Window start: ${windowStart.toISOString()}`);
-    console.log(`  Window end: ${windowEnd.toISOString()}`);
 
     // Find active registration in the current 5 AM–5 AM PH window
     const registration = await MealRegistration.findOne({

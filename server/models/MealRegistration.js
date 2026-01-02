@@ -15,7 +15,14 @@ const mealRegistrationSchema = new mongoose.Schema({
     lunch: { type: Boolean, default: false },
     dinner: { type: Boolean, default: false }
   },
-  registrationDate: { type: Date, default: Date.now },
+  registrationDate: { 
+    type: Date, 
+    default: () => {
+      // Store registration date in Asia/Manila timezone
+      const now = new Date();
+      return new Date(now.toLocaleString("en-US", {timeZone: "Asia/Manila"}));
+    }
+  },
   status: { 
     type: String, 
     enum: ['active', 'cancelled'], 

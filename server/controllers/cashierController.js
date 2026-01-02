@@ -165,12 +165,7 @@ export const availMeal = async (req, res) => {
     registration.mealsAvailed[mealType] = true;
     await registration.save();
 
-    // Get current PH time for history record
-    const now = new Date();
-    const utcTime = now.getTime() + (now.getTimezoneOffset() * 60000);
-    const philNow = new Date(utcTime + (8 * 3600000));
-
-    // Create history entry with PH time
+    // Create history entry
     await AvailHistory.create({
       registrationId: registration._id,
       idNumber: registration.idNumber,
@@ -182,8 +177,7 @@ export const availMeal = async (req, res) => {
         idNumber: registration.idNumber,
         name: `${registration.firstName} ${registration.lastName}`
       },
-      registrationDate: registration.registrationDate,
-      availedAt: philNow // Use PH time
+      registrationDate: registration.registrationDate
     });
 
     res.json({
