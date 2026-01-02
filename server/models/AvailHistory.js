@@ -22,9 +22,10 @@ const availHistorySchema = new mongoose.Schema({
   availedAt: { 
     type: Date, 
     default: () => {
-      // Store availed date in Asia/Manila timezone
+      // Store availed date in Asia/Manila timezone (UTC+8)
       const now = new Date();
-      return new Date(now.toLocaleString("en-US", {timeZone: "Asia/Manila"}));
+      const utcTime = now.getTime() + (now.getTimezoneOffset() * 60000);
+      return new Date(utcTime + (8 * 3600000));
     }
   },
   registrationDate: { type: Date, required: true }
