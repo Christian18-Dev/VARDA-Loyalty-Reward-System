@@ -167,11 +167,6 @@ export default function StudentPage() {
     lunch: false,
     dinner: false
   });
-  const [serverMealRegistration, setServerMealRegistration] = useState({
-    breakfast: false,
-    lunch: false,
-    dinner: false
-  }); // Track server state as state (not ref) to trigger re-renders
   const [isLoadingMealRegistration, setIsLoadingMealRegistration] = useState(false);
   const [mealRegistrationMessage, setMealRegistrationMessage] = useState({ type: '', text: '' });
   const [showAvailNotification, setShowAvailNotification] = useState(false);
@@ -253,17 +248,11 @@ export default function StudentPage() {
       const response = await axios.get(`${baseUrl}/api/student/meal-registration`, {
         headers: { Authorization: `Bearer ${token}` }
       });
-      
-      // Log for debugging in production
-      if (import.meta.env.MODE === 'production') {
-        console.log('Meal registration fetch response:', response.data);
-      }
-      
       if (response.data.success && response.data.registration) {
         const newMealRegistration = {
-          breakfast: response.data.registration.meals?.breakfast || false,
-          lunch: response.data.registration.meals?.lunch || false,
-          dinner: response.data.registration.meals?.dinner || false
+          breakfast: response.data.registration.meals.breakfast || false,
+          lunch: response.data.registration.meals.lunch || false,
+          dinner: response.data.registration.meals.dinner || false
         };
         const newMealsAvailed = {
           breakfast: response.data.registration.mealsAvailed?.breakfast || false,
@@ -275,18 +264,23 @@ export default function StudentPage() {
         const prevMealsAvailed = prevMealsAvailedRef.current;
         const notifiedMeals = notifiedMealsRef.current;
 
-        // Update ref before state updates - CRITICAL for production
+        // Update ref before state updates
         prevMealsAvailedRef.current = newMealsAvailed;
-        setServerMealRegistration(newMealRegistration); // Update server state (triggers re-render)
 
-        // Always update mealRegistration state from server (server is source of truth)
-        // Only preserve local changes if user is actively editing on the meal registration page
+        // Only update mealRegistration state if:
+        // 1. Values actually changed, AND
+        // 2. User doesn't have unsaved local changes (on meal registration page)
         setMealRegistration(prev => {
           // Don't overwrite if user has unsaved changes and is on meal registration page
           if (hasLocalMealChangesRef.current && currentPage === 'lima-meal-registration') {
-            return prev; // Keep local changes while user is editing
+            return prev; // Keep local changes
           }
-          // Always sync with server state
+          
+          if (prev.breakfast === newMealRegistration.breakfast &&
+              prev.lunch === newMealRegistration.lunch &&
+              prev.dinner === newMealRegistration.dinner) {
+            return prev; // No change, return previous state
+          }
           return newMealRegistration;
         });
 
@@ -299,9 +293,6 @@ export default function StudentPage() {
           return newMealsAvailed;
         });
       } else {
-        // No registration found - reset server state
-        setServerMealRegistration({ breakfast: false, lunch: false, dinner: false });
-        
         // Only reset if there was previous data AND no local unsaved changes
         setMealRegistration(prev => {
           // Don't reset if user has unsaved changes and is on meal registration page
@@ -309,8 +300,10 @@ export default function StudentPage() {
             return prev; // Keep local changes
           }
           
-          // Always sync with server (no registration = all false)
-          return { breakfast: false, lunch: false, dinner: false };
+          if (prev.breakfast || prev.lunch || prev.dinner) {
+            return { breakfast: false, lunch: false, dinner: false };
+          }
+          return prev;
         });
         setMealsAvailed(prev => {
           if (prev.breakfast || prev.lunch || prev.dinner) {
@@ -323,25 +316,23 @@ export default function StudentPage() {
       }
     } catch (error) {
       console.error('Error fetching meal registration:', error);
-      console.error('Error details:', error.response?.data || error.message);
       // Don't reset state on error to avoid flickering
-      // But log the error for debugging in production
     }
   }, [token, baseUrl, currentPage]);
 
-  // Fetch meal registration when navigating to the meal registration page
+  // Reset meal registration form when navigating to the meal registration page
   useEffect(() => {
     if (currentPage === 'lima-meal-registration' && user.university === 'lima') {
+      // Clear the form when opening the page
+      setMealRegistration({
+        breakfast: false,
+        lunch: false,
+        dinner: false
+      });
       setMealRegistrationMessage({ type: '', text: '' });
       hasLocalMealChangesRef.current = false; // Reset the flag
-      // Fetch meal registration when page opens - this will populate the form with server data
-      // Use a small timeout to ensure the component is fully mounted
-      const timeoutId = setTimeout(() => {
-        fetchMealRegistration().catch(err => {
-          console.error('Failed to fetch meal registration on page load:', err);
-        });
-      }, 100);
-      return () => clearTimeout(timeoutId);
+      // Fetch meal registration when page opens
+      fetchMealRegistration();
     }
   }, [currentPage, user.university, fetchMealRegistration]);
 
@@ -369,20 +360,6 @@ export default function StudentPage() {
       return;
     }
 
-    // Check if there are any changes from the server state
-    const hasChanges = 
-      mealRegistration.breakfast !== serverMealRegistration.breakfast ||
-      mealRegistration.lunch !== serverMealRegistration.lunch ||
-      mealRegistration.dinner !== serverMealRegistration.dinner;
-
-    if (!hasChanges) {
-      setMealRegistrationMessage({
-        type: 'info',
-        text: 'No changes detected. Your meals are already registered as selected.'
-      });
-      return;
-    }
-
     try {
       setIsLoadingMealRegistration(true);
       setMealRegistrationMessage({ type: '', text: '' });
@@ -394,41 +371,19 @@ export default function StudentPage() {
       );
 
       if (response.data.success) {
-        // CRITICAL: Update server state IMMEDIATELY from response to prevent re-registration
-        // This must happen before fetchMealRegistration() to handle production network latency
-        if (response.data.registration) {
-          const newServerState = {
-            breakfast: response.data.registration.meals?.breakfast || false,
-            lunch: response.data.registration.meals?.lunch || false,
-            dinner: response.data.registration.meals?.dinner || false
-          };
-          setServerMealRegistration(newServerState); // Update immediately - this triggers re-render
-          
-          // Also update form state to match what was registered (only if no local changes)
-          if (!hasLocalMealChangesRef.current) {
-            setMealRegistration(newServerState);
-          }
-          
-          // Update mealsAvailed from response
-          const newMealsAvailed = {
-            breakfast: response.data.registration.mealsAvailed?.breakfast || false,
-            lunch: response.data.registration.mealsAvailed?.lunch || false,
-            dinner: response.data.registration.mealsAvailed?.dinner || false
-          };
-          prevMealsAvailedRef.current = newMealsAvailed;
-          setMealsAvailed(newMealsAvailed);
-        }
-        
         setMealRegistrationMessage({
           type: 'success',
           text: response.data.message || 'Meal registration successful!'
         });
+        // Clear the form after successful submission
+        setMealRegistration({
+          breakfast: false,
+          lunch: false,
+          dinner: false
+        });
         hasLocalMealChangesRef.current = false; // Clear the flag after successful submission
-        
-        // Refresh meal registration data - this will sync any additional updates (like availed status changes)
-        // But the server state ref is already updated above, so re-registration is prevented
+        // Refresh meal registration data
         await fetchMealRegistration();
-        
         // Clear message after 3 seconds
         setTimeout(() => {
           setMealRegistrationMessage({ type: '', text: '' });
@@ -1495,41 +1450,16 @@ export default function StudentPage() {
                     All your meals for today have been availed. Please come back tomorrow to avail again.
                   </p>
                 )}
-                {(() => {
-                  const hasChanges = 
-                    mealRegistration.breakfast !== serverMealRegistration.breakfast ||
-                    mealRegistration.lunch !== serverMealRegistration.lunch ||
-                    mealRegistration.dinner !== serverMealRegistration.dinner;
-                  const hasAnyRegistration = serverMealRegistration.breakfast || serverMealRegistration.lunch || serverMealRegistration.dinner;
-                  
-                  if (hasAnyRegistration && !hasChanges && !hasLocalMealChangesRef.current) {
-                    return (
-                      <p className="text-xs sm:text-sm text-blue-300 text-center py-2">
-                        Your meals are already registered. Make changes to update your registration.
-                      </p>
-                    );
-                  }
-                  return null;
-                })()}
-                {(() => {
-                  const hasChanges = 
-                    mealRegistration.breakfast !== serverMealRegistration.breakfast ||
-                    mealRegistration.lunch !== serverMealRegistration.lunch ||
-                    mealRegistration.dinner !== serverMealRegistration.dinner;
-                  const hasAnyRegistration = serverMealRegistration.breakfast || serverMealRegistration.lunch || serverMealRegistration.dinner;
-                  const isDisabled = 
+                <motion.button
+                  whileHover={{ scale: 1.02 }}
+                  whileTap={{ scale: 0.98 }}
+                  onClick={handleMealRegistrationSubmit}
+                  disabled={
                     isLoadingMealRegistration ||
-                    (mealsAvailed.breakfast && mealsAvailed.lunch && mealsAvailed.dinner) ||
-                    (hasAnyRegistration && !hasChanges && !hasLocalMealChangesRef.current);
-                  
-                  return (
-                    <motion.button
-                      whileHover={{ scale: 1.02 }}
-                      whileTap={{ scale: 0.98 }}
-                      onClick={handleMealRegistrationSubmit}
-                      disabled={isDisabled}
-                      className="w-full bg-gradient-to-r from-orange-600 to-orange-700 hover:from-orange-700 hover:to-orange-800 text-white font-bold py-3 sm:py-4 rounded-xl shadow-lg transition-all disabled:opacity-50 disabled:cursor-not-allowed text-sm sm:text-base"
-                    >
+                    (mealsAvailed.breakfast && mealsAvailed.lunch && mealsAvailed.dinner)
+                  }
+                  className="w-full bg-gradient-to-r from-orange-600 to-orange-700 hover:from-orange-700 hover:to-orange-800 text-white font-bold py-3 sm:py-4 rounded-xl shadow-lg transition-all disabled:opacity-50 disabled:cursor-not-allowed text-sm sm:text-base"
+                >
                   {isLoadingMealRegistration ? (
                     <div className="flex items-center justify-center space-x-2">
                       <svg className="animate-spin h-5 w-5" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24">
@@ -1541,9 +1471,7 @@ export default function StudentPage() {
                   ) : (
                     'Register Meals'
                   )}
-                    </motion.button>
-                  );
-                })()}
+                </motion.button>
               </div>
 
             </motion.div>
