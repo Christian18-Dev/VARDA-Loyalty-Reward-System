@@ -276,6 +276,7 @@ export default function StudentPage() {
             return prev; // Keep local changes
           }
           
+          // Always update to show current registration status
           if (prev.breakfast === newMealRegistration.breakfast &&
               prev.lunch === newMealRegistration.lunch &&
               prev.dinner === newMealRegistration.dinner) {
@@ -320,18 +321,12 @@ export default function StudentPage() {
     }
   }, [token, baseUrl, currentPage]);
 
-  // Reset meal registration form when navigating to the meal registration page
+  // Load meal registration when navigating to the meal registration page
   useEffect(() => {
     if (currentPage === 'lima-meal-registration' && user.university === 'lima') {
-      // Clear the form when opening the page
-      setMealRegistration({
-        breakfast: false,
-        lunch: false,
-        dinner: false
-      });
       setMealRegistrationMessage({ type: '', text: '' });
       hasLocalMealChangesRef.current = false; // Reset the flag
-      // Fetch meal registration when page opens
+      // Fetch meal registration when page opens to load current status
       fetchMealRegistration();
     }
   }, [currentPage, user.university, fetchMealRegistration]);
@@ -375,14 +370,8 @@ export default function StudentPage() {
           type: 'success',
           text: response.data.message || 'Meal registration successful!'
         });
-        // Clear the form after successful submission
-        setMealRegistration({
-          breakfast: false,
-          lunch: false,
-          dinner: false
-        });
         hasLocalMealChangesRef.current = false; // Clear the flag after successful submission
-        // Refresh meal registration data
+        // Refresh meal registration data to show current status
         await fetchMealRegistration();
         // Clear message after 3 seconds
         setTimeout(() => {
