@@ -19,14 +19,7 @@ const availHistorySchema = new mongoose.Schema({
     idNumber: { type: String, required: true },
     name: { type: String, required: true }
   },
-  availedAt: { 
-    type: Date, 
-    default: () => {
-      // Store availed date in Asia/Manila timezone
-      const now = new Date();
-      return new Date(now.toLocaleString("en-US", {timeZone: "Asia/Manila"}));
-    }
-  },
+  availedAt: { type: Date, default: Date.now },
   registrationDate: { type: Date, required: true }
 }, {
   timestamps: true

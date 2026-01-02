@@ -334,11 +334,9 @@ export const registerMeals = async (req, res) => {
     // Use proper timezone handling with Asia/Manila timezone
     const now = new Date();
     
-    // Convert to Asia/Manila timezone (UTC+8)
-    const philTime = new Date(now.toLocaleString("en-US", {timeZone: "Asia/Manila"}));
-    
-    // Create a copy for date calculations in PH time
-    const philNow = new Date(philTime);
+    // Get current time in Asia/Manila (UTC+8) for window calculations
+    const utcTime = now.getTime() + (now.getTimezoneOffset() * 60000);
+    const philNow = new Date(utcTime + (8 * 3600000));
     
     // Compute the start of the current 5 AM–5 AM window in PH time
     const windowStart = new Date(philNow);
@@ -349,16 +347,16 @@ export const registerMeals = async (req, res) => {
       windowStart.setDate(windowStart.getDate() - 1);
     }
     
-    // End of window is 24 hours after start (next day's 5 AM)
-    const windowEnd = new Date(windowStart);
-    windowEnd.setDate(windowEnd.getDate() + 1);
+    // Convert window boundaries back to UTC for database queries
+    const windowStartUTC = new Date(windowStart.getTime() - (8 * 3600000));
+    const windowEndUTC = new Date(windowStartUTC.getTime() + (24 * 3600000));
 
     // Check if there's an active registration in the current 5 AM–5 AM PH window
     const existingRegistration = await MealRegistration.findOne({
       idNumber: user.idNumber,
       registrationDate: {
-        $gte: windowStart,
-        $lt: windowEnd
+        $gte: windowStartUTC,
+        $lt: windowEndUTC
       },
       status: 'active'
     });
@@ -417,11 +415,9 @@ export const getMealRegistration = async (req, res) => {
     // Use proper timezone handling with Asia/Manila timezone
     const now = new Date();
     
-    // Convert to Asia/Manila timezone (UTC+8)
-    const philTime = new Date(now.toLocaleString("en-US", {timeZone: "Asia/Manila"}));
-    
-    // Create a copy for date calculations in PH time
-    const philNow = new Date(philTime);
+    // Get current time in Asia/Manila (UTC+8) for window calculations
+    const utcTime = now.getTime() + (now.getTimezoneOffset() * 60000);
+    const philNow = new Date(utcTime + (8 * 3600000));
     
     // Compute the start of the current 5 AM–5 AM window in PH time
     const windowStart = new Date(philNow);
@@ -432,16 +428,16 @@ export const getMealRegistration = async (req, res) => {
       windowStart.setDate(windowStart.getDate() - 1);
     }
     
-    // End of window is 24 hours after start (next day's 5 AM)
-    const windowEnd = new Date(windowStart);
-    windowEnd.setDate(windowEnd.getDate() + 1);
+    // Convert window boundaries back to UTC for database queries
+    const windowStartUTC = new Date(windowStart.getTime() - (8 * 3600000));
+    const windowEndUTC = new Date(windowStartUTC.getTime() + (24 * 3600000));
 
     // Find active registration in the current 5 AM–5 AM PH window
     const registration = await MealRegistration.findOne({
       idNumber: user.idNumber,
       registrationDate: {
-        $gte: windowStart,
-        $lt: windowEnd
+        $gte: windowStartUTC,
+        $lt: windowEndUTC
       },
       status: 'active'
     });
