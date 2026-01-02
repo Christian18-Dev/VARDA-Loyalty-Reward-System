@@ -235,6 +235,7 @@ export default function StudentPage() {
   const prevMealsAvailedRef = useRef(mealsAvailed);
   const notifiedMealsRef = useRef({ breakfast: false, lunch: false, dinner: false });
   const hasLocalMealChangesRef = useRef(false); // Track if user has unsaved meal selections
+  const serverMealRegistrationRef = useRef({ breakfast: false, lunch: false, dinner: false }); // Track server state
 
   // Function to show avail notification (can be called from anywhere)
   const showAvailNotificationForMeal = useCallback((mealType) => {
@@ -266,6 +267,7 @@ export default function StudentPage() {
 
         // Update ref before state updates
         prevMealsAvailedRef.current = newMealsAvailed;
+        serverMealRegistrationRef.current = newMealRegistration; // Update server state ref
 
         // Only update mealRegistration state if:
         // 1. Values actually changed, AND
@@ -293,6 +295,9 @@ export default function StudentPage() {
           return newMealsAvailed;
         });
       } else {
+        // No registration found - reset server state ref
+        serverMealRegistrationRef.current = { breakfast: false, lunch: false, dinner: false };
+        
         // Only reset if there was previous data AND no local unsaved changes
         setMealRegistration(prev => {
           // Don't reset if user has unsaved changes and is on meal registration page
@@ -350,6 +355,21 @@ export default function StudentPage() {
       setMealRegistrationMessage({
         type: 'error',
         text: 'Please select at least one meal (Breakfast, Lunch, or Dinner)'
+      });
+      return;
+    }
+
+    // Check if there are any changes from the server state
+    const serverState = serverMealRegistrationRef.current;
+    const hasChanges = 
+      mealRegistration.breakfast !== serverState.breakfast ||
+      mealRegistration.lunch !== serverState.lunch ||
+      mealRegistration.dinner !== serverState.dinner;
+
+    if (!hasChanges) {
+      setMealRegistrationMessage({
+        type: 'info',
+        text: 'No changes detected. Your meals are already registered as selected.'
       });
       return;
     }
@@ -1438,16 +1458,43 @@ export default function StudentPage() {
                     All your meals for today have been availed. Please come back tomorrow to avail again.
                   </p>
                 )}
-                <motion.button
-                  whileHover={{ scale: 1.02 }}
-                  whileTap={{ scale: 0.98 }}
-                  onClick={handleMealRegistrationSubmit}
-                  disabled={
-                    isLoadingMealRegistration ||
-                    (mealsAvailed.breakfast && mealsAvailed.lunch && mealsAvailed.dinner)
+                {(() => {
+                  const serverState = serverMealRegistrationRef.current;
+                  const hasChanges = 
+                    mealRegistration.breakfast !== serverState.breakfast ||
+                    mealRegistration.lunch !== serverState.lunch ||
+                    mealRegistration.dinner !== serverState.dinner;
+                  const hasAnyRegistration = serverState.breakfast || serverState.lunch || serverState.dinner;
+                  
+                  if (hasAnyRegistration && !hasChanges && !hasLocalMealChangesRef.current) {
+                    return (
+                      <p className="text-xs sm:text-sm text-blue-300 text-center py-2">
+                        Your meals are already registered. Make changes to update your registration.
+                      </p>
+                    );
                   }
-                  className="w-full bg-gradient-to-r from-orange-600 to-orange-700 hover:from-orange-700 hover:to-orange-800 text-white font-bold py-3 sm:py-4 rounded-xl shadow-lg transition-all disabled:opacity-50 disabled:cursor-not-allowed text-sm sm:text-base"
-                >
+                  return null;
+                })()}
+                {(() => {
+                  const serverState = serverMealRegistrationRef.current;
+                  const hasChanges = 
+                    mealRegistration.breakfast !== serverState.breakfast ||
+                    mealRegistration.lunch !== serverState.lunch ||
+                    mealRegistration.dinner !== serverState.dinner;
+                  const hasAnyRegistration = serverState.breakfast || serverState.lunch || serverState.dinner;
+                  const isDisabled = 
+                    isLoadingMealRegistration ||
+                    (mealsAvailed.breakfast && mealsAvailed.lunch && mealsAvailed.dinner) ||
+                    (hasAnyRegistration && !hasChanges && !hasLocalMealChangesRef.current);
+                  
+                  return (
+                    <motion.button
+                      whileHover={{ scale: 1.02 }}
+                      whileTap={{ scale: 0.98 }}
+                      onClick={handleMealRegistrationSubmit}
+                      disabled={isDisabled}
+                      className="w-full bg-gradient-to-r from-orange-600 to-orange-700 hover:from-orange-700 hover:to-orange-800 text-white font-bold py-3 sm:py-4 rounded-xl shadow-lg transition-all disabled:opacity-50 disabled:cursor-not-allowed text-sm sm:text-base"
+                    >
                   {isLoadingMealRegistration ? (
                     <div className="flex items-center justify-center space-x-2">
                       <svg className="animate-spin h-5 w-5" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24">
@@ -1459,7 +1506,9 @@ export default function StudentPage() {
                   ) : (
                     'Register Meals'
                   )}
-                </motion.button>
+                    </motion.button>
+                  );
+                })()}
               </div>
 
             </motion.div>
