@@ -276,16 +276,6 @@ export default function StudentPage() {
             return prev; // Keep local changes
           }
           
-          // Additional check: if form was just cleared (all false), don't repopulate immediately
-          if (!prev.breakfast && !prev.lunch && !prev.dinner && 
-              (newMealRegistration.breakfast || newMealRegistration.lunch || newMealRegistration.dinner)) {
-            // Form was just cleared, delay the repopulation to avoid race condition
-            setTimeout(() => {
-              setMealRegistration(newMealRegistration);
-            }, 500);
-            return prev; // Keep cleared form for now
-          }
-          
           if (prev.breakfast === newMealRegistration.breakfast &&
               prev.lunch === newMealRegistration.lunch &&
               prev.dinner === newMealRegistration.dinner) {
@@ -385,16 +375,19 @@ export default function StudentPage() {
           type: 'success',
           text: response.data.message || 'Meal registration successful!'
         });
-        // Clear the form after successful submission
-        setMealRegistration({
-          breakfast: false,
-          lunch: false,
-          dinner: false
-        });
+        
+        // Update form with the registered meals from server response
+        if (response.data.registration && response.data.registration.meals) {
+          setMealRegistration({
+            breakfast: response.data.registration.meals.breakfast || false,
+            lunch: response.data.registration.meals.lunch || false,
+            dinner: response.data.registration.meals.dinner || false
+          });
+        }
+        
         hasLocalMealChangesRef.current = false; // Clear the flag after successful submission
         
-        // IMPORTANT: Don't immediately fetch meal registration to avoid race condition
-        // Instead, wait a moment and then fetch to update the availed status
+        // Update meals availed status
         setTimeout(() => {
           fetchMealRegistration();
         }, 1000);
