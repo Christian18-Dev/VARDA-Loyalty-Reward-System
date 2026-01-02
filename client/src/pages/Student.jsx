@@ -273,21 +273,15 @@ export default function StudentPage() {
         prevMealsAvailedRef.current = newMealsAvailed;
         setServerMealRegistration(newMealRegistration); // Update server state (triggers re-render)
 
-        // Only update mealRegistration state if:
-        // 1. Values actually changed, AND
-        // 2. User doesn't have unsaved local changes (on meal registration page)
+        // Always update mealRegistration state to match server (server is source of truth)
+        // Only preserve local changes if user is actively editing on the meal registration page
         setMealRegistration(prev => {
-          // Don't overwrite if user has unsaved changes and is on meal registration page
+          // If user has unsaved changes and is on meal registration page, keep their changes
+          // Otherwise, sync with server
           if (hasLocalMealChangesRef.current && currentPage === 'lima-meal-registration') {
-            return prev; // Keep local changes
+            return prev; // Keep local changes while user is editing
           }
-          
-          if (prev.breakfast === newMealRegistration.breakfast &&
-              prev.lunch === newMealRegistration.lunch &&
-              prev.dinner === newMealRegistration.dinner) {
-            return prev; // No change, return previous state
-          }
-          return newMealRegistration;
+          return newMealRegistration; // Sync with server
         });
 
         setMealsAvailed(prev => {
@@ -395,9 +389,11 @@ export default function StudentPage() {
             lunch: response.data.registration.meals?.lunch || false,
             dinner: response.data.registration.meals?.dinner || false
           };
-          setServerMealRegistration(newServerState); // Update state immediately (triggers re-render)
           
-          // Also update the form state to match what was registered
+          // Update server state immediately - this is the source of truth
+          setServerMealRegistration(newServerState);
+          
+          // Update form state to match what was registered
           setMealRegistration(newServerState);
           
           // Update mealsAvailed from response
@@ -414,11 +410,13 @@ export default function StudentPage() {
           type: 'success',
           text: response.data.message || 'Meal registration successful!'
         });
-        hasLocalMealChangesRef.current = false; // Clear the flag after successful submission
         
-        // Refresh meal registration data to ensure we have the latest availed status
-        // This is important for when meals are availed by cashier
-        await fetchMealRegistration();
+        // Clear the local changes flag - registration is complete
+        hasLocalMealChangesRef.current = false;
+        
+        // Don't call fetchMealRegistration here - we already have the data from the response
+        // This prevents race conditions and ensures our immediate state update isn't overwritten
+        // The polling will handle future updates (like when cashier avails meals)
         
         // Clear message after 3 seconds
         setTimeout(() => {
