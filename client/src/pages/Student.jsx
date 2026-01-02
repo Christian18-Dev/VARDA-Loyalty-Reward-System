@@ -375,23 +375,15 @@ export default function StudentPage() {
           type: 'success',
           text: response.data.message || 'Meal registration successful!'
         });
-        
-        // Update form with the registered meals from server response
-        if (response.data.registration && response.data.registration.meals) {
-          setMealRegistration({
-            breakfast: response.data.registration.meals.breakfast || false,
-            lunch: response.data.registration.meals.lunch || false,
-            dinner: response.data.registration.meals.dinner || false
-          });
-        }
-        
+        // Clear the form after successful submission
+        setMealRegistration({
+          breakfast: false,
+          lunch: false,
+          dinner: false
+        });
         hasLocalMealChangesRef.current = false; // Clear the flag after successful submission
-        
-        // Update meals availed status
-        setTimeout(() => {
-          fetchMealRegistration();
-        }, 1000);
-        
+        // Refresh meal registration data
+        await fetchMealRegistration();
         // Clear message after 3 seconds
         setTimeout(() => {
           setMealRegistrationMessage({ type: '', text: '' });
