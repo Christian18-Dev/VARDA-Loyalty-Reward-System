@@ -334,10 +334,8 @@ export const registerMeals = async (req, res) => {
     // Use Philippine time (Asia/Manila) and a 24-hour window from 5 AM PH time to 5 AM next day
     const now = new Date();
     
-    // Get current time in Asia/Manila timezone by calculating the offset
-    const utcNow = new Date(now.getTime() + (now.getTimezoneOffset() * 60000));
-    // Asia/Manila is UTC+8, so add 8 hours
-    const philNow = new Date(utcNow.getTime() + (8 * 3600000));
+    // Get current time in Asia/Manila timezone properly
+    const philNow = new Date(now.toLocaleString('en-US', { timeZone: 'Asia/Manila' }));
 
     // Compute the start of the current 5 AM–5 AM window in PH time
     const windowStart = new Date(philNow);
@@ -416,10 +414,8 @@ export const getMealRegistration = async (req, res) => {
     // Use Philippine time (Asia/Manila) and a 24-hour window from 5 AM PH time to 5 AM next day
     const now = new Date();
     
-    // Get current time in Asia/Manila timezone by calculating the offset
-    const utcNow = new Date(now.getTime() + (now.getTimezoneOffset() * 60000));
-    // Asia/Manila is UTC+8, so add 8 hours
-    const philNow = new Date(utcNow.getTime() + (8 * 3600000));
+    // Get current time in Asia/Manila timezone properly
+    const philNow = new Date(now.toLocaleString('en-US', { timeZone: 'Asia/Manila' }));
 
     // Compute the start of the current 5 AM–5 AM window in PH time
     const windowStart = new Date(philNow);

@@ -276,6 +276,16 @@ export default function StudentPage() {
             return prev; // Keep local changes
           }
           
+          // Additional check: if form was just cleared (all false), don't repopulate immediately
+          if (!prev.breakfast && !prev.lunch && !prev.dinner && 
+              (newMealRegistration.breakfast || newMealRegistration.lunch || newMealRegistration.dinner)) {
+            // Form was just cleared, delay the repopulation to avoid race condition
+            setTimeout(() => {
+              setMealRegistration(newMealRegistration);
+            }, 500);
+            return prev; // Keep cleared form for now
+          }
+          
           if (prev.breakfast === newMealRegistration.breakfast &&
               prev.lunch === newMealRegistration.lunch &&
               prev.dinner === newMealRegistration.dinner) {
@@ -382,8 +392,13 @@ export default function StudentPage() {
           dinner: false
         });
         hasLocalMealChangesRef.current = false; // Clear the flag after successful submission
-        // Refresh meal registration data
-        await fetchMealRegistration();
+        
+        // IMPORTANT: Don't immediately fetch meal registration to avoid race condition
+        // Instead, wait a moment and then fetch to update the availed status
+        setTimeout(() => {
+          fetchMealRegistration();
+        }, 1000);
+        
         // Clear message after 3 seconds
         setTimeout(() => {
           setMealRegistrationMessage({ type: '', text: '' });
