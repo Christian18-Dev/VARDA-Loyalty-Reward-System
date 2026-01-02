@@ -167,11 +167,7 @@ export default function StudentPage() {
     lunch: false,
     dinner: false
   });
-  const [serverMealRegistration, setServerMealRegistration] = useState({
-    breakfast: false,
-    lunch: false,
-    dinner: false
-  }); // Track server state - using state so it triggers re-renders
+  const [serverStateVersion, setServerStateVersion] = useState(0); // Force re-render when server state changes
   const [isLoadingMealRegistration, setIsLoadingMealRegistration] = useState(false);
   const [mealRegistrationMessage, setMealRegistrationMessage] = useState({ type: '', text: '' });
   const [showAvailNotification, setShowAvailNotification] = useState(false);
@@ -240,6 +236,7 @@ export default function StudentPage() {
   const prevMealsAvailedRef = useRef(mealsAvailed);
   const notifiedMealsRef = useRef({ breakfast: false, lunch: false, dinner: false });
   const hasLocalMealChangesRef = useRef(false); // Track if user has unsaved meal selections
+  const serverMealRegistrationRef = useRef({ breakfast: false, lunch: false, dinner: false }); // Track server state
 
   // Function to show avail notification (can be called from anywhere)
   const showAvailNotificationForMeal = useCallback((mealType) => {
@@ -271,7 +268,8 @@ export default function StudentPage() {
 
         // Update ref before state updates
         prevMealsAvailedRef.current = newMealsAvailed;
-        setServerMealRegistration(newMealRegistration); // Update server state - triggers re-render
+        serverMealRegistrationRef.current = newMealRegistration; // Update server state ref
+        setServerStateVersion(prev => prev + 1); // Force re-render
 
         // Only update mealRegistration state if:
         // 1. Values actually changed, AND
@@ -299,8 +297,9 @@ export default function StudentPage() {
           return newMealsAvailed;
         });
       } else {
-        // No registration found - reset server state
-        setServerMealRegistration({ breakfast: false, lunch: false, dinner: false });
+        // No registration found - reset server state ref
+        serverMealRegistrationRef.current = { breakfast: false, lunch: false, dinner: false };
+        setServerStateVersion(prev => prev + 1); // Force re-render
         
         // Only reset if there was previous data AND no local unsaved changes
         setMealRegistration(prev => {
@@ -364,10 +363,11 @@ export default function StudentPage() {
     }
 
     // Check if there are any changes from the server state
+    const serverState = serverMealRegistrationRef.current;
     const hasChanges = 
-      mealRegistration.breakfast !== serverMealRegistration.breakfast ||
-      mealRegistration.lunch !== serverMealRegistration.lunch ||
-      mealRegistration.dinner !== serverMealRegistration.dinner;
+      mealRegistration.breakfast !== serverState.breakfast ||
+      mealRegistration.lunch !== serverState.lunch ||
+      mealRegistration.dinner !== serverState.dinner;
 
     if (!hasChanges) {
       setMealRegistrationMessage({
@@ -388,14 +388,15 @@ export default function StudentPage() {
       );
 
       if (response.data.success) {
-        // Immediately update server state from response to prevent re-registration
+        // Immediately update server state ref from response to prevent re-registration
         if (response.data.registration) {
           const newServerState = {
             breakfast: response.data.registration.meals?.breakfast || false,
             lunch: response.data.registration.meals?.lunch || false,
             dinner: response.data.registration.meals?.dinner || false
           };
-          setServerMealRegistration(newServerState); // Update state - triggers re-render
+          serverMealRegistrationRef.current = newServerState; // Update ref
+          setServerStateVersion(prev => prev + 1); // Force re-render
           
           // Also update mealsAvailed from response
           const newMealsAvailed = {
@@ -1481,11 +1482,12 @@ export default function StudentPage() {
                   </p>
                 )}
                 {(() => {
+                  const serverState = serverMealRegistrationRef.current;
                   const hasChanges = 
-                    mealRegistration.breakfast !== serverMealRegistration.breakfast ||
-                    mealRegistration.lunch !== serverMealRegistration.lunch ||
-                    mealRegistration.dinner !== serverMealRegistration.dinner;
-                  const hasAnyRegistration = serverMealRegistration.breakfast || serverMealRegistration.lunch || serverMealRegistration.dinner;
+                    mealRegistration.breakfast !== serverState.breakfast ||
+                    mealRegistration.lunch !== serverState.lunch ||
+                    mealRegistration.dinner !== serverState.dinner;
+                  const hasAnyRegistration = serverState.breakfast || serverState.lunch || serverState.dinner;
                   
                   if (hasAnyRegistration && !hasChanges && !hasLocalMealChangesRef.current) {
                     return (
@@ -1497,11 +1499,12 @@ export default function StudentPage() {
                   return null;
                 })()}
                 {(() => {
+                  const serverState = serverMealRegistrationRef.current;
                   const hasChanges = 
-                    mealRegistration.breakfast !== serverMealRegistration.breakfast ||
-                    mealRegistration.lunch !== serverMealRegistration.lunch ||
-                    mealRegistration.dinner !== serverMealRegistration.dinner;
-                  const hasAnyRegistration = serverMealRegistration.breakfast || serverMealRegistration.lunch || serverMealRegistration.dinner;
+                    mealRegistration.breakfast !== serverState.breakfast ||
+                    mealRegistration.lunch !== serverState.lunch ||
+                    mealRegistration.dinner !== serverState.dinner;
+                  const hasAnyRegistration = serverState.breakfast || serverState.lunch || serverState.dinner;
                   const isDisabled = 
                     isLoadingMealRegistration ||
                     (mealsAvailed.breakfast && mealsAvailed.lunch && mealsAvailed.dinner) ||
