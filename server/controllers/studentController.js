@@ -331,19 +331,19 @@ export const registerMeals = async (req, res) => {
       });
     }
 
-    // Use proper timezone handling with Asia/Manila timezone (UTC+8)
+    // Use timezone-independent approach for Philippine time (UTC+8)
     const now = new Date();
     
-    // Calculate Philippine time correctly
-    // getTimezoneOffset() returns minutes to add to local time to get UTC (negative for PH)
-    const offsetMinutes = now.getTimezoneOffset();
-    const philNow = new Date(now.getTime() + (offsetMinutes * 60000) + (8 * 3600000));
+    // Get UTC time and add 8 hours for Philippine time
+    const utcTime = now.getTime() + (now.getTimezoneOffset() * 60000);
+    const philNow = new Date(utcTime + (8 * 3600000));
     
     // Debug logging to verify timezone handling
     console.log(`🕐 Timezone Debug:`);
     console.log(`  Server time: ${now.toISOString()}`);
     console.log(`  Server local: ${now.toString()}`);
-    console.log(`  Timezone offset: ${offsetMinutes} minutes`);
+    console.log(`  Timezone offset: ${now.getTimezoneOffset()} minutes`);
+    console.log(`  UTC time: ${new Date(utcTime).toISOString()}`);
     console.log(`  PH time: ${philNow.toISOString()}`);
     console.log(`  PH local: ${philNow.toString()}`);
     console.log(`  PH hours: ${philNow.getHours()}`);
@@ -425,19 +425,19 @@ export const getMealRegistration = async (req, res) => {
       });
     }
 
-    // Use proper timezone handling with Asia/Manila timezone (UTC+8)
+    // Use timezone-independent approach for Philippine time (UTC+8)
     const now = new Date();
     
-    // Calculate Philippine time correctly
-    // getTimezoneOffset() returns minutes to add to local time to get UTC (negative for PH)
-    const offsetMinutes = now.getTimezoneOffset();
-    const philNow = new Date(now.getTime() + (offsetMinutes * 60000) + (8 * 3600000));
+    // Get UTC time and add 8 hours for Philippine time
+    const utcTime = now.getTime() + (now.getTimezoneOffset() * 60000);
+    const philNow = new Date(utcTime + (8 * 3600000));
     
     // Debug logging to verify timezone handling
     console.log(`🕐 Timezone Debug:`);
     console.log(`  Server time: ${now.toISOString()}`);
     console.log(`  Server local: ${now.toString()}`);
-    console.log(`  Timezone offset: ${offsetMinutes} minutes`);
+    console.log(`  Timezone offset: ${now.getTimezoneOffset()} minutes`);
+    console.log(`  UTC time: ${new Date(utcTime).toISOString()}`);
     console.log(`  PH time: ${philNow.toISOString()}`);
     console.log(`  PH local: ${philNow.toString()}`);
     console.log(`  PH hours: ${philNow.getHours()}`);
