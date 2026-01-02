@@ -66,7 +66,8 @@ const corsOptions = {
       "https://christian18-dev.github.io",
       "https://www.vgconcierge.com",
       "http://www.vgconcierge.com",
-      "http://localhost:3001"
+      "http://localhost:3001",
+      "http://localhost:5000",
     ];
 
     if (allowedOrigins.indexOf(origin) === -1) {

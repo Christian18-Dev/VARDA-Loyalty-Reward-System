@@ -320,18 +320,12 @@ export default function StudentPage() {
     }
   }, [token, baseUrl, currentPage]);
 
-  // Reset meal registration form when navigating to the meal registration page
+  // Fetch meal registration when navigating to the meal registration page
   useEffect(() => {
     if (currentPage === 'lima-meal-registration' && user.university === 'lima') {
-      // Clear the form when opening the page
-      setMealRegistration({
-        breakfast: false,
-        lunch: false,
-        dinner: false
-      });
       setMealRegistrationMessage({ type: '', text: '' });
       hasLocalMealChangesRef.current = false; // Reset the flag
-      // Fetch meal registration when page opens
+      // Fetch meal registration when page opens - this will populate the form with server data
       fetchMealRegistration();
     }
   }, [currentPage, user.university, fetchMealRegistration]);
@@ -375,14 +369,8 @@ export default function StudentPage() {
           type: 'success',
           text: response.data.message || 'Meal registration successful!'
         });
-        // Clear the form after successful submission
-        setMealRegistration({
-          breakfast: false,
-          lunch: false,
-          dinner: false
-        });
         hasLocalMealChangesRef.current = false; // Clear the flag after successful submission
-        // Refresh meal registration data
+        // Refresh meal registration data - this will update the form with server data including availed status
         await fetchMealRegistration();
         // Clear message after 3 seconds
         setTimeout(() => {
@@ -1464,7 +1452,7 @@ export default function StudentPage() {
                     <div className="flex items-center justify-center space-x-2">
                       <svg className="animate-spin h-5 w-5" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24">
                         <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4"></circle>
-                        <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2-647z"></path>
+                        <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path>
                       </svg>
                       <span>Registering...</span>
                     </div>
