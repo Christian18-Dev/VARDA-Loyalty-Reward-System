@@ -18,10 +18,10 @@ const mealRegistrationSchema = new mongoose.Schema({
   registrationDate: { 
     type: Date, 
     default: () => {
-      // Store registration date in Asia/Manila timezone (UTC+8)
-      // Date.getTime() returns milliseconds since epoch (UTC), so add 8 hours
+      // Store registration date in Asia/Manila timezone (UTC+8) regardless of server timezone
       const now = new Date();
-      return new Date(now.getTime() + (8 * 3600000));
+      const utcTime = new Date(now.getTime() + (now.getTimezoneOffset() * 60000));
+      return new Date(utcTime.getTime() + (8 * 3600000));
     }
   },
   status: { 

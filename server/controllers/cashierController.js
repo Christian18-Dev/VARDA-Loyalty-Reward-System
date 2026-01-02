@@ -210,15 +210,17 @@ export const getAvailHistory = async (req, res) => {
       query.availedAt = {};
       if (startDate) {
         const start = new Date(startDate);
-        // Convert to Asia/Manila timezone (UTC+8) - add 8 hours to UTC timestamp
-        const startPH = new Date(start.getTime() + (8 * 3600000));
+        // Convert to Asia/Manila timezone (UTC+8) regardless of server timezone
+        const utcStart = new Date(start.getTime() + (start.getTimezoneOffset() * 60000));
+        const startPH = new Date(utcStart.getTime() + (8 * 3600000));
         startPH.setHours(0, 0, 0, 0);
         query.availedAt.$gte = startPH;
       }
       if (endDate) {
         const end = new Date(endDate);
-        // Convert to Asia/Manila timezone (UTC+8) - add 8 hours to UTC timestamp
-        const endPH = new Date(end.getTime() + (8 * 3600000));
+        // Convert to Asia/Manila timezone (UTC+8) regardless of server timezone
+        const utcEnd = new Date(end.getTime() + (end.getTimezoneOffset() * 60000));
+        const endPH = new Date(utcEnd.getTime() + (8 * 3600000));
         endPH.setHours(23, 59, 59, 999);
         query.availedAt.$lte = endPH;
       }

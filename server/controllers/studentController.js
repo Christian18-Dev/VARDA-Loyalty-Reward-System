@@ -334,9 +334,10 @@ export const registerMeals = async (req, res) => {
     // Use proper timezone handling with Asia/Manila timezone
     const now = new Date();
     
-    // Get Philippines time by adding 8 hours to current time (assuming server is in UTC)
-    // This works because Date.getTime() returns milliseconds since epoch (UTC)
-    const philNow = new Date(now.getTime() + (8 * 3600000)); // UTC+8 for Philippines
+    // Get Philippines time (UTC+8) regardless of server timezone
+    // Use UTC time and add 8 hours for Philippines
+    const utcTime = new Date(now.getTime() + (now.getTimezoneOffset() * 60000));
+    const philNow = new Date(utcTime.getTime() + (8 * 3600000));
     
     // Compute the start of the current 5 AM–5 AM window in PH time
     const windowStart = new Date(philNow);
@@ -415,9 +416,10 @@ export const getMealRegistration = async (req, res) => {
     // Use proper timezone handling with Asia/Manila timezone
     const now = new Date();
     
-    // Get Philippines time by adding 8 hours to current time (assuming server is in UTC)
-    // This works because Date.getTime() returns milliseconds since epoch (UTC)
-    const philNow = new Date(now.getTime() + (8 * 3600000)); // UTC+8 for Philippines
+    // Get Philippines time (UTC+8) regardless of server timezone
+    // Use UTC time and add 8 hours for Philippines
+    const utcTime = new Date(now.getTime() + (now.getTimezoneOffset() * 60000));
+    const philNow = new Date(utcTime.getTime() + (8 * 3600000));
     
     // Compute the start of the current 5 AM–5 AM window in PH time
     const windowStart = new Date(philNow);
