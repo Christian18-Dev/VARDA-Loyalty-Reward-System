@@ -250,11 +250,17 @@ export default function StudentPage() {
       const response = await axios.get(`${baseUrl}/api/student/meal-registration`, {
         headers: { Authorization: `Bearer ${token}` }
       });
+      
+      // Log for debugging in production
+      if (import.meta.env.MODE === 'production') {
+        console.log('Meal registration fetch response:', response.data);
+      }
+      
       if (response.data.success && response.data.registration) {
         const newMealRegistration = {
-          breakfast: response.data.registration.meals.breakfast || false,
-          lunch: response.data.registration.meals.lunch || false,
-          dinner: response.data.registration.meals.dinner || false
+          breakfast: response.data.registration.meals?.breakfast || false,
+          lunch: response.data.registration.meals?.lunch || false,
+          dinner: response.data.registration.meals?.dinner || false
         };
         const newMealsAvailed = {
           breakfast: response.data.registration.mealsAvailed?.breakfast || false,
@@ -266,24 +272,19 @@ export default function StudentPage() {
         const prevMealsAvailed = prevMealsAvailedRef.current;
         const notifiedMeals = notifiedMealsRef.current;
 
-        // Update ref before state updates
+        // Update ref before state updates - CRITICAL for production
         prevMealsAvailedRef.current = newMealsAvailed;
         serverMealRegistrationRef.current = newMealRegistration; // Update server state ref
+        setRegistrationUpdateTrigger(prev => prev + 1); // Force re-render
 
-        // Only update mealRegistration state if:
-        // 1. Values actually changed, AND
-        // 2. User doesn't have unsaved local changes (on meal registration page)
+        // Always update mealRegistration state from server (server is source of truth)
+        // Only preserve local changes if user is actively editing on the meal registration page
         setMealRegistration(prev => {
           // Don't overwrite if user has unsaved changes and is on meal registration page
           if (hasLocalMealChangesRef.current && currentPage === 'lima-meal-registration') {
-            return prev; // Keep local changes
+            return prev; // Keep local changes while user is editing
           }
-          
-          if (prev.breakfast === newMealRegistration.breakfast &&
-              prev.lunch === newMealRegistration.lunch &&
-              prev.dinner === newMealRegistration.dinner) {
-            return prev; // No change, return previous state
-          }
+          // Always sync with server state
           return newMealRegistration;
         });
 
@@ -298,6 +299,7 @@ export default function StudentPage() {
       } else {
         // No registration found - reset server state ref
         serverMealRegistrationRef.current = { breakfast: false, lunch: false, dinner: false };
+        setRegistrationUpdateTrigger(prev => prev + 1); // Force re-render
         
         // Only reset if there was previous data AND no local unsaved changes
         setMealRegistration(prev => {
@@ -306,10 +308,8 @@ export default function StudentPage() {
             return prev; // Keep local changes
           }
           
-          if (prev.breakfast || prev.lunch || prev.dinner) {
-            return { breakfast: false, lunch: false, dinner: false };
-          }
-          return prev;
+          // Always sync with server (no registration = all false)
+          return { breakfast: false, lunch: false, dinner: false };
         });
         setMealsAvailed(prev => {
           if (prev.breakfast || prev.lunch || prev.dinner) {
@@ -322,7 +322,9 @@ export default function StudentPage() {
       }
     } catch (error) {
       console.error('Error fetching meal registration:', error);
+      console.error('Error details:', error.response?.data || error.message);
       // Don't reset state on error to avoid flickering
+      // But log the error for debugging in production
     }
   }, [token, baseUrl, currentPage]);
 
