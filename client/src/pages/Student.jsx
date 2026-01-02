@@ -167,7 +167,11 @@ export default function StudentPage() {
     lunch: false,
     dinner: false
   });
-  const [registrationUpdateTrigger, setRegistrationUpdateTrigger] = useState(0); // Force re-render when server state changes
+  const [serverMealRegistration, setServerMealRegistration] = useState({
+    breakfast: false,
+    lunch: false,
+    dinner: false
+  }); // Track server state as state (not ref) to trigger re-renders
   const [isLoadingMealRegistration, setIsLoadingMealRegistration] = useState(false);
   const [mealRegistrationMessage, setMealRegistrationMessage] = useState({ type: '', text: '' });
   const [showAvailNotification, setShowAvailNotification] = useState(false);
@@ -236,7 +240,6 @@ export default function StudentPage() {
   const prevMealsAvailedRef = useRef(mealsAvailed);
   const notifiedMealsRef = useRef({ breakfast: false, lunch: false, dinner: false });
   const hasLocalMealChangesRef = useRef(false); // Track if user has unsaved meal selections
-  const serverMealRegistrationRef = useRef({ breakfast: false, lunch: false, dinner: false }); // Track server state
 
   // Function to show avail notification (can be called from anywhere)
   const showAvailNotificationForMeal = useCallback((mealType) => {
@@ -274,8 +277,7 @@ export default function StudentPage() {
 
         // Update ref before state updates - CRITICAL for production
         prevMealsAvailedRef.current = newMealsAvailed;
-        serverMealRegistrationRef.current = newMealRegistration; // Update server state ref
-        setRegistrationUpdateTrigger(prev => prev + 1); // Force re-render
+        setServerMealRegistration(newMealRegistration); // Update server state (triggers re-render)
 
         // Always update mealRegistration state from server (server is source of truth)
         // Only preserve local changes if user is actively editing on the meal registration page
@@ -297,9 +299,8 @@ export default function StudentPage() {
           return newMealsAvailed;
         });
       } else {
-        // No registration found - reset server state ref
-        serverMealRegistrationRef.current = { breakfast: false, lunch: false, dinner: false };
-        setRegistrationUpdateTrigger(prev => prev + 1); // Force re-render
+        // No registration found - reset server state
+        setServerMealRegistration({ breakfast: false, lunch: false, dinner: false });
         
         // Only reset if there was previous data AND no local unsaved changes
         setMealRegistration(prev => {
@@ -334,7 +335,13 @@ export default function StudentPage() {
       setMealRegistrationMessage({ type: '', text: '' });
       hasLocalMealChangesRef.current = false; // Reset the flag
       // Fetch meal registration when page opens - this will populate the form with server data
-      fetchMealRegistration();
+      // Use a small timeout to ensure the component is fully mounted
+      const timeoutId = setTimeout(() => {
+        fetchMealRegistration().catch(err => {
+          console.error('Failed to fetch meal registration on page load:', err);
+        });
+      }, 100);
+      return () => clearTimeout(timeoutId);
     }
   }, [currentPage, user.university, fetchMealRegistration]);
 
@@ -363,11 +370,10 @@ export default function StudentPage() {
     }
 
     // Check if there are any changes from the server state
-    const serverState = serverMealRegistrationRef.current;
     const hasChanges = 
-      mealRegistration.breakfast !== serverState.breakfast ||
-      mealRegistration.lunch !== serverState.lunch ||
-      mealRegistration.dinner !== serverState.dinner;
+      mealRegistration.breakfast !== serverMealRegistration.breakfast ||
+      mealRegistration.lunch !== serverMealRegistration.lunch ||
+      mealRegistration.dinner !== serverMealRegistration.dinner;
 
     if (!hasChanges) {
       setMealRegistrationMessage({
@@ -388,7 +394,7 @@ export default function StudentPage() {
       );
 
       if (response.data.success) {
-        // CRITICAL: Update server state ref IMMEDIATELY from response to prevent re-registration
+        // CRITICAL: Update server state IMMEDIATELY from response to prevent re-registration
         // This must happen before fetchMealRegistration() to handle production network latency
         if (response.data.registration) {
           const newServerState = {
@@ -396,10 +402,7 @@ export default function StudentPage() {
             lunch: response.data.registration.meals?.lunch || false,
             dinner: response.data.registration.meals?.dinner || false
           };
-          serverMealRegistrationRef.current = newServerState; // Update immediately - this is the source of truth
-          
-          // Force re-render to update button disabled state
-          setRegistrationUpdateTrigger(prev => prev + 1);
+          setServerMealRegistration(newServerState); // Update immediately - this triggers re-render
           
           // Also update form state to match what was registered (only if no local changes)
           if (!hasLocalMealChangesRef.current) {
@@ -1493,12 +1496,11 @@ export default function StudentPage() {
                   </p>
                 )}
                 {(() => {
-                  const serverState = serverMealRegistrationRef.current;
                   const hasChanges = 
-                    mealRegistration.breakfast !== serverState.breakfast ||
-                    mealRegistration.lunch !== serverState.lunch ||
-                    mealRegistration.dinner !== serverState.dinner;
-                  const hasAnyRegistration = serverState.breakfast || serverState.lunch || serverState.dinner;
+                    mealRegistration.breakfast !== serverMealRegistration.breakfast ||
+                    mealRegistration.lunch !== serverMealRegistration.lunch ||
+                    mealRegistration.dinner !== serverMealRegistration.dinner;
+                  const hasAnyRegistration = serverMealRegistration.breakfast || serverMealRegistration.lunch || serverMealRegistration.dinner;
                   
                   if (hasAnyRegistration && !hasChanges && !hasLocalMealChangesRef.current) {
                     return (
@@ -1510,12 +1512,11 @@ export default function StudentPage() {
                   return null;
                 })()}
                 {(() => {
-                  const serverState = serverMealRegistrationRef.current;
                   const hasChanges = 
-                    mealRegistration.breakfast !== serverState.breakfast ||
-                    mealRegistration.lunch !== serverState.lunch ||
-                    mealRegistration.dinner !== serverState.dinner;
-                  const hasAnyRegistration = serverState.breakfast || serverState.lunch || serverState.dinner;
+                    mealRegistration.breakfast !== serverMealRegistration.breakfast ||
+                    mealRegistration.lunch !== serverMealRegistration.lunch ||
+                    mealRegistration.dinner !== serverMealRegistration.dinner;
+                  const hasAnyRegistration = serverMealRegistration.breakfast || serverMealRegistration.lunch || serverMealRegistration.dinner;
                   const isDisabled = 
                     isLoadingMealRegistration ||
                     (mealsAvailed.breakfast && mealsAvailed.lunch && mealsAvailed.dinner) ||
