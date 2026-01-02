@@ -390,7 +390,7 @@ export const registerMeals = async (req, res) => {
       });
     }
 
-    // Create new registration
+    // Create new registration with PH time
     const registration = await MealRegistration.create({
       idNumber: user.idNumber,
       firstName: user.firstName,
@@ -400,7 +400,8 @@ export const registerMeals = async (req, res) => {
         breakfast: meals.breakfast || false,
         lunch: meals.lunch || false,
         dinner: meals.dinner || false
-      }
+      },
+      registrationDate: philNow // Use PH time instead of default Date.now()
     });
 
     res.json({
