@@ -363,40 +363,17 @@ export const registerMeals = async (req, res) => {
     });
 
     if (existingRegistration) {
-      // Check if trying to register for meals that are already registered
-      const conflicts = [];
-      if (meals.breakfast && existingRegistration.meals.breakfast) {
-        conflicts.push('breakfast');
-      }
-      if (meals.lunch && existingRegistration.meals.lunch) {
-        conflicts.push('lunch');
-      }
-      if (meals.dinner && existingRegistration.meals.dinner) {
-        conflicts.push('dinner');
-      }
-
-      if (conflicts.length > 0) {
-        return res.status(400).json({ 
-          message: `You have already registered for ${conflicts.join(', ')} today. You can only register 1 breakfast, 1 lunch, and 1 dinner per day.` 
-        });
-      }
-
-      // Add new meals to existing registration (only for meals not already registered)
-      if (meals.breakfast && !existingRegistration.meals.breakfast) {
-        existingRegistration.meals.breakfast = true;
-      }
-      if (meals.lunch && !existingRegistration.meals.lunch) {
-        existingRegistration.meals.lunch = true;
-      }
-      if (meals.dinner && !existingRegistration.meals.dinner) {
-        existingRegistration.meals.dinner = true;
-      }
-      
+      // Update existing registration
+      existingRegistration.meals = {
+        breakfast: meals.breakfast || false,
+        lunch: meals.lunch || false,
+        dinner: meals.dinner || false
+      };
       await existingRegistration.save();
 
       return res.json({
         success: true,
-        message: 'Additional meals registered successfully',
+        message: 'Meal registration updated successfully',
         registration: existingRegistration
       });
     }
