@@ -23,9 +23,9 @@ const availHistorySchema = new mongoose.Schema({
     type: Date, 
     default: () => {
       // Store availed date in Asia/Manila timezone (UTC+8)
+      // Date.getTime() returns milliseconds since epoch (UTC), so add 8 hours
       const now = new Date();
-      const utcTime = now.getTime() + (now.getTimezoneOffset() * 60000);
-      return new Date(utcTime + (8 * 3600000));
+      return new Date(now.getTime() + (8 * 3600000));
     }
   },
   registrationDate: { type: Date, required: true }
