@@ -386,6 +386,11 @@ export const registerMeals = async (req, res) => {
         breakfast: meals.breakfast || false,
         lunch: meals.lunch || false,
         dinner: meals.dinner || false
+      },
+      mealsAvailed: {
+        breakfast: false,
+        lunch: false,
+        dinner: false
       }
     });
 
