@@ -205,22 +205,22 @@ export const getAvailHistory = async (req, res) => {
     // Build query
     const query = {};
 
-    // Use proper timezone handling for date filters
+    // Use proper timezone handling for date filters (now using registrationDate)
     if (startDate || endDate) {
-      query.availedAt = {};
+      query.registrationDate = {};
       if (startDate) {
         const start = new Date(startDate);
         // Convert to Asia/Manila timezone for consistent date handling
         const startPH = new Date(start.toLocaleString("en-US", {timeZone: "Asia/Manila"}));
         startPH.setHours(0, 0, 0, 0);
-        query.availedAt.$gte = startPH;
+        query.registrationDate.$gte = startPH;
       }
       if (endDate) {
         const end = new Date(endDate);
         // Convert to Asia/Manila timezone for consistent date handling
         const endPH = new Date(end.toLocaleString("en-US", {timeZone: "Asia/Manila"}));
         endPH.setHours(23, 59, 59, 999);
-        query.availedAt.$lte = endPH;
+        query.registrationDate.$lte = endPH;
       }
     }
 
