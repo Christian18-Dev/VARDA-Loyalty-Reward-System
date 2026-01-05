@@ -56,6 +56,7 @@ export default function CashierPage() {
     search: ''
   });
   const [isExportingExcel, setIsExportingExcel] = useState(false);
+  const [isExportingBilling, setIsExportingBilling] = useState(false);
   const [isExportingPDF, setIsExportingPDF] = useState(false);
 
   const baseUrl = import.meta.env.VITE_API_BASE_URL;
@@ -588,7 +589,7 @@ export default function CashierPage() {
     );
   };
 
-  // Export to Excel
+  // Export to Excel (Full Report)
   const handleExportToExcel = async () => {
     if (!availHistory || availHistory.length === 0) {
       setError('No data to export');
@@ -684,12 +685,10 @@ export default function CashierPage() {
       const a = document.createElement('a');
       a.href = url;
       a.download = filename;
-      document.body.appendChild(a);
       a.click();
       window.URL.revokeObjectURL(url);
-      document.body.removeChild(a);
 
-      setSuccess(`Successfully exported ${availHistory.length} records to Excel`);
+      setSuccess('Excel file exported successfully!');
       setTimeout(() => setSuccess(''), 3000);
     } catch (error) {
       console.error('Error exporting to Excel:', error);
@@ -697,6 +696,114 @@ export default function CashierPage() {
       setTimeout(() => setError(''), 3000);
     } finally {
       setIsExportingExcel(false);
+    }
+  };
+
+  // Export to Excel (Billing Report - Only specific columns)
+  const handleExportBillingExcel = async () => {
+    if (!availHistory || availHistory.length === 0) {
+      setError('No data to export');
+      setTimeout(() => setError(''), 3000);
+      return;
+    }
+
+    setIsExportingBilling(true);
+    try {
+      const workbook = new ExcelJS.Workbook();
+      const worksheet = workbook.addWorksheet('Billing Report');
+
+      // Define columns for billing (only requested columns)
+      worksheet.columns = [
+        { header: 'AccountID', key: 'accountID', width: 15 },
+        { header: 'ID Number', key: 'idNumber', width: 20 },
+        { header: 'Availed By', key: 'availedBy', width: 30 },
+        { header: 'Availed At', key: 'availedAt', width: 25 }
+      ];
+
+      // Style the header row
+      const headerRow = worksheet.getRow(1);
+      headerRow.height = 25;
+      headerRow.eachCell((cell) => {
+        cell.font = { 
+          bold: true,
+          size: 12,
+          color: { argb: '1a1a1a' },
+          name: 'Helvetica-Bold'
+        };
+        cell.fill = {
+          type: 'pattern',
+          pattern: 'solid',
+          fgColor: { argb: 'e8f5e8' } // Light green for billing
+        };
+        cell.alignment = {
+          vertical: 'middle',
+          horizontal: 'center'
+        };
+        cell.border = {
+          top: { style: 'thin', color: { argb: 'bfbfbf' } },
+          left: { style: 'thin', color: { argb: 'bfbfbf' } },
+          bottom: { style: 'thin', color: { argb: 'bfbfbf' } },
+          right: { style: 'thin', color: { argb: 'bfbfbf' } }
+        };
+      });
+
+      // Add data rows for billing
+      availHistory.forEach(item => {
+        worksheet.addRow({
+          accountID: item.accountID || '-',
+          idNumber: item.idNumber || '-',
+          availedBy: item.availedBy?.name || 'Unknown',
+          availedAt: item.availedAt ? new Date(item.availedAt).toLocaleString('en-US', { timeZone: 'Asia/Manila' }) : '-'
+        });
+      });
+
+      // Style data rows
+      worksheet.eachRow((row, rowNumber) => {
+        if (rowNumber > 1) {
+          row.eachCell((cell) => {
+            cell.border = {
+              top: { style: 'thin', color: { argb: 'bfbfbf' } },
+              left: { style: 'thin', color: { argb: 'bfbfbf' } },
+              bottom: { style: 'thin', color: { argb: 'bfbfbf' } },
+              right: { style: 'thin', color: { argb: 'bfbfbf' } }
+            };
+            cell.alignment = {
+              vertical: 'middle',
+              horizontal: 'left'
+            };
+          });
+        }
+      });
+
+      // Generate filename with filter info for billing
+      const filterParts = [];
+      if (availHistoryFilters.startDate && availHistoryFilters.endDate) {
+        filterParts.push(`${availHistoryFilters.startDate}_to_${availHistoryFilters.endDate}`);
+      } else if (availHistoryFilters.startDate) {
+        filterParts.push(`from_${availHistoryFilters.startDate}`);
+      } else if (availHistoryFilters.endDate) {
+        filterParts.push(`until_${availHistoryFilters.endDate}`);
+      }
+      const filename = `billing_report${filterParts.length > 0 ? '_' + filterParts.join('_') : ''}_${new Date().toISOString().split('T')[0]}.xlsx`;
+
+      // Generate buffer and download
+      const buffer = await workbook.xlsx.writeBuffer();
+      const blob = new Blob([buffer], { type: 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet' });
+      const url = window.URL.createObjectURL(blob);
+      const a = document.createElement('a');
+      a.href = url;
+      a.download = filename;
+      a.click();
+      window.URL.revokeObjectURL(url);
+
+      setSuccess('Billing report exported successfully!');
+      setTimeout(() => setSuccess(''), 3000);
+    } catch (error) {
+      console.error('Error exporting billing report:', error);
+      setError('Error exporting billing report');
+      setTimeout(() => setError(''), 3000);
+    } finally {
+      setIsExportingBilling(false);
     }
   };
 
@@ -1598,6 +1705,32 @@ export default function CashierPage() {
                         <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M12 10v6m0 0l-3-3m3 3l3-3m2 8H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z" />
                       </svg>
                       <span>Export Excel</span>
+                    </>
+                  )}
+                </button>
+                <button
+                  onClick={handleExportBillingExcel}
+                  disabled={isExportingBilling || isLoadingAvailHistory || availHistory.length === 0}
+                  className={`flex items-center space-x-2 px-4 py-2 rounded-lg transition-all ${
+                    isExportingBilling || isLoadingAvailHistory || availHistory.length === 0
+                      ? 'bg-gray-300 text-gray-500 cursor-not-allowed'
+                      : 'bg-blue-600 text-white hover:bg-blue-700 shadow-md hover:shadow-lg'
+                  }`}
+                >
+                  {isExportingBilling ? (
+                    <>
+                      <svg className="animate-spin h-5 w-5" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24">
+                        <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4"></circle>
+                        <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path>
+                      </svg>
+                      <span>Exporting...</span>
+                    </>
+                  ) : (
+                    <>
+                      <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z" />
+                      </svg>
+                      <span>Billing Export</span>
                     </>
                   )}
                 </button>
