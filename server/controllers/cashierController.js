@@ -205,22 +205,37 @@ export const getAvailHistory = async (req, res) => {
     // Build query
     const query = {};
 
-    // Use proper timezone handling for date filters (now using registrationDate)
+    // Use proper timezone handling for date filters (using 5 AM window logic)
     if (startDate || endDate) {
       query.registrationDate = {};
       if (startDate) {
+        // Convert start date to Asia/Manila timezone using 5 AM window logic
         const start = new Date(startDate);
-        // Convert to Asia/Manila timezone for consistent date handling
-        const startPH = new Date(start.toLocaleString("en-US", {timeZone: "Asia/Manila"}));
-        startPH.setHours(0, 0, 0, 0);
-        query.registrationDate.$gte = startPH;
+        const utcTime = start.getTime() + (start.getTimezoneOffset() * 60000);
+        const startPH = new Date(utcTime + (8 * 3600000));
+        
+        // Use 5 AM as start of day (same as meal registration logic)
+        const windowStart = new Date(startPH);
+        windowStart.setHours(5, 0, 0, 0); // 5:00 AM PH time
+        
+        // Convert back to UTC for database query
+        const startUTC = new Date(windowStart.getTime() - (8 * 3600000));
+        query.registrationDate.$gte = startUTC;
       }
       if (endDate) {
+        // Convert end date to Asia/Manila timezone using 5 AM window logic
         const end = new Date(endDate);
-        // Convert to Asia/Manila timezone for consistent date handling
-        const endPH = new Date(end.toLocaleString("en-US", {timeZone: "Asia/Manila"}));
-        endPH.setHours(23, 59, 59, 999);
-        query.registrationDate.$lte = endPH;
+        const utcTime = end.getTime() + (end.getTimezoneOffset() * 60000);
+        const endPH = new Date(utcTime + (8 * 3600000));
+        
+        // Use next day's 5 AM as end boundary (same as meal registration logic)
+        const windowEnd = new Date(endPH);
+        windowEnd.setHours(5, 0, 0, 0); // 5:00 AM next day PH time
+        windowEnd.setDate(windowEnd.getDate() + 1);
+        
+        // Convert back to UTC for database query
+        const endUTC = new Date(windowEnd.getTime() - (8 * 3600000));
+        query.registrationDate.$lt = endUTC; // Use $lt instead of $lte for exact window
       }
     }
 
