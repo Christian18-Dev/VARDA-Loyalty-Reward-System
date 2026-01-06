@@ -35,6 +35,7 @@ export const submitFeedback = async (req, res) => {
     const feedback = new Feedback({
       studentId,
       studentIdNumber,
+      university: req.user.university,
       ratings,
       overallComment
     });
@@ -143,6 +144,7 @@ export const submitSurveyFeedback = async (req, res) => {
     const feedback = new Feedback({
       studentId,
       studentIdNumber,
+      university: req.user.university,
       ratings,
       overallComment,
       submissionType: 'survey'
@@ -194,6 +196,7 @@ export const getFeedbackComments = async (req, res) => {
       createdAt: feedback.createdAt,
       studentIdNumber: feedback.studentId?.idNumber || feedback.studentIdNumber || 'N/A',
       studentName: feedback.studentId?.name || 'N/A',
+      university: feedback.university || 'N/A',
       taste: feedback.ratings?.taste || 0,
       variety: feedback.ratings?.variety || 0,
       value: feedback.ratings?.value || 0,

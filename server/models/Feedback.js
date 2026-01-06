@@ -10,6 +10,10 @@ const feedbackSchema = new mongoose.Schema({
     type: String,
     required: true
   },
+  university: {
+    type: String,
+    required: true
+  },
   ratings: {
     taste: { type: Number, required: true, min: 1, max: 5 },
     variety: { type: Number, required: true, min: 1, max: 5 },
