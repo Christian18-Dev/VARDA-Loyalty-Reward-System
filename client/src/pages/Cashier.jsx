@@ -28,7 +28,7 @@ export default function CashierPage() {
   const [success, setSuccess] = useState('');
   const [currentRewardsPage, setCurrentRewardsPage] = useState(1);
   const [rewardsSearchTerm, setRewardsSearchTerm] = useState('');
-  const itemsPerPage = 5;
+  const itemsPerPage = 10;
   const [showLogoutModal, setShowLogoutModal] = useState(false);
   const [isGenerating, setIsGenerating] = useState(false);
   const [isPrinting, setIsPrinting] = useState(false);

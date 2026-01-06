@@ -149,6 +149,8 @@ export default function StudentPage() {
   const [message, setMessage] = useState({ type: '', text: '' });
   const [error, setError] = useState('');
   const [showFeedbackForm, setShowFeedbackForm] = useState(false);
+  const [showMealFeedbackConfirmation, setShowMealFeedbackConfirmation] = useState(false);
+  const [showMealFeedbackForm, setShowMealFeedbackForm] = useState(false);
   const [claimedRewards, setClaimedRewards] = useState([]);
   const [isLoadingClaimedRewards, setIsLoadingClaimedRewards] = useState(false);
   const [showLevelUpModal, setShowLevelUpModal] = useState(false);
@@ -384,6 +386,8 @@ export default function StudentPage() {
         hasLocalMealChangesRef.current = false; // Clear the flag after successful submission
         // Refresh meal registration data
         await fetchMealRegistration();
+        // Show feedback confirmation popup
+        setShowMealFeedbackConfirmation(true);
         // Clear message after 3 seconds
         setTimeout(() => {
           setMealRegistrationMessage({ type: '', text: '' });
@@ -613,6 +617,37 @@ export default function StudentPage() {
         throw new Error(response.data.message || 'Failed to submit feedback');
       }
       
+    } catch (err) {
+      setErrorMessage(err.response?.data?.message || err.message || 'Failed to submit feedback');
+    } finally {
+      setIsLoading(false);
+    }
+  };
+
+  const handleSurveyFeedbackSubmit = async (feedbackData) => {
+    try {
+      setIsLoading(true);
+      const response = await axios.post(
+        `${baseUrl}/api/student/survey-feedback`,
+        feedbackData,
+        { 
+          headers: { Authorization: `Bearer ${token}` }
+        }
+      );
+
+      if (response.data.success) {
+        setShowMealFeedbackForm(false);
+        // Show simple thank you message
+        setMealRegistrationMessage({
+          type: 'success',
+          text: 'Thank you for your feedback!'
+        });
+        setTimeout(() => {
+          setMealRegistrationMessage({ type: '', text: '' });
+        }, 3000);
+      } else {
+        throw new Error(response.data.message || 'Failed to submit feedback');
+      }
     } catch (err) {
       setErrorMessage(err.response?.data?.message || err.message || 'Failed to submit feedback');
     } finally {
@@ -1773,6 +1808,50 @@ export default function StudentPage() {
         </div>
       )}
 
+      {/* Meal Feedback Confirmation Dialog */}
+      {showMealFeedbackConfirmation && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 backdrop-blur-sm">
+          <motion.div 
+            initial={{ scale: 0.9, opacity: 0 }}
+            animate={{ scale: 1, opacity: 1 }}
+            className="bg-[#1e293b] rounded-2xl p-6 max-w-sm w-full shadow-xl border-2 border-gray-700/50"
+          >
+            <div className="text-center space-y-4">
+              <div className="w-16 h-16 bg-green-900/50 rounded-full flex items-center justify-center mx-auto">
+                <svg xmlns="http://www.w3.org/2000/svg" className="h-8 w-8 text-green-400" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z" />
+                </svg>
+              </div>
+              <h3 className="text-xl font-bold text-gray-200">
+                Help us improve!
+              </h3>
+              <p className="text-gray-300">
+                Would you like to share your feedback about your meal experience?
+              </p>
+              <div className="flex space-x-4">
+                <button 
+                  onClick={() => {
+                    setShowMealFeedbackConfirmation(false);
+                  }}
+                  className="flex-1 py-2 bg-gray-600 text-white rounded-lg font-medium hover:bg-gray-700 transition-all"
+                >
+                  No, thanks
+                </button>
+                <button 
+                  onClick={() => {
+                    setShowMealFeedbackConfirmation(false);
+                    setShowMealFeedbackForm(true);
+                  }}
+                  className="flex-1 py-2 bg-green-600 text-white rounded-lg font-medium hover:bg-green-700 transition-all"
+                >
+                  Give Feedback
+                </button>
+              </div>
+            </div>
+          </motion.div>
+        </div>
+      )}
+
       {/* Feedback Success Modal */}
       {showFeedbackSuccess && (
         <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 backdrop-blur-sm">
@@ -1879,6 +1958,13 @@ export default function StudentPage() {
         <FeedbackForm
           onSubmit={handleFeedbackSubmit}
           onClose={() => setShowFeedbackForm(false)}
+        />
+      )}
+
+      {showMealFeedbackForm && (
+        <FeedbackForm
+          onSubmit={handleSurveyFeedbackSubmit}
+          onClose={() => setShowMealFeedbackForm(false)}
         />
       )}
 

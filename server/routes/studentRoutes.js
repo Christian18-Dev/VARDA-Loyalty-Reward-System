@@ -15,7 +15,7 @@ import { protect, borrowAccess } from '../middleware/authMiddleware.js';
 import { getRewards } from '../controllers/rewardController.js';
 import { createBorrowedItem, getBorrowedItems, processReturnQR } from '../controllers/borrowedItemController.js';
 import { recordPointsUsage, getPointsUsageHistory, getPointsUsageStats } from '../controllers/pointsUsageController.js';
-import { submitFeedback as feedbackSubmit } from '../controllers/feedbackController.js';
+import { submitFeedback as feedbackSubmit, submitSurveyFeedback } from '../controllers/feedbackController.js';
 
 const router = express.Router();
 
@@ -64,6 +64,9 @@ router.post('/return-items', borrowAccess, processReturnQR);
 
 // Add feedback route
 router.post('/feedback', protect, feedbackSubmit);
+
+// Add survey feedback route (no points)
+router.post('/survey-feedback', protect, submitSurveyFeedback);
 
 // Meal registration routes
 router.post('/meal-registration', protect, registerMeals);

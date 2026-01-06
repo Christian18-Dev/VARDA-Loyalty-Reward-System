@@ -23,6 +23,11 @@ const feedbackSchema = new mongoose.Schema({
   overallComment: {
     type: String,
     required: true
+  },
+  submissionType: {
+    type: String,
+    enum: ['points', 'survey'],
+    default: 'points'
   }
 }, { timestamps: true });
 
