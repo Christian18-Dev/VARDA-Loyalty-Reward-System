@@ -58,6 +58,18 @@ export default function CashierPage() {
   const [isExportingExcel, setIsExportingExcel] = useState(false);
   const [isExportingBilling, setIsExportingBilling] = useState(false);
   const [isExportingPDF, setIsExportingPDF] = useState(false);
+  const [availHistoryPagination, setAvailHistoryPagination] = useState({
+    currentPage: 1,
+    totalPages: 1,
+    totalItems: 0,
+    itemsPerPage: 10
+  });
+  const [mealRegistrationsPagination, setMealRegistrationsPagination] = useState({
+    currentPage: 1,
+    totalPages: 1,
+    totalItems: 0,
+    itemsPerPage: 10
+  });
 
   const baseUrl = import.meta.env.VITE_API_BASE_URL;
   const token = user.token;
@@ -263,10 +275,17 @@ export default function CashierPage() {
     
     try {
       setIsLoadingMealRegistrations(true);
-      const res = await axios.get(`${baseUrl}/api/cashier/lima-meal-registrations`, {
+      const params = new URLSearchParams();
+      if (mealRegistrationsSearchTerm) params.append('search', mealRegistrationsSearchTerm);
+      // Add pagination parameters
+      params.append('page', currentMealRegistrationsPage);
+      params.append('limit', itemsPerPage);
+
+      const res = await axios.get(`${baseUrl}/api/cashier/lima-meal-registrations?${params.toString()}`, {
         headers: { Authorization: `Bearer ${token}` },
       });
-      setMealRegistrations(res.data);
+      setMealRegistrations(res.data.data); // Use res.data.data instead of res.data
+      setMealRegistrationsPagination(res.data.pagination); // Store pagination info
     } catch (err) {
       console.error('Error fetching meal registrations:', err);
       setError('Error fetching meal registrations');
@@ -285,7 +304,7 @@ export default function CashierPage() {
     return () => {
       if (pollInterval) clearInterval(pollInterval);
     };
-  }, [activeTab, token, user.role]);
+  }, [activeTab, token, user.role, currentMealRegistrationsPage, mealRegistrationsSearchTerm]);
 
   // Fetch avail history
   const fetchAvailHistory = async () => {
@@ -299,11 +318,15 @@ export default function CashierPage() {
       if (availHistoryFilters.mealType) params.append('mealType', availHistoryFilters.mealType);
       if (availHistoryFilters.accountID) params.append('accountID', availHistoryFilters.accountID);
       if (availHistoryFilters.search) params.append('search', availHistoryFilters.search);
+      // Add pagination parameters
+      params.append('page', currentAvailHistoryPage);
+      params.append('limit', itemsPerPage);
 
       const res = await axios.get(`${baseUrl}/api/cashier/avail-history?${params.toString()}`, {
         headers: { Authorization: `Bearer ${token}` },
       });
-      setAvailHistory(res.data);
+      setAvailHistory(res.data.data); // Use res.data.data instead of res.data
+      setAvailHistoryPagination(res.data.pagination); // Store pagination info
     } catch (err) {
       console.error('Error fetching avail history:', err);
       setError('Error fetching avail history');
@@ -322,7 +345,7 @@ export default function CashierPage() {
     return () => {
       if (pollInterval) clearInterval(pollInterval);
     };
-  }, [activeTab, token, user.role, availHistoryFilters]);
+  }, [activeTab, token, user.role, availHistoryFilters, currentAvailHistoryPage]);
       
   // Filter rewards based on search term
   const filteredRewards = claimedRewards.filter(reward => 
@@ -348,24 +371,8 @@ export default function CashierPage() {
     setCurrentRewardsPage(1);
   };
 
-  // Filter meal registrations based on search term
-  const filteredMealRegistrations = mealRegistrations.filter(registration => {
-    const searchTerm = mealRegistrationsSearchTerm.toLowerCase();
-    const accountIDStr = registration?.accountID?.toString() || '';
-    return (
-      accountIDStr.includes(searchTerm) ||
-      registration?.idNumber?.toLowerCase().includes(searchTerm) ||
-      registration?.firstName?.toLowerCase().includes(searchTerm) ||
-      registration?.lastName?.toLowerCase().includes(searchTerm)
-    );
-  });
-      
-  // Pagination calculations for meal registrations
-  const totalMealRegistrationsPages = Math.ceil(filteredMealRegistrations.length / itemsPerPage);
-  const paginatedMealRegistrations = filteredMealRegistrations.slice(
-    (currentMealRegistrationsPage - 1) * itemsPerPage,
-    currentMealRegistrationsPage * itemsPerPage
-  );
+  // Meal registrations are now paginated server-side, no client-side filtering needed
+  // Use mealRegistrations directly (already filtered and paginated by server)
 
   // Handle meal registrations page change
   const handleMealRegistrationsPageChange = (page) => {
@@ -375,7 +382,7 @@ export default function CashierPage() {
   // Handle meal registrations search
   const handleMealRegistrationsSearch = (e) => {
     setMealRegistrationsSearchTerm(e.target.value);
-    setCurrentMealRegistrationsPage(1);
+    setCurrentMealRegistrationsPage(1); // Reset to page 1 when search changes
   };
 
   // Handle clicking Avail button - show confirmation modal
@@ -590,15 +597,35 @@ export default function CashierPage() {
   };
 
   // Export to Excel (Full Report)
-  const handleExportToExcel = async () => {
-    if (!availHistory || availHistory.length === 0) {
-      setError('No data to export');
-      setTimeout(() => setError(''), 3000);
-      return;
-    }
+  // Helper function to fetch all avail history data for export (without pagination)
+  const fetchAllAvailHistoryForExport = async () => {
+    const params = new URLSearchParams();
+    if (availHistoryFilters.startDate) params.append('startDate', availHistoryFilters.startDate);
+    if (availHistoryFilters.endDate) params.append('endDate', availHistoryFilters.endDate);
+    if (availHistoryFilters.mealType) params.append('mealType', availHistoryFilters.mealType);
+    if (availHistoryFilters.accountID) params.append('accountID', availHistoryFilters.accountID);
+    if (availHistoryFilters.search) params.append('search', availHistoryFilters.search);
+    // Fetch all data by setting a very high limit
+    params.append('page', 1);
+    params.append('limit', 10000); // Large limit to get all data
 
+    const res = await axios.get(`${baseUrl}/api/cashier/avail-history?${params.toString()}`, {
+      headers: { Authorization: `Bearer ${token}` },
+    });
+    return res.data.data;
+  };
+
+  const handleExportToExcel = async () => {
     setIsExportingExcel(true);
     try {
+      // Fetch all data for export
+      const allHistory = await fetchAllAvailHistoryForExport();
+      
+      if (!allHistory || allHistory.length === 0) {
+        setError('No data to export');
+        setTimeout(() => setError(''), 3000);
+        return;
+      }
       const workbook = new ExcelJS.Workbook();
       const worksheet = workbook.addWorksheet('Avail History');
 
@@ -639,7 +666,7 @@ export default function CashierPage() {
       });
 
       // Add data rows
-      availHistory.forEach(item => {
+      allHistory.forEach(item => {
         worksheet.addRow({
           accountID: item.accountID || '-',
           mealType: item.mealType ? item.mealType.charAt(0).toUpperCase() + item.mealType.slice(1) : '-',
@@ -701,14 +728,16 @@ export default function CashierPage() {
 
   // Export to Excel (Billing Report - Only specific columns)
   const handleExportBillingExcel = async () => {
-    if (!availHistory || availHistory.length === 0) {
-      setError('No data to export');
-      setTimeout(() => setError(''), 3000);
-      return;
-    }
-
     setIsExportingBilling(true);
     try {
+      // Fetch all data for export
+      const allHistory = await fetchAllAvailHistoryForExport();
+      
+      if (!allHistory || allHistory.length === 0) {
+        setError('No data to export');
+        setTimeout(() => setError(''), 3000);
+        return;
+      }
       const workbook = new ExcelJS.Workbook();
       const worksheet = workbook.addWorksheet('Billing Report');
 
@@ -748,7 +777,7 @@ export default function CashierPage() {
       });
 
       // Add data rows for billing
-      availHistory.forEach(item => {
+      allHistory.forEach(item => {
         worksheet.addRow({
           accountID: item.accountID || '-',
           idNumber: item.idNumber || '-',
@@ -809,20 +838,23 @@ export default function CashierPage() {
 
   // Export to PDF
   const handleExportToPDF = async () => {
-    if (!availHistory || availHistory.length === 0) {
-      setError('No data to export');
-      setTimeout(() => setError(''), 3000);
-      return;
-    }
-
     setIsExportingPDF(true);
     try {
+      // Fetch all data for export
+      const allHistory = await fetchAllAvailHistoryForExport();
+      
+      if (!allHistory || allHistory.length === 0) {
+        setError('No data to export');
+        setTimeout(() => setError(''), 3000);
+        return;
+      }
+
       // Limit data size for PDF generation
       const MAX_PDF_ITEMS = 1000;
-      const dataToExport = availHistory.slice(0, MAX_PDF_ITEMS);
+      const dataToExport = allHistory.slice(0, MAX_PDF_ITEMS);
       
-      if (availHistory.length > MAX_PDF_ITEMS) {
-        setError(`Too many items (${availHistory.length}) for PDF export. Exporting first ${MAX_PDF_ITEMS} items. Please use Excel format for complete data.`);
+      if (allHistory.length > MAX_PDF_ITEMS) {
+        setError(`Too many items (${allHistory.length}) for PDF export. Exporting first ${MAX_PDF_ITEMS} items. Please use Excel format for complete data.`);
         setTimeout(() => setError(''), 5000);
       }
 
@@ -1453,7 +1485,7 @@ export default function CashierPage() {
                       </tr>
                     </thead>
                     <tbody className="divide-y divide-gray-200">
-                      {paginatedMealRegistrations.map((registration) => (
+                      {mealRegistrations.map((registration) => (
                         <tr key={registration._id} className="hover:bg-gray-50 transition-colors">
                           <td className="px-4 sm:px-6 py-4 whitespace-nowrap">
                             <div className="text-sm font-medium text-gray-900">
@@ -1616,7 +1648,7 @@ export default function CashierPage() {
                       ))}
                     </tbody>
                   </table>
-                  {paginatedMealRegistrations.length === 0 && (
+                  {mealRegistrations.length === 0 && (
                     <div className="text-center py-12">
                       <p className="text-gray-500">No meal registrations found.</p>
                     </div>
@@ -1624,7 +1656,7 @@ export default function CashierPage() {
                 </div>
                 
                 {/* Pagination for Meal Registrations */}
-                {totalMealRegistrationsPages > 1 && (
+                {mealRegistrationsPagination.totalPages > 1 && (
                   <div className="flex justify-center items-center mt-6 space-x-4">
                     <button
                       onClick={() => handleMealRegistrationsPageChange(Math.max(1, currentMealRegistrationsPage - 1))}
@@ -1640,13 +1672,13 @@ export default function CashierPage() {
                       </svg>
                     </button>
                     <span className="text-gray-700 font-medium">
-                      Page {currentMealRegistrationsPage} of {totalMealRegistrationsPages}
+                      Page {mealRegistrationsPagination.currentPage} of {mealRegistrationsPagination.totalPages} ({mealRegistrationsPagination.totalItems} total)
                     </span>
                     <button
-                      onClick={() => handleMealRegistrationsPageChange(Math.min(totalMealRegistrationsPages, currentMealRegistrationsPage + 1))}
-                      disabled={currentMealRegistrationsPage === totalMealRegistrationsPages}
+                      onClick={() => handleMealRegistrationsPageChange(Math.min(mealRegistrationsPagination.totalPages, currentMealRegistrationsPage + 1))}
+                      disabled={currentMealRegistrationsPage === mealRegistrationsPagination.totalPages}
                       className={`p-2 rounded-lg transition-colors ${
-                        currentMealRegistrationsPage === totalMealRegistrationsPages
+                        currentMealRegistrationsPage === mealRegistrationsPagination.totalPages
                           ? 'text-gray-400 cursor-not-allowed'
                           : 'text-gray-700 hover:bg-gray-100'
                       }`}
@@ -1885,9 +1917,7 @@ export default function CashierPage() {
                       </tr>
                     </thead>
                     <tbody className="divide-y divide-gray-200">
-                      {availHistory
-                        .slice((currentAvailHistoryPage - 1) * itemsPerPage, currentAvailHistoryPage * itemsPerPage)
-                        .map((history) => (
+                      {availHistory.map((history) => (
                         <tr key={history._id} className="hover:bg-gray-50 transition-colors">
                           <td className="px-4 sm:px-6 py-4 whitespace-nowrap">
                             <div className="text-sm font-medium text-gray-900">
@@ -1928,7 +1958,7 @@ export default function CashierPage() {
                 </div>
                 
                 {/* Pagination for Avail History */}
-                {Math.ceil(availHistory.length / itemsPerPage) > 1 && (
+                {availHistoryPagination.totalPages > 1 && (
                   <div className="flex justify-center items-center mt-6 space-x-4">
                     <button
                       onClick={() => setCurrentAvailHistoryPage(Math.max(1, currentAvailHistoryPage - 1))}
@@ -1944,13 +1974,13 @@ export default function CashierPage() {
                       </svg>
                     </button>
                     <span className="text-gray-700 font-medium">
-                      Page {currentAvailHistoryPage} of {Math.ceil(availHistory.length / itemsPerPage)}
+                      Page {availHistoryPagination.currentPage} of {availHistoryPagination.totalPages} ({availHistoryPagination.totalItems} total)
                     </span>
                     <button
-                      onClick={() => setCurrentAvailHistoryPage(Math.min(Math.ceil(availHistory.length / itemsPerPage), currentAvailHistoryPage + 1))}
-                      disabled={currentAvailHistoryPage === Math.ceil(availHistory.length / itemsPerPage)}
+                      onClick={() => setCurrentAvailHistoryPage(Math.min(availHistoryPagination.totalPages, currentAvailHistoryPage + 1))}
+                      disabled={currentAvailHistoryPage === availHistoryPagination.totalPages}
                       className={`p-2 rounded-lg transition-colors ${
-                        currentAvailHistoryPage === Math.ceil(availHistory.length / itemsPerPage)
+                        currentAvailHistoryPage === availHistoryPagination.totalPages
                           ? 'text-gray-400 cursor-not-allowed'
                           : 'text-gray-700 hover:bg-gray-100'
                       }`}

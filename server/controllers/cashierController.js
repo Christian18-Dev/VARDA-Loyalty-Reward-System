@@ -61,27 +61,50 @@ export const getPointsUsageHistory = async (req, res) => {
         storeName = req.user.role.charAt(0).toUpperCase() + req.user.role.slice(1);
     }
     
-    // Find points usage records for this store only
+    // Add pagination
+    const { page = 1, limit = 10 } = req.query;
+    const pageNum = parseInt(page);
+    const limitNum = parseInt(limit);
+    const skip = (pageNum - 1) * limitNum;
+    
+    // Get total count
+    const total = await PointsUsage.countDocuments({ storeName });
+    
+    // Find points usage records for this store only with pagination
     const pointsUsage = await PointsUsage.find({ storeName })
       .sort({ dateUsed: -1 })
+      .skip(skip)
+      .limit(limitNum)
       .lean();
 
-    // Get user details for each points usage record
-    const pointsUsageWithUserDetails = await Promise.all(
-      pointsUsage.map(async (usage) => {
-        const user = await User.findOne({ idNumber: usage.idNumber })
-          .select('firstName lastName')
-          .lean();
-        
-        return {
-          ...usage,
-          firstName: user?.firstName || 'Unknown',
-          lastName: user?.lastName || 'Unknown'
-        };
-      })
-    );
+    // Batch query: Get all unique idNumbers and fetch users in one query
+    const idNumbers = [...new Set(pointsUsage.map(usage => usage.idNumber))];
+    const users = await User.find({ idNumber: { $in: idNumbers } })
+      .select('idNumber firstName lastName')
+      .lean();
+    
+    // Create a map for O(1) lookup
+    const userMap = new Map(users.map(u => [u.idNumber, u]));
 
-    res.json(pointsUsageWithUserDetails);
+    // Map points usage with user details
+    const pointsUsageWithUserDetails = pointsUsage.map((usage) => {
+      const user = userMap.get(usage.idNumber);
+      return {
+        ...usage,
+        firstName: user?.firstName || 'Unknown',
+        lastName: user?.lastName || 'Unknown'
+      };
+    });
+
+    res.json({
+      data: pointsUsageWithUserDetails,
+      pagination: {
+        currentPage: pageNum,
+        totalPages: Math.ceil(total / limitNum),
+        totalItems: total,
+        itemsPerPage: limitNum
+      }
+    });
   } catch (error) {
     console.error('Error fetching points usage history:', error);
     res.status(500).json({ message: 'Server error' });
@@ -96,29 +119,59 @@ export const getLimaMealRegistrations = async (req, res) => {
       return res.status(403).json({ message: 'Access denied. Only cashierlima role can access this endpoint.' });
     }
 
-    // Get meal registrations for students with university = 'lima'
-    const mealRegistrations = await MealRegistration.find({ 
+    // Get pagination parameters
+    const { page = 1, limit = 10, search = '' } = req.query;
+    const pageNum = parseInt(page);
+    const limitNum = parseInt(limit);
+    const skip = (pageNum - 1) * limitNum;
+
+    // Build query
+    const query = {
       university: 'lima',
       status: 'active'
-    })
+    };
+
+    // Add search filter if provided
+    if (search) {
+      query.$or = [
+        { firstName: { $regex: search, $options: 'i' } },
+        { lastName: { $regex: search, $options: 'i' } },
+        { idNumber: { $regex: search, $options: 'i' } }
+      ];
+    }
+
+    // Get total count
+    const total = await MealRegistration.countDocuments(query);
+
+    // Get meal registrations with pagination
+    const mealRegistrations = await MealRegistration.find(query)
       .sort({ registrationDate: -1 })
+      .skip(skip)
+      .limit(limitNum)
       .lean();
 
-    // Populate accountID from User model
-    const mealRegistrationsWithAccountID = await Promise.all(
-      mealRegistrations.map(async (registration) => {
-        const user = await User.findOne({ idNumber: registration.idNumber })
-          .select('accountID')
-          .lean();
-        
-        return {
-          ...registration,
-          accountID: user?.accountID || null
-        };
-      })
-    );
+    // Populate accountID from User model (batch query for better performance)
+    const idNumbers = mealRegistrations.map(r => r.idNumber);
+    const users = await User.find({ idNumber: { $in: idNumbers } })
+      .select('idNumber accountID')
+      .lean();
+    
+    const userMap = new Map(users.map(u => [u.idNumber, u.accountID]));
 
-    res.json(mealRegistrationsWithAccountID);
+    const mealRegistrationsWithAccountID = mealRegistrations.map((registration) => ({
+      ...registration,
+      accountID: userMap.get(registration.idNumber) || null
+    }));
+
+    res.json({
+      data: mealRegistrationsWithAccountID,
+      pagination: {
+        currentPage: pageNum,
+        totalPages: Math.ceil(total / limitNum),
+        totalItems: total,
+        itemsPerPage: limitNum
+      }
+    });
   } catch (error) {
     console.error('Error fetching LIMA meal registrations:', error);
     res.status(500).json({ message: 'Server error' });
@@ -199,8 +252,11 @@ export const getAvailHistory = async (req, res) => {
       return res.status(403).json({ message: 'Access denied. Only cashierlima role can access this endpoint.' });
     }
 
-    // Get query parameters for filtering
-    const { startDate, endDate, mealType, accountID, search } = req.query;
+    // Get query parameters for filtering and pagination
+    const { startDate, endDate, mealType, accountID, search, page = 1, limit = 10 } = req.query;
+    const pageNum = parseInt(page);
+    const limitNum = parseInt(limit);
+    const skip = (pageNum - 1) * limitNum;
 
     // Build query
     const query = {};
@@ -258,12 +314,25 @@ export const getAvailHistory = async (req, res) => {
       ];
     }
 
-    // Fetch history with sorting (newest first)
+    // Get total count for pagination
+    const total = await AvailHistory.countDocuments(query);
+
+    // Fetch only the current page with pagination
     const history = await AvailHistory.find(query)
       .sort({ availedAt: -1 })
+      .skip(skip)
+      .limit(limitNum)
       .lean();
 
-    res.json(history);
+    res.json({
+      data: history,
+      pagination: {
+        currentPage: pageNum,
+        totalPages: Math.ceil(total / limitNum),
+        totalItems: total,
+        itemsPerPage: limitNum
+      }
+    });
   } catch (error) {
     console.error('Error fetching avail history:', error);
     res.status(500).json({ message: 'Server error' });
