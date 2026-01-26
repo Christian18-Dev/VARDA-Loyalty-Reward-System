@@ -776,13 +776,41 @@ export default function CashierPage() {
         };
       });
 
-      // Add data rows for billing
+      // Group by student (accountID or idNumber) to avoid duplicates
+      const studentMap = new Map();
+      
       allHistory.forEach(item => {
+        const key = item.accountID || item.idNumber || 'unknown';
+        
+        if (!studentMap.has(key)) {
+          // First occurrence of this student - store the data
+          studentMap.set(key, {
+            accountID: item.accountID || '-',
+            idNumber: item.idNumber || '-',
+            availedBy: item.availedBy?.name || 'Unknown',
+            availedAt: item.availedAt ? new Date(item.availedAt) : null
+          });
+        } else {
+          // Student already exists - update availedAt to earliest date
+          const existing = studentMap.get(key);
+          if (item.availedAt) {
+            const itemDate = new Date(item.availedAt);
+            if (!existing.availedAt || itemDate < existing.availedAt) {
+              existing.availedAt = itemDate;
+            }
+          }
+        }
+      });
+
+      // Add data rows for billing (one row per unique student)
+      studentMap.forEach((studentData) => {
         worksheet.addRow({
-          accountID: item.accountID || '-',
-          idNumber: item.idNumber || '-',
-          availedBy: item.availedBy?.name || 'Unknown',
-          availedAt: item.availedAt ? new Date(item.availedAt).toLocaleString('en-US', { timeZone: 'Asia/Manila' }) : '-'
+          accountID: studentData.accountID,
+          idNumber: studentData.idNumber,
+          availedBy: studentData.availedBy,
+          availedAt: studentData.availedAt 
+            ? studentData.availedAt.toLocaleString('en-US', { timeZone: 'Asia/Manila' }) 
+            : '-'
         });
       });
 
