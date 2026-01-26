@@ -178,6 +178,10 @@ export default function ConciergePage() {
   const [showStatusModal, setShowStatusModal] = useState(false);
   const [statusModalData, setStatusModalData] = useState({ type: '', message: '' });
 
+  // Analytics state
+  const [analyticsStartDate, setAnalyticsStartDate] = useState('');
+  const [analyticsEndDate, setAnalyticsEndDate] = useState('');
+
   // Add new state for polling
   const [isBorrowedPolling, setIsBorrowedPolling] = useState(false);
   const [isReturnedPolling, setIsReturnedPolling] = useState(false);
@@ -309,16 +313,84 @@ export default function ConciergePage() {
   }, []);
 
   // Date validation
-  const validateDates = () => {
-    if (!startDate || !endDate) {
-      setError('Please select both start and end dates');
+  const validateDates = (isAnalytics = false) => {
+    const start = isAnalytics ? analyticsStartDate : startDate;
+    const end = isAnalytics ? analyticsEndDate : endDate;
+    
+    if (!start || !end) {
       return false;
     }
-    if (new Date(endDate) < new Date(startDate)) {
-      setError('End date cannot be before start date');
+    if (new Date(end) < new Date(start)) {
       return false;
     }
     return true;
+  };
+
+  // Process borrowed items data with individual item breakdown for analytics
+  const processBorrowedItemsDataWithBreakdown = (items) => {
+    const data = {};
+    
+    // Define breakdown for sets
+    const setBreakdowns = {
+      'Basic Set': [
+        { name: 'Plate', quantity: 1 },
+        { name: 'Spoon', quantity: 1 },
+        { name: 'Fork', quantity: 1 }
+      ],
+      'Complete Set': [
+        { name: 'Plate', quantity: 1 },
+        { name: 'Bowl', quantity: 1 },
+        { name: 'Spoon', quantity: 1 },
+        { name: 'Fork', quantity: 1 },
+        { name: 'Glass', quantity: 1 }
+      ],
+      'Spoon & Fork': [
+        { name: 'Spoon', quantity: 1 },
+        { name: 'Fork', quantity: 1 }
+      ]
+    };
+    
+    items.forEach(item => {
+      const borrowDate = new Date(item.borrowTime);
+      // Group by day - use Philippine Time date format
+      const key = borrowDate.toLocaleDateString('en-CA', { timeZone: 'Asia/Manila' });
+      
+      if (!data[key]) {
+        data[key] = {
+          'Plate': 0,
+          'Bowl': 0,
+          'Glass': 0,
+          'Spoon': 0,
+          'Fork': 0,
+          'Saucer': 0
+        };
+      }
+      
+      // Process each item in borrow record
+      item.items.forEach(borrowedItem => {
+        if (setBreakdowns[borrowedItem.name]) {
+          // This is a set, break it down into individual items
+          setBreakdowns[borrowedItem.name].forEach(breakdownItem => {
+            data[key][breakdownItem.name] += breakdownItem.quantity * borrowedItem.quantity;
+          });
+        } else {
+          // This is an individual item
+          if (data[key].hasOwnProperty(borrowedItem.name)) {
+            data[key][borrowedItem.name] += borrowedItem.quantity;
+          }
+        }
+      });
+    });
+    
+    // Sort data chronologically
+    const sortedData = {};
+    Object.keys(data)
+      .sort((a, b) => new Date(a) - new Date(b))
+      .forEach(key => {
+        sortedData[key] = data[key];
+      });
+    
+    return sortedData;
   };
 
   // Optimized fetchBorrowedItems function with smart caching
@@ -964,6 +1036,378 @@ export default function ConciergePage() {
     }
   };
 
+  // Analytics export function
+  const handleExportAnalytics = async (format) => {
+    try {
+      if (!validateDates(true)) {
+        showStatusMessage('error', 'Please select both start and end dates');
+        return;
+      }
+
+      // Fetch fresh data for analytics export with breakdown
+      const queryParams = new URLSearchParams();
+      if (analyticsStartDate) queryParams.append('startDate', analyticsStartDate);
+      if (analyticsEndDate) queryParams.append('endDate', analyticsEndDate);
+      
+      const res = await axios.get(`${baseUrl}/api/concierge/borrowed-history?${queryParams}`, {
+        headers: { Authorization: `Bearer ${token}` },
+        timeout: 30000
+      });
+      
+      const items = res.data.data;
+      if (!items || items.length === 0) {
+        showStatusMessage('error', 'No data found for selected date range');
+        return;
+      }
+
+      // Process data with individual item breakdown
+      const processedData = processBorrowedItemsDataWithBreakdown(items);
+
+      if (Object.keys(processedData).length === 0) {
+        showStatusMessage('error', 'No data found for selected date range');
+        return;
+      }
+
+      if (format === 'excel') {
+        const workbook = new ExcelJS.Workbook();
+        const worksheet = workbook.addWorksheet('Borrowed Items Analytics');
+        
+        // Add headers for individual items
+        worksheet.columns = [
+          { header: 'Date', key: 'date', width: 20 },
+          { header: 'Plate', key: 'Plate', width: 15 },
+          { header: 'Bowl', key: 'Bowl', width: 15 },
+          { header: 'Glass', key: 'Glass', width: 15 },
+          { header: 'Spoon', key: 'Spoon', width: 15 },
+          { header: 'Fork', key: 'Fork', width: 15 },
+          { header: 'Saucer', key: 'Saucer', width: 15 }
+        ];
+
+        // Style header row
+        const headerRow = worksheet.getRow(1);
+        headerRow.height = 25;
+        headerRow.eachCell((cell) => {
+          cell.font = { 
+            bold: true,
+            size: 12,
+            color: { argb: '1a1a1a' },
+            name: 'Helvetica-Bold'
+          };
+          cell.fill = {
+            type: 'pattern',
+            pattern: 'solid',
+            fgColor: { argb: 'f0f0f0' }
+          };
+          cell.alignment = {
+            vertical: 'middle',
+            horizontal: 'center'
+          };
+          cell.border = {
+            top: { style: 'thin', color: { argb: 'bfbfbf' } },
+            left: { style: 'thin', color: { argb: 'bfbfbf' } },
+            bottom: { style: 'thin', color: { argb: 'bfbfbf' } },
+            right: { style: 'thin', color: { argb: 'bfbfbf' } }
+          };
+        });
+
+        // Calculate totals
+        const totals = {
+          Plate: 0,
+          Bowl: 0,
+          Glass: 0,
+          Spoon: 0,
+          Fork: 0,
+          Saucer: 0
+        };
+
+        // Add data rows and calculate totals
+        Object.entries(processedData).forEach(([date, itemCounts]) => {
+          worksheet.addRow({
+            date: date,
+            Plate: itemCounts.Plate,
+            Bowl: itemCounts.Bowl,
+            Glass: itemCounts.Glass,
+            Spoon: itemCounts.Spoon,
+            Fork: itemCounts.Fork,
+            Saucer: itemCounts.Saucer
+          });
+          
+          // Add to totals
+          totals.Plate += itemCounts.Plate;
+          totals.Bowl += itemCounts.Bowl;
+          totals.Glass += itemCounts.Glass;
+          totals.Spoon += itemCounts.Spoon;
+          totals.Fork += itemCounts.Fork;
+          totals.Saucer += itemCounts.Saucer;
+        });
+
+        // Add subtotal row
+        const subtotalRow = worksheet.addRow({
+          date: 'SUBTOTAL',
+          Plate: totals.Plate,
+          Bowl: totals.Bowl,
+          Glass: totals.Glass,
+          Spoon: totals.Spoon,
+          Fork: totals.Fork,
+          Saucer: totals.Saucer
+        });
+        
+        // Add grand total row
+        const grandTotal = Object.values(totals).reduce((sum, value) => sum + value, 0);
+        const grandTotalRow = worksheet.addRow({
+          date: 'GRAND TOTAL',
+          Plate: grandTotal,
+          Bowl: '',
+          Glass: '',
+          Spoon: '',
+          Fork: '',
+          Saucer: ''
+        });
+
+        // Style data rows
+        worksheet.eachRow((row, rowNumber) => {
+          if (rowNumber > 1) {
+            row.eachCell((cell) => {
+              cell.font = { 
+                size: 11,
+                name: 'Helvetica'
+              };
+              cell.alignment = {
+                vertical: 'middle',
+                horizontal: 'center'
+              };
+              cell.border = {
+                top: { style: 'thin', color: { argb: 'bfbfbf' } },
+                left: { style: 'thin', color: { argb: 'bfbfbf' } },
+                bottom: { style: 'thin', color: { argb: 'bfbfbf' } },
+                right: { style: 'thin', color: { argb: 'bfbfbf' } }
+              };
+            });
+          }
+        });
+
+        // Style subtotal row
+        subtotalRow.eachCell((cell) => {
+          cell.font = { 
+            bold: true,
+            size: 11,
+            name: 'Helvetica-Bold'
+          };
+          cell.fill = {
+            type: 'pattern',
+            pattern: 'solid',
+            fgColor: { argb: 'e6e6e6' }
+          };
+          cell.alignment = {
+            vertical: 'middle',
+            horizontal: 'center'
+          };
+          cell.border = {
+            top: { style: 'thin', color: { argb: 'bfbfbf' } },
+            left: { style: 'thin', color: { argb: 'bfbfbf' } },
+            bottom: { style: 'thin', color: { argb: 'bfbfbf' } },
+            right: { style: 'thin', color: { argb: 'bfbfbf' } }
+          };
+        });
+        
+        // Style grand total row
+        grandTotalRow.eachCell((cell, colNumber) => {
+          cell.font = { 
+            bold: true,
+            size: 11,
+            name: 'Helvetica-Bold'
+          };
+          cell.fill = {
+            type: 'pattern',
+            pattern: 'solid',
+            fgColor: { argb: 'e6e6e6' }
+          };
+          cell.alignment = {
+            vertical: 'middle',
+            horizontal: 'center'
+          };
+          cell.border = {
+            top: { style: 'thin', color: { argb: 'bfbfbf' } },
+            left: { style: 'thin', color: { argb: 'bfbfbf' } },
+            bottom: { style: 'thin', color: { argb: 'bfbfbf' } },
+            right: { style: 'thin', color: { argb: 'bfbfbf' } }
+          };
+        });
+
+        // Generate and download Excel file
+        const buffer = await workbook.xlsx.writeBuffer();
+        const blob = new Blob([buffer], { type: 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet' });
+        const url = window.URL.createObjectURL(blob);
+        const a = document.createElement('a');
+        a.href = url;
+        a.download = 'borrowed-items-analytics.xlsx';
+        document.body.appendChild(a);
+        a.click();
+        window.URL.revokeObjectURL(url);
+        
+        showStatusMessage('success', 'Analytics exported successfully to Excel');
+      } else if (format === 'pdf') {
+        // PDF export for analytics
+        const AnalyticsPDFDocument = () => {
+          const data = Object.entries(processedData).map(([date, itemCounts]) => ({
+            date,
+            ...itemCounts
+          }));
+
+          // Calculate totals for PDF
+          const totals = {
+            Plate: 0,
+            Bowl: 0,
+            Glass: 0,
+            Spoon: 0,
+            Fork: 0,
+            Saucer: 0
+          };
+
+          Object.entries(processedData).forEach(([date, itemCounts]) => {
+            totals.Plate += itemCounts.Plate;
+            totals.Bowl += itemCounts.Bowl;
+            totals.Glass += itemCounts.Glass;
+            totals.Spoon += itemCounts.Spoon;
+            totals.Fork += itemCounts.Fork;
+            totals.Saucer += itemCounts.Saucer;
+          });
+
+          const grandTotal = Object.values(totals).reduce((sum, value) => sum + value, 0);
+
+          return (
+            <Document>
+              <Page size="A4" style={styles.page}>
+                <View style={styles.header}>
+                  {logoDataUrl && !logoError && (
+                    <Image 
+                      src={logoDataUrl}
+                      style={styles.logo}
+                    />
+                  )}
+                  <Text style={styles.title}>Borrowed Items Analytics</Text>
+                  <Text style={styles.subtitle}>
+                    {`From ${new Date(analyticsStartDate).toLocaleDateString('en-US', { timeZone: 'Asia/Manila' })} to ${new Date(analyticsEndDate).toLocaleDateString('en-US', { timeZone: 'Asia/Manila' })}`}
+                  </Text>
+                </View>
+                <View style={styles.table}>
+                  <View style={styles.tableRow}>
+                    <View style={[styles.tableCol, { width: '20%' }]}>
+                      <Text style={styles.headerCell}>Date</Text>
+                    </View>
+                    <View style={[styles.tableCol, { width: '13%' }]}>
+                      <Text style={styles.headerCell}>Plate</Text>
+                    </View>
+                    <View style={[styles.tableCol, { width: '13%' }]}>
+                      <Text style={styles.headerCell}>Bowl</Text>
+                    </View>
+                    <View style={[styles.tableCol, { width: '13%' }]}>
+                      <Text style={styles.headerCell}>Glass</Text>
+                    </View>
+                    <View style={[styles.tableCol, { width: '13%' }]}>
+                      <Text style={styles.headerCell}>Spoon</Text>
+                    </View>
+                    <View style={[styles.tableCol, { width: '13%' }]}>
+                      <Text style={styles.headerCell}>Fork</Text>
+                    </View>
+                    <View style={[styles.tableCol, { width: '15%' }]}>
+                      <Text style={styles.headerCell}>Saucer</Text>
+                    </View>
+                  </View>
+                  {data.map((item, index) => (
+                    <View key={index} style={styles.tableRow}>
+                      <View style={[styles.tableCol, { width: '20%' }]}>
+                        <Text style={styles.tableCell}>{item.date}</Text>
+                      </View>
+                      <View style={[styles.tableCol, { width: '13%' }]}>
+                        <Text style={styles.tableCell}>{item.Plate}</Text>
+                      </View>
+                      <View style={[styles.tableCol, { width: '13%' }]}>
+                        <Text style={styles.tableCell}>{item.Bowl}</Text>
+                      </View>
+                      <View style={[styles.tableCol, { width: '13%' }]}>
+                        <Text style={styles.tableCell}>{item.Glass}</Text>
+                      </View>
+                      <View style={[styles.tableCol, { width: '13%' }]}>
+                        <Text style={styles.tableCell}>{item.Spoon}</Text>
+                      </View>
+                      <View style={[styles.tableCol, { width: '13%' }]}>
+                        <Text style={styles.tableCell}>{item.Fork}</Text>
+                      </View>
+                      <View style={[styles.tableCol, { width: '15%' }]}>
+                        <Text style={styles.tableCell}>{item.Saucer}</Text>
+                      </View>
+                    </View>
+                  ))}
+                  {/* Subtotal Row */}
+                  <View style={styles.tableRow}>
+                    <View style={[styles.tableCol, { width: '20%' }]}>
+                      <Text style={[styles.tableCell, { fontWeight: 'bold', backgroundColor: '#e6e6e6' }]}>SUBTOTAL</Text>
+                    </View>
+                    <View style={[styles.tableCol, { width: '13%' }]}>
+                      <Text style={[styles.tableCell, { fontWeight: 'bold', backgroundColor: '#e6e6e6' }]}>{totals.Plate}</Text>
+                    </View>
+                    <View style={[styles.tableCol, { width: '13%' }]}>
+                      <Text style={[styles.tableCell, { fontWeight: 'bold', backgroundColor: '#e6e6e6' }]}>{totals.Bowl}</Text>
+                    </View>
+                    <View style={[styles.tableCol, { width: '13%' }]}>
+                      <Text style={[styles.tableCell, { fontWeight: 'bold', backgroundColor: '#e6e6e6' }]}>{totals.Glass}</Text>
+                    </View>
+                    <View style={[styles.tableCol, { width: '13%' }]}>
+                      <Text style={[styles.tableCell, { fontWeight: 'bold', backgroundColor: '#e6e6e6' }]}>{totals.Spoon}</Text>
+                    </View>
+                    <View style={[styles.tableCol, { width: '13%' }]}>
+                      <Text style={[styles.tableCell, { fontWeight: 'bold', backgroundColor: '#e6e6e6' }]}>{totals.Fork}</Text>
+                    </View>
+                    <View style={[styles.tableCol, { width: '15%' }]}>
+                      <Text style={[styles.tableCell, { fontWeight: 'bold', backgroundColor: '#e6e6e6' }]}>{totals.Saucer}</Text>
+                    </View>
+                  </View>
+                  {/* Grand Total Row */}
+                  <View style={styles.tableRow}>
+                    <View style={[styles.tableCol, { width: '20%' }]}>
+                      <Text style={[styles.tableCell, { fontWeight: 'bold', backgroundColor: '#e6e6e6' }]}>GRAND TOTAL</Text>
+                    </View>
+                    <View style={[styles.tableCol, { width: '13%' }]}>
+                      <Text style={[styles.tableCell, { fontWeight: 'bold', backgroundColor: '#e6e6e6' }]}>{grandTotal}</Text>
+                    </View>
+                    <View style={[styles.tableCol, { width: '13%' }]}>
+                      <Text style={styles.tableCell}></Text>
+                    </View>
+                    <View style={[styles.tableCol, { width: '13%' }]}>
+                      <Text style={styles.tableCell}></Text>
+                    </View>
+                    <View style={[styles.tableCol, { width: '13%' }]}>
+                      <Text style={styles.tableCell}></Text>
+                    </View>
+                    <View style={[styles.tableCol, { width: '15%' }]}>
+                      <Text style={styles.tableCell}></Text>
+                    </View>
+                  </View>
+                </View>
+              </Page>
+            </Document>
+          );
+        };
+
+        const pdfBlob = await pdf(<AnalyticsPDFDocument />).toBlob();
+        const url = window.URL.createObjectURL(pdfBlob);
+        const a = document.createElement('a');
+        a.href = url;
+        a.download = 'borrowed-items-analytics.pdf';
+        document.body.appendChild(a);
+        a.click();
+        window.URL.revokeObjectURL(url);
+        document.body.removeChild(a);
+        
+        showStatusMessage('success', 'Analytics exported successfully to PDF');
+      }
+    } catch (error) {
+      console.error('Error exporting analytics:', error);
+      showStatusMessage('error', 'Error exporting analytics data');
+    }
+  };
+
   // Update the PDFExportButton to show loading state
   const PDFExportButton = ({ type }) => {
     const [isLoading, setIsLoading] = useState(false);
@@ -1002,6 +1446,15 @@ export default function ConciergePage() {
   const handleEndDateChange = (e) => {
     setEndDate(e.target.value);
     setError('');
+  };
+
+  // Analytics date handlers
+  const handleAnalyticsStartDateChange = (e) => {
+    setAnalyticsStartDate(e.target.value);
+  };
+
+  const handleAnalyticsEndDateChange = (e) => {
+    setAnalyticsEndDate(e.target.value);
   };
 
   // Handle manual return
@@ -1707,6 +2160,62 @@ export default function ConciergePage() {
                       <span>Excel</span>
                     </button>
                     <PDFExportButton type="returned" />
+                  </div>
+                </div>
+              </div>
+
+              {/* Analytics Section */}
+              <div className="mt-6">
+                <div className="bg-gradient-to-br from-purple-50 to-indigo-50 p-6 rounded-xl border border-purple-100">
+                  <div className="flex items-center space-x-2 mb-4">
+                    <svg className="w-5 h-5 text-purple-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M9 19v-6a2 2 0 00-2-2H5a2 2 0 00-2 2v6a2 2 0 002 2h2a2 2 0 002-2zm0 0V9a2 2 0 012-2h2a2 2 0 012 2v10m-6 0a2 2 0 002 2h2a2 2 0 002-2m0 0V5a2 2 0 012-2h2a2 2 0 012 2z" />
+                    </svg>
+                    <h3 className="text-lg font-semibold text-gray-800">Analytics</h3>
+                  </div>
+                  <p className="text-gray-600 mb-4">Export detailed breakdown of borrowed items by individual components.</p>
+                  
+                  {/* Date Range Inputs */}
+                  <div className="grid grid-cols-2 gap-4 mb-4">
+                    <div>
+                      <label className="block text-sm font-medium text-gray-700 mb-1">Start Date</label>
+                      <input
+                        type="date"
+                        value={analyticsStartDate}
+                        onChange={handleAnalyticsStartDateChange}
+                        className="w-full px-4 py-2 border border-gray-300 rounded-xl focus:ring-2 focus:ring-purple-500 focus:border-transparent bg-white"
+                      />
+                    </div>
+                    <div>
+                      <label className="block text-sm font-medium text-gray-700 mb-1">End Date</label>
+                      <input
+                        type="date"
+                        value={analyticsEndDate}
+                        onChange={handleAnalyticsEndDateChange}
+                        className="w-full px-4 py-2 border border-gray-300 rounded-xl focus:ring-2 focus:ring-purple-500 focus:border-transparent bg-white"
+                      />
+                    </div>
+                  </div>
+
+                  <div className="grid grid-cols-2 gap-4">
+                    <button
+                      onClick={() => handleExportAnalytics('excel')}
+                      className="w-full px-4 py-3 bg-purple-600 text-white rounded-xl hover:bg-purple-700 flex items-center justify-center space-x-2 transition-all transform hover:scale-105"
+                    >
+                      <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M9 17v-2m3 2v-4m3 4v-6m2 10H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z" />
+                      </svg>
+                      <span>Excel</span>
+                    </button>
+                    <button
+                      onClick={() => handleExportAnalytics('pdf')}
+                      className="w-full px-4 py-3 bg-purple-600 text-white rounded-xl hover:bg-purple-700 flex items-center justify-center space-x-2 transition-all transform hover:scale-105"
+                    >
+                      <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M7 21h10a2 2 0 002-2V9.414a1 1 0 00-.293-.707l-5.414-5.414A1 1 0 0012.586 3H7a2 2 0 00-2 2v14a2 2 0 002 2z" />
+                      </svg>
+                      <span>PDF</span>
+                    </button>
                   </div>
                 </div>
               </div>
