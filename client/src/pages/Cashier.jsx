@@ -42,9 +42,6 @@ export default function CashierPage() {
   const [isLoadingMealRegistrations, setIsLoadingMealRegistrations] = useState(false);
   const [currentMealRegistrationsPage, setCurrentMealRegistrationsPage] = useState(1);
   const [mealRegistrationsSearchTerm, setMealRegistrationsSearchTerm] = useState('');
-  const [availingMeals, setAvailingMeals] = useState({}); // Track which meals are being availed
-  const [showAvailConfirmModal, setShowAvailConfirmModal] = useState(false);
-  const [pendingAvail, setPendingAvail] = useState(null); // { registrationId, mealType, studentName, accountID }
   const [availHistory, setAvailHistory] = useState([]);
   const [isLoadingAvailHistory, setIsLoadingAvailHistory] = useState(false);
   const [currentAvailHistoryPage, setCurrentAvailHistoryPage] = useState(1);
@@ -385,76 +382,6 @@ export default function CashierPage() {
     setCurrentMealRegistrationsPage(1); // Reset to page 1 when search changes
   };
 
-  // Handle clicking Avail button - show confirmation modal
-  const handleAvailMealClick = (registrationId, mealType) => {
-    const registration = mealRegistrations.find(reg => reg._id === registrationId);
-    if (registration) {
-      setPendingAvail({
-        registrationId,
-        mealType,
-        studentName: `${registration.firstName} ${registration.lastName}`,
-        accountID: registration.accountID || 'N/A'
-      });
-      setShowAvailConfirmModal(true);
-    }
-  };
-
-  // Handle confirming and availing a meal
-  const handleConfirmAvailMeal = async () => {
-    if (!pendingAvail) return;
-
-    const { registrationId, mealType } = pendingAvail;
-    const key = `${registrationId}-${mealType}`;
-    
-    try {
-      setShowAvailConfirmModal(false);
-      setAvailingMeals(prev => ({ ...prev, [key]: true }));
-      setError('');
-      setSuccess('');
-
-      const res = await axios.post(
-        `${baseUrl}/api/cashier/avail-meal`,
-        { registrationId, mealType },
-        { headers: { Authorization: `Bearer ${token}` } }
-      );
-
-      if (res.data.success) {
-        setSuccess(res.data.message);
-        // Update the local state to reflect the availed meal
-        setMealRegistrations(prev => 
-          prev.map(reg => 
-            reg._id === registrationId 
-              ? { ...reg, mealsAvailed: { ...reg.mealsAvailed, [mealType]: true } }
-              : reg
-          )
-        );
-        // Refresh history if on history tab
-        if (activeTab === 'avail-history') {
-          fetchAvailHistory();
-        }
-        // Clear success message after 3 seconds
-        setTimeout(() => setSuccess(''), 3000);
-      }
-    } catch (err) {
-      console.error('Error availing meal:', err);
-      setError(err.response?.data?.message || 'Error availing meal');
-      setTimeout(() => setError(''), 5000);
-    } finally {
-      setAvailingMeals(prev => {
-        const newState = { ...prev };
-        delete newState[key];
-        return newState;
-      });
-      setPendingAvail(null);
-    }
-  };
-
-  // Handle canceling avail confirmation
-  const handleCancelAvailMeal = () => {
-    setShowAvailConfirmModal(false);
-    setPendingAvail(null);
-  };
-
   // PDF Styles for Avail History Export
   const availHistoryPDFStyles = StyleSheet.create({
     page: { padding: 10 },
@@ -562,11 +489,8 @@ export default function CashierPage() {
               <View style={[availHistoryPDFStyles.tableCol, { width: '30%' }]}>
                 <Text style={availHistoryPDFStyles.headerCell}>Availed By</Text>
               </View>
-              <View style={[availHistoryPDFStyles.tableCol, { width: '20%' }]}>
+              <View style={[availHistoryPDFStyles.tableCol, { width: '40%' }]}>
                 <Text style={availHistoryPDFStyles.headerCell}>Availed At</Text>
-              </View>
-              <View style={[availHistoryPDFStyles.tableCol, { width: '20%' }]}>
-                <Text style={availHistoryPDFStyles.headerCell}>Registration Date</Text>
               </View>
             </View>
             {data.map((item, index) => (
@@ -582,11 +506,8 @@ export default function CashierPage() {
                 <View style={[availHistoryPDFStyles.tableCol, { width: '30%' }]}>
                   <Text style={availHistoryPDFStyles.tableCell}>{item.availedBy?.name || 'Unknown'}</Text>
                 </View>
-                <View style={[availHistoryPDFStyles.tableCol, { width: '20%' }]}>
-                  <Text style={availHistoryPDFStyles.tableCell}>{formatDateTime(item.availedAt)}</Text>
-                </View>
-                <View style={[availHistoryPDFStyles.tableCol, { width: '20%' }]}>
-                  <Text style={availHistoryPDFStyles.tableCell}>{formatDate(item.registrationDate)}</Text>
+                <View style={[availHistoryPDFStyles.tableCol, { width: '40%' }]}>
+                  <Text style={availHistoryPDFStyles.tableCell}>{formatDate(item.availedAt)}</Text>
                 </View>
               </View>
             ))}
@@ -634,8 +555,7 @@ export default function CashierPage() {
         { header: 'AccountID', key: 'accountID', width: 15 },
         { header: 'Meal Type', key: 'mealType', width: 15 },
         { header: 'Availed By', key: 'availedBy', width: 30 },
-        { header: 'Availed At', key: 'availedAt', width: 25 },
-        { header: 'Registration Date', key: 'registrationDate', width: 20 }
+        { header: 'Availed At', key: 'availedAt', width: 25 }
       ];
 
       // Style the header row
@@ -671,8 +591,7 @@ export default function CashierPage() {
           accountID: item.accountID || '-',
           mealType: item.mealType ? item.mealType.charAt(0).toUpperCase() + item.mealType.slice(1) : '-',
           availedBy: item.availedBy?.name || 'Unknown',
-          availedAt: item.availedAt ? new Date(item.availedAt).toLocaleString('en-US', { timeZone: 'Asia/Manila' }) : '-',
-          registrationDate: item.registrationDate ? new Date(item.registrationDate).toLocaleDateString('en-US', { timeZone: 'Asia/Manila' }) : '-'
+          availedAt: item.availedAt ? new Date(item.availedAt).toLocaleDateString('en-US', { timeZone: 'Asia/Manila' }) : '-'
         });
       });
 
@@ -809,7 +728,7 @@ export default function CashierPage() {
           idNumber: studentData.idNumber,
           availedBy: studentData.availedBy,
           availedAt: studentData.availedAt 
-            ? studentData.availedAt.toLocaleString('en-US', { timeZone: 'Asia/Manila' }) 
+            ? studentData.availedAt.toLocaleDateString('en-US', { timeZone: 'Asia/Manila' }) 
             : '-'
         });
       });
@@ -1189,7 +1108,7 @@ export default function CashierPage() {
                   >
                     {isGenerating ? (
                       <>
-                        <svg className="animate-spin -ml-1 mr-3 h-5 w-5 text-white" xmlns="http://www.w3.org/2000/svg" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <svg className="animate-spin -ml-1 mr-3 h-5 w-5 text-white" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24">
                           <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4"></circle>
                           <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path>
                         </svg>
@@ -1210,7 +1129,7 @@ export default function CashierPage() {
                   >
                     {isBulkGenerating ? (
                       <>
-                        <svg className="animate-spin -ml-1 mr-3 h-5 w-5 text-white" xmlns="http://www.w3.org/2000/svg" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <svg className="animate-spin -ml-1 mr-3 h-5 w-5 text-white" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24">
                           <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4"></circle>
                           <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path>
                         </svg>
@@ -1526,44 +1445,11 @@ export default function CashierPage() {
                           <td className="px-4 sm:px-6 py-4 whitespace-nowrap">
                             <div className="flex flex-col items-center space-y-2">
                               {registration.meals?.breakfast ? (
-                                <>
-                                  {registration.mealsAvailed?.breakfast ? (
-                                    <div className="flex items-center justify-center w-10 h-10 rounded-full bg-green-100 border-2 border-green-500">
-                                      <svg className="w-6 h-6 text-green-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="3" d="M5 13l4 4L19 7" />
-                                      </svg>
-                                    </div>
-                                  ) : (
-                                    <>
-                                      <div className="flex items-center justify-center w-10 h-10 rounded-full bg-amber-100 border-2 border-amber-500">
-                                        <svg className="w-6 h-6 text-amber-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                                          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M12 8v4l3 3m6-3a9 9 0 11-18 0 9 9 0 0118 0z" />
-                                        </svg>
-                                      </div>
-                                      <button
-                                        onClick={() => handleAvailMealClick(registration._id, 'breakfast')}
-                                        disabled={availingMeals[`${registration._id}-breakfast`]}
-                                        className={`px-4 py-2 text-sm font-semibold rounded-lg transition-all transform hover:scale-105 active:scale-95 shadow-md ${
-                                          availingMeals[`${registration._id}-breakfast`]
-                                            ? 'bg-gray-300 text-gray-600 cursor-not-allowed shadow-none'
-                                            : 'bg-gradient-to-r from-purple-600 to-indigo-600 text-white hover:from-purple-700 hover:to-indigo-700 shadow-purple-200'
-                                        }`}
-                                      >
-                                        {availingMeals[`${registration._id}-breakfast`] ? (
-                                          <span className="flex items-center">
-                                            <svg className="animate-spin -ml-1 mr-2 h-4 w-4 text-white" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24">
-                                              <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4"></circle>
-                                              <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path>
-                                            </svg>
-                                            Processing...
-                                          </span>
-                                        ) : (
-                                          'Avail'
-                                        )}
-                                      </button>
-                                    </>
-                                  )}
-                                </>
+                                <div className="flex items-center justify-center w-10 h-10 rounded-full bg-green-100 border-2 border-green-500">
+                                  <svg className="w-6 h-6 text-green-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="3" d="M5 13l4 4L19 7" />
+                                  </svg>
+                                </div>
                               ) : (
                                 <div className="flex items-center justify-center w-10 h-10 rounded-full bg-gray-100 border-2 border-gray-300">
                                   <span className="text-gray-400 text-xs">-</span>
@@ -1574,44 +1460,11 @@ export default function CashierPage() {
                           <td className="px-4 sm:px-6 py-4 whitespace-nowrap">
                             <div className="flex flex-col items-center space-y-2">
                               {registration.meals?.lunch ? (
-                                <>
-                                  {registration.mealsAvailed?.lunch ? (
-                                    <div className="flex items-center justify-center w-10 h-10 rounded-full bg-green-100 border-2 border-green-500">
-                                      <svg className="w-6 h-6 text-green-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="3" d="M5 13l4 4L19 7" />
-                                      </svg>
-                                    </div>
-                                  ) : (
-                                    <>
-                                      <div className="flex items-center justify-center w-10 h-10 rounded-full bg-amber-100 border-2 border-amber-500">
-                                        <svg className="w-6 h-6 text-amber-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                                          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M12 8v4l3 3m6-3a9 9 0 11-18 0 9 9 0 0118 0z" />
-                                        </svg>
-                                      </div>
-                                      <button
-                                        onClick={() => handleAvailMealClick(registration._id, 'lunch')}
-                                        disabled={availingMeals[`${registration._id}-lunch`]}
-                                        className={`px-4 py-2 text-sm font-semibold rounded-lg transition-all transform hover:scale-105 active:scale-95 shadow-md ${
-                                          availingMeals[`${registration._id}-lunch`]
-                                            ? 'bg-gray-300 text-gray-600 cursor-not-allowed shadow-none'
-                                            : 'bg-gradient-to-r from-purple-600 to-indigo-600 text-white hover:from-purple-700 hover:to-indigo-700 shadow-purple-200'
-                                        }`}
-                                      >
-                                        {availingMeals[`${registration._id}-lunch`] ? (
-                                          <span className="flex items-center">
-                                            <svg className="animate-spin -ml-1 mr-2 h-4 w-4 text-white" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24">
-                                              <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4"></circle>
-                                              <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path>
-                                            </svg>
-                                            Processing...
-                                          </span>
-                                        ) : (
-                                          'Avail'
-                                        )}
-                                      </button>
-                                    </>
-                                  )}
-                                </>
+                                <div className="flex items-center justify-center w-10 h-10 rounded-full bg-green-100 border-2 border-green-500">
+                                  <svg className="w-6 h-6 text-green-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="3" d="M5 13l4 4L19 7" />
+                                  </svg>
+                                </div>
                               ) : (
                                 <div className="flex items-center justify-center w-10 h-10 rounded-full bg-gray-100 border-2 border-gray-300">
                                   <span className="text-gray-400 text-xs">-</span>
@@ -1622,44 +1475,11 @@ export default function CashierPage() {
                           <td className="px-4 sm:px-6 py-4 whitespace-nowrap">
                             <div className="flex flex-col items-center space-y-2">
                               {registration.meals?.dinner ? (
-                                <>
-                                  {registration.mealsAvailed?.dinner ? (
-                                    <div className="flex items-center justify-center w-10 h-10 rounded-full bg-green-100 border-2 border-green-500">
-                                      <svg className="w-6 h-6 text-green-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="3" d="M5 13l4 4L19 7" />
-                                      </svg>
-                                    </div>
-                                  ) : (
-                                    <>
-                                      <div className="flex items-center justify-center w-10 h-10 rounded-full bg-amber-100 border-2 border-amber-500">
-                                        <svg className="w-6 h-6 text-amber-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                                          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M12 8v4l3 3m6-3a9 9 0 11-18 0 9 9 0 0118 0z" />
-                                        </svg>
-                                      </div>
-                                      <button
-                                        onClick={() => handleAvailMealClick(registration._id, 'dinner')}
-                                        disabled={availingMeals[`${registration._id}-dinner`]}
-                                        className={`px-4 py-2 text-sm font-semibold rounded-lg transition-all transform hover:scale-105 active:scale-95 shadow-md ${
-                                          availingMeals[`${registration._id}-dinner`]
-                                            ? 'bg-gray-300 text-gray-600 cursor-not-allowed shadow-none'
-                                            : 'bg-gradient-to-r from-purple-600 to-indigo-600 text-white hover:from-purple-700 hover:to-indigo-700 shadow-purple-200'
-                                        }`}
-                                      >
-                                        {availingMeals[`${registration._id}-dinner`] ? (
-                                          <span className="flex items-center">
-                                            <svg className="animate-spin -ml-1 mr-2 h-4 w-4 text-white" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24">
-                                              <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4"></circle>
-                                              <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path>
-                                            </svg>
-                                            Processing...
-                                          </span>
-                                        ) : (
-                                          'Avail'
-                                        )}
-                                      </button>
-                                    </>
-                                  )}
-                                </>
+                                <div className="flex items-center justify-center w-10 h-10 rounded-full bg-green-100 border-2 border-green-500">
+                                  <svg className="w-6 h-6 text-green-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="3" d="M5 13l4 4L19 7" />
+                                  </svg>
+                                </div>
                               ) : (
                                 <div className="flex items-center justify-center w-10 h-10 rounded-full bg-gray-100 border-2 border-gray-300">
                                   <span className="text-gray-400 text-xs">-</span>
@@ -1669,7 +1489,7 @@ export default function CashierPage() {
                           </td>
                           <td className="px-4 sm:px-6 py-4 whitespace-nowrap">
                             <div className="text-sm text-gray-900">
-                              {new Date(registration.registrationDate).toLocaleString()}
+                              {new Date(registration.registrationDate).toLocaleDateString('en-US', { timeZone: 'Asia/Manila' })}
                             </div>
                           </td>
                         </tr>
@@ -1941,7 +1761,6 @@ export default function CashierPage() {
                         <th className="px-4 sm:px-6 py-3 text-center text-xs font-medium text-gray-500 uppercase tracking-wider">Meal Type</th>
                         <th className="px-4 sm:px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Availed By</th>
                         <th className="px-4 sm:px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Availed At</th>
-                        <th className="px-4 sm:px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Registration Date</th>
                       </tr>
                     </thead>
                     <tbody className="divide-y divide-gray-200">
@@ -1966,12 +1785,7 @@ export default function CashierPage() {
                           </td>
                           <td className="px-4 sm:px-6 py-4 whitespace-nowrap">
                             <div className="text-sm text-gray-900">
-                              {new Date(history.availedAt).toLocaleString()}
-                            </div>
-                          </td>
-                          <td className="px-4 sm:px-6 py-4 whitespace-nowrap">
-                            <div className="text-sm text-gray-900">
-                              {new Date(history.registrationDate).toLocaleDateString()}
+                              {new Date(history.availedAt).toLocaleDateString('en-US', { timeZone: 'Asia/Manila' })}
                             </div>
                           </td>
                         </tr>
@@ -2025,9 +1839,9 @@ export default function CashierPage() {
         )}
       </div>
 
-      {/* Avail Meal Confirmation Modal */}
+      {/* Logout Confirmation Modal */}
       <AnimatePresence>
-        {showAvailConfirmModal && pendingAvail && (
+        {showLogoutModal && (
           <div className="fixed inset-0 z-[100] overflow-y-auto">
             <div className="flex items-center justify-center min-h-screen px-4 pt-4 pb-20 text-center sm:block sm:p-0">
               <motion.div
@@ -2036,7 +1850,7 @@ export default function CashierPage() {
                 exit={{ opacity: 0 }}
                 className="fixed inset-0 backdrop-blur-sm bg-white/30 transition-opacity"
                 aria-hidden="true"
-                onClick={handleCancelAvailMeal}
+                onClick={handleCancelLogout}
               />
 
               <span className="hidden sm:inline-block sm:align-middle sm:h-screen" aria-hidden="true">&#8203;</span>
@@ -2052,27 +1866,16 @@ export default function CashierPage() {
               >
                 <div className="bg-white px-4 pt-5 pb-4 sm:p-6 sm:pb-4">
                   <div className="sm:flex sm:items-start">
-                    <div className="mx-auto flex-shrink-0 flex items-center justify-center h-12 w-12 rounded-full bg-purple-100 sm:mx-0 sm:h-10 sm:w-10">
-                      <ExclamationIcon className="h-6 w-6 text-purple-600" aria-hidden="true" />
+                    <div className="mx-auto flex-shrink-0 flex items-center justify-center h-12 w-12 rounded-full bg-red-100 sm:mx-0 sm:h-10 sm:w-10">
+                      <ExclamationIcon className="h-6 w-6 text-red-600" aria-hidden="true" />
                     </div>
                     <div className="mt-3 text-center sm:mt-0 sm:ml-4 sm:text-left">
                       <h3 className="text-lg leading-6 font-medium text-gray-900" id="modal-headline">
-                        Confirm Meal Avail
+                        Confirm Logout
                       </h3>
                       <div className="mt-2">
                         <p className="text-sm text-gray-500">
-                          Are you sure you want to mark <span className="font-semibold text-gray-900">{pendingAvail.mealType.charAt(0).toUpperCase() + pendingAvail.mealType.slice(1)}</span> as availed for:
-                        </p>
-                        <div className="mt-3 p-3 bg-gray-50 rounded-lg">
-                          <p className="text-sm font-medium text-gray-900">
-                            AccountID: <span className="text-purple-600">{pendingAvail.accountID}</span>
-                          </p>
-                          <p className="text-sm text-gray-600 mt-1">
-                            {pendingAvail.studentName}
-                          </p>
-                        </div>
-                        <p className="text-sm text-gray-500 mt-3">
-                          This action cannot be undone.
+                          Are you sure you want to logout? You will need to login again to access the dashboard.
                         </p>
                       </div>
                     </div>
@@ -2081,15 +1884,15 @@ export default function CashierPage() {
                 <div className="bg-gray-50 px-4 py-3 sm:px-6 sm:flex sm:flex-row-reverse">
                   <button
                     type="button"
-                    onClick={handleConfirmAvailMeal}
-                    className="w-full inline-flex justify-center rounded-md border border-transparent shadow-sm px-4 py-2 bg-purple-600 text-base font-medium text-white hover:bg-purple-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-purple-500 sm:ml-3 sm:w-auto sm:text-sm"
+                    onClick={handleConfirmLogout}
+                    className="w-full inline-flex justify-center rounded-md border border-transparent shadow-sm px-4 py-2 bg-red-600 text-base font-medium text-white hover:bg-red-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-red-500 sm:ml-3 sm:w-auto sm:text-sm"
                   >
-                    Confirm Avail
+                    Logout
                   </button>
                   <button
                     type="button"
-                    onClick={handleCancelAvailMeal}
-                    className="mt-3 w-full inline-flex justify-center rounded-md border border-gray-300 shadow-sm px-4 py-2 bg-white text-base font-medium text-gray-700 hover:bg-gray-50 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-purple-500 sm:mt-0 sm:ml-3 sm:w-auto sm:text-sm"
+                    onClick={handleCancelLogout}
+                    className="mt-3 w-full inline-flex justify-center rounded-md border border-gray-300 shadow-sm px-4 py-2 bg-white text-base font-medium text-gray-700 hover:bg-gray-50 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-indigo-500 sm:mt-0 sm:ml-3 sm:w-auto sm:text-sm"
                   >
                     Cancel
                   </button>

@@ -171,6 +171,10 @@ export default function StudentPage() {
   });
   const [isLoadingMealRegistration, setIsLoadingMealRegistration] = useState(false);
   const [mealRegistrationMessage, setMealRegistrationMessage] = useState({ type: '', text: '' });
+  const [showMealTimeWindowModal, setShowMealTimeWindowModal] = useState(false);
+  const [mealTimeWindowTitle, setMealTimeWindowTitle] = useState('');
+  const [mealTimeWindowBody, setMealTimeWindowBody] = useState('');
+  const [invalidMealQueue, setInvalidMealQueue] = useState([]);
   const [showAvailNotification, setShowAvailNotification] = useState(false);
   const [availedMealType, setAvailedMealType] = useState('');
   const [notifiedMeals, setNotifiedMeals] = useState({ breakfast: false, lunch: false, dinner: false });
@@ -353,12 +357,79 @@ export default function StudentPage() {
 
   // Submit meal registration
   const handleMealRegistrationSubmit = async () => {
-    // Check if at least one meal is selected
-    if (!mealRegistration.breakfast && !mealRegistration.lunch && !mealRegistration.dinner) {
+    const getPhilippinesCurrentMinutes = () => {
+      const parts = new Intl.DateTimeFormat('en-US', {
+        timeZone: 'Asia/Manila',
+        hour: '2-digit',
+        minute: '2-digit',
+        hour12: false
+      }).formatToParts(new Date());
+
+      const hourPart = parts.find(p => p.type === 'hour')?.value;
+      const minutePart = parts.find(p => p.type === 'minute')?.value;
+      const hour = parseInt(hourPart || '0', 10);
+      const minute = parseInt(minutePart || '0', 10);
+      return (hour * 60) + minute;
+    };
+
+    const getMealWindow = (mealType) => {
+      switch (mealType) {
+        case 'breakfast':
+          return { start: 5 * 60, end: 10 * 60, label: '5:00 AM – 10:00 AM' };
+        case 'lunch':
+          return { start: 10 * 60, end: 14 * 60, label: '10:00 AM – 2:00 PM' };
+        case 'dinner':
+          return { start: 14 * 60, end: 22 * 60, label: '2:00 PM – 10:00 PM' };
+        default:
+          return null;
+      }
+    };
+
+    const showNextInvalidMealModal = (queue) => {
+      if (!queue || queue.length === 0) return;
+      const mealType = queue[0];
+      const window = getMealWindow(mealType);
+      const title = mealType.charAt(0).toUpperCase() + mealType.slice(1);
+      setMealTimeWindowTitle(`${title} Timeframe`);
+      setMealTimeWindowBody(`You can only avail ${title} during ${window?.label}.`);
+      setShowMealTimeWindowModal(true);
+    };
+
+    // Validate only meals the student is trying to newly avail (exclude already availed meals)
+    const mealsToValidate = {
+      breakfast: !!(mealRegistration.breakfast && !mealsAvailed.breakfast),
+      lunch: !!(mealRegistration.lunch && !mealsAvailed.lunch),
+      dinner: !!(mealRegistration.dinner && !mealsAvailed.dinner)
+    };
+
+    // But submit a merged payload so we don't accidentally clear already-availed meals
+    // (backend updates overwrite missing/false values)
+    const mealsToSubmit = {
+      breakfast: !!(mealRegistration.breakfast || mealsAvailed.breakfast),
+      lunch: !!(mealRegistration.lunch || mealsAvailed.lunch),
+      dinner: !!(mealRegistration.dinner || mealsAvailed.dinner)
+    };
+
+    // Check if at least one NEW meal is selected
+    if (!mealsToValidate.breakfast && !mealsToValidate.lunch && !mealsToValidate.dinner) {
       setMealRegistrationMessage({
         type: 'error',
         text: 'Please select at least one meal (Breakfast, Lunch, or Dinner)'
       });
+      return;
+    }
+
+    const currentMinutesPH = getPhilippinesCurrentMinutes();
+    const selectedMeals = ['breakfast', 'lunch', 'dinner'].filter((mealType) => !!mealsToValidate?.[mealType]);
+    const invalidSelections = selectedMeals.filter((mealType) => {
+      const window = getMealWindow(mealType);
+      if (!window) return false;
+      return !(currentMinutesPH >= window.start && currentMinutesPH < window.end);
+    });
+
+    if (invalidSelections.length > 0) {
+      setInvalidMealQueue(invalidSelections);
+      showNextInvalidMealModal(invalidSelections);
       return;
     }
 
@@ -368,7 +439,7 @@ export default function StudentPage() {
 
       const response = await axios.post(
         `${baseUrl}/api/student/meal-registration`,
-        { meals: mealRegistration },
+        { meals: mealsToSubmit },
         { headers: { Authorization: `Bearer ${token}` } }
       );
 
@@ -395,6 +466,27 @@ export default function StudentPage() {
       }
     } catch (error) {
       console.error('Error submitting meal registration:', error);
+
+      const serverMessage = error.response?.data?.message;
+      if (typeof serverMessage === 'string' && serverMessage.includes('Invalid selection(s):')) {
+        const invalidPart = serverMessage.split('Invalid selection(s):')[1];
+        const invalidMeals = (invalidPart || '')
+          .replace('.', '')
+          .split(',')
+          .map(s => s.trim())
+          .filter(Boolean);
+        if (invalidMeals.length > 0) {
+          setInvalidMealQueue(invalidMeals);
+          const mealType = invalidMeals[0];
+          const window = getMealWindow(mealType);
+          const title = mealType.charAt(0).toUpperCase() + mealType.slice(1);
+          setMealTimeWindowTitle(`${title} Timeframe`);
+          setMealTimeWindowBody(`You can only avail ${title} during ${window?.label}.`);
+          setShowMealTimeWindowModal(true);
+          return;
+        }
+      }
+
       setMealRegistrationMessage({
         type: 'error',
         text: error.response?.data?.message || 'Failed to register meals. Please try again.'
@@ -1728,6 +1820,52 @@ export default function StudentPage() {
                   Try Again
                 </span>
               </motion.button>
+            </div>
+          </motion.div>
+        </div>
+      )}
+
+      {showMealTimeWindowModal && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 backdrop-blur-sm">
+          <motion.div
+            initial={{ scale: 0.9, opacity: 0, y: 10 }}
+            animate={{ scale: 1, opacity: 1, y: 0 }}
+            exit={{ scale: 0.9, opacity: 0, y: 10 }}
+            transition={{ type: "spring", damping: 25, stiffness: 300 }}
+            className="bg-[#1e293b] rounded-2xl p-6 max-w-sm w-full shadow-xl border-2 border-orange-500/30"
+          >
+            <div className="text-center space-y-4">
+              <div className="w-16 h-16 bg-orange-900/30 rounded-full flex items-center justify-center mx-auto">
+                <svg xmlns="http://www.w3.org/2000/svg" className="h-8 w-8 text-orange-400" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 8v4l3 3m6-3a9 9 0 11-18 0 9 9 0 0118 0z" />
+                </svg>
+              </div>
+              <h3 className="text-xl font-bold text-gray-200">{mealTimeWindowTitle}</h3>
+              <p className="text-gray-300">{mealTimeWindowBody}</p>
+              <button
+                onClick={() => {
+                  const nextQueue = invalidMealQueue.slice(1);
+                  setInvalidMealQueue(nextQueue);
+                  if (nextQueue.length === 0) {
+                    setShowMealTimeWindowModal(false);
+                    setMealTimeWindowTitle('');
+                    setMealTimeWindowBody('');
+                    return;
+                  }
+                  const mealType = nextQueue[0];
+                  const title = mealType.charAt(0).toUpperCase() + mealType.slice(1);
+                  const label = mealType === 'breakfast'
+                    ? '5:00 AM – 10:00 AM'
+                    : mealType === 'lunch'
+                      ? '10:00 AM – 2:00 PM'
+                      : '2:00 PM – 10:00 PM';
+                  setMealTimeWindowTitle(`${title} Timeframe`);
+                  setMealTimeWindowBody(`You can only avail ${title} during ${label}.`);
+                }}
+                className="w-full py-3 bg-orange-600 text-white rounded-xl font-bold hover:bg-orange-700 transition-all"
+              >
+                OK
+              </button>
             </div>
           </motion.div>
         </div>

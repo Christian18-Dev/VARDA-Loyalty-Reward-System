@@ -4,6 +4,7 @@ import Feedback from '../models/Feedback.js';
 import ClaimedReward from '../models/ClaimedReward.js';
 import User from '../models/User.js';
 import MealRegistration from '../models/MealRegistration.js';
+import AvailHistory from '../models/AvailHistory.js';
 import bcrypt from 'bcryptjs';
 
 export const claimCode = async (req, res) => {
@@ -337,7 +338,7 @@ export const registerMeals = async (req, res) => {
     // Get current time in Asia/Manila (UTC+8) for window calculations
     const utcTime = now.getTime() + (now.getTimezoneOffset() * 60000);
     const philNow = new Date(utcTime + (8 * 3600000));
-    
+
     // Compute the start of the current 5 AM–5 AM window in PH time
     const windowStart = new Date(philNow);
     windowStart.setHours(5, 0, 0, 0); // 5:00 AM
@@ -361,19 +362,101 @@ export const registerMeals = async (req, res) => {
       status: 'active'
     });
 
+    const hour = philNow.getHours();
+    const minute = philNow.getMinutes();
+    const currentMinutes = (hour * 60) + minute;
+
+    const breakfastStart = 5 * 60;
+    const breakfastEnd = 10 * 60;
+    const lunchStart = 10 * 60;
+    const lunchEnd = 14 * 60;
+    const dinnerStart = 14 * 60;
+    const dinnerEnd = 22 * 60;
+
+    const allowedMeals = {
+      breakfast: currentMinutes >= breakfastStart && currentMinutes < breakfastEnd,
+      lunch: currentMinutes >= lunchStart && currentMinutes < lunchEnd,
+      dinner: currentMinutes >= dinnerStart && currentMinutes < dinnerEnd
+    };
+
     if (existingRegistration) {
+      const previousMealsAvailed = {
+        breakfast: existingRegistration.mealsAvailed?.breakfast || false,
+        lunch: existingRegistration.mealsAvailed?.lunch || false,
+        dinner: existingRegistration.mealsAvailed?.dinner || false
+      };
+
+      // Only validate time windows for meals that are being newly availed
+      // (i.e., selected now but not previously availed).
+      const selectedMeals = ['breakfast', 'lunch', 'dinner'].filter((mealType) => !!(meals?.[mealType]));
+      const mealsToValidate = selectedMeals.filter((mealType) => !previousMealsAvailed[mealType]);
+
+      if (mealsToValidate.length === 0) {
+        return res.status(400).json({
+          message: 'No new meals selected to avail.'
+        });
+      }
+
+      const invalidSelections = mealsToValidate.filter((mealType) => !allowedMeals[mealType]);
+
+      if (invalidSelections.length > 0) {
+        return res.status(400).json({
+          message: `You can only claim meals during these PH time windows: Breakfast 5:00 AM–10:00 AM, Lunch 10:00 AM–2:00 PM, Dinner 2:00 PM–10:00 PM. Invalid selection(s): ${invalidSelections.join(', ')}.`
+        });
+      }
+
       // Update existing registration
       existingRegistration.meals = {
         breakfast: meals.breakfast || false,
         lunch: meals.lunch || false,
         dinner: meals.dinner || false
       };
+
+      existingRegistration.mealsAvailed = {
+        breakfast: previousMealsAvailed.breakfast || !!(meals.breakfast),
+        lunch: previousMealsAvailed.lunch || !!(meals.lunch),
+        dinner: previousMealsAvailed.dinner || !!(meals.dinner)
+      };
+
       await existingRegistration.save();
+
+      const userWithAccountId = await User.findOne({ idNumber: existingRegistration.idNumber })
+        .select('accountID')
+        .lean();
+
+      const mealTypes = ['breakfast', 'lunch', 'dinner'];
+      const historyCreates = mealTypes
+        .filter((mealType) => !!(meals?.[mealType]) && !previousMealsAvailed[mealType])
+        .map((mealType) => AvailHistory.create({
+          registrationId: existingRegistration._id,
+          idNumber: existingRegistration.idNumber,
+          accountID: userWithAccountId?.accountID || null,
+          firstName: existingRegistration.firstName,
+          lastName: existingRegistration.lastName,
+          mealType,
+          availedBy: {
+            idNumber: existingRegistration.idNumber,
+            name: `${existingRegistration.firstName} ${existingRegistration.lastName}`
+          },
+          registrationDate: existingRegistration.registrationDate
+        }));
+
+      await Promise.all(historyCreates);
 
       return res.json({
         success: true,
         message: 'Meal registration updated successfully',
         registration: existingRegistration
+      });
+    }
+
+    // New registration: validate all selected meals
+    const selectedMeals = ['breakfast', 'lunch', 'dinner'].filter((mealType) => !!(meals?.[mealType]));
+    const invalidSelections = selectedMeals.filter((mealType) => !allowedMeals[mealType]);
+
+    if (invalidSelections.length > 0) {
+      return res.status(400).json({
+        message: `You can only claim meals during these PH time windows: Breakfast 5:00 AM–10:00 AM, Lunch 10:00 AM–2:00 PM, Dinner 2:00 PM–10:00 PM. Invalid selection(s): ${invalidSelections.join(', ')}.`
       });
     }
 
@@ -387,8 +470,36 @@ export const registerMeals = async (req, res) => {
         breakfast: meals.breakfast || false,
         lunch: meals.lunch || false,
         dinner: meals.dinner || false
+      },
+      mealsAvailed: {
+        breakfast: !!(meals.breakfast),
+        lunch: !!(meals.lunch),
+        dinner: !!(meals.dinner)
       }
     });
+
+    const userWithAccountId = await User.findOne({ idNumber: registration.idNumber })
+      .select('accountID')
+      .lean();
+
+    const mealTypes = ['breakfast', 'lunch', 'dinner'];
+    const historyCreates = mealTypes
+      .filter((mealType) => !!(meals?.[mealType]))
+      .map((mealType) => AvailHistory.create({
+        registrationId: registration._id,
+        idNumber: registration.idNumber,
+        accountID: userWithAccountId?.accountID || null,
+        firstName: registration.firstName,
+        lastName: registration.lastName,
+        mealType,
+        availedBy: {
+          idNumber: registration.idNumber,
+          name: `${registration.firstName} ${registration.lastName}`
+        },
+        registrationDate: registration.registrationDate
+      }));
+
+    await Promise.all(historyCreates);
 
     res.json({
       success: true,
