@@ -553,6 +553,7 @@ export default function CashierPage() {
       // Define columns
       worksheet.columns = [
         { header: 'AccountID', key: 'accountID', width: 15 },
+        { header: 'ID Number', key: 'idNumber', width: 20 },
         { header: 'Meal Type', key: 'mealType', width: 15 },
         { header: 'Availed By', key: 'availedBy', width: 30 },
         { header: 'Availed At', key: 'availedAt', width: 25 }
@@ -589,6 +590,7 @@ export default function CashierPage() {
       allHistory.forEach(item => {
         worksheet.addRow({
           accountID: item.accountID || '-',
+          idNumber: item.idNumber || '-',
           mealType: item.mealType ? item.mealType.charAt(0).toUpperCase() + item.mealType.slice(1) : '-',
           availedBy: item.availedBy?.name || 'Unknown',
           availedAt: item.availedAt ? new Date(item.availedAt).toLocaleDateString('en-US', { timeZone: 'Asia/Manila' }) : '-'
