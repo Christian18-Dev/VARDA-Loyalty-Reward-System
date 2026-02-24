@@ -455,7 +455,10 @@ export const verifyAdminCode = async (req, res) => {
       return res.status(400).json({ message: 'Admin code is required' });
     }
 
-    const expectedCode = process.env.ADMIN_VERIFICATION_CODE || '696969';
+    const expectedCode = process.env.ADMIN_VERIFICATION_CODE;
+    if (!expectedCode) {
+      return res.status(500).json({ message: 'Admin verification code is not configured' });
+    }
 
     if (adminCode !== expectedCode) {
       return res.status(400).json({ message: 'Invalid admin code' });

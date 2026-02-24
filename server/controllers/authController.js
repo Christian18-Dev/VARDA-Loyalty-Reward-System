@@ -59,6 +59,12 @@ export const registerUser = async (req, res) => {
     return res.status(400).json({ message: 'Password must be at least 6 characters long' });
   }
 
+  const allowedSelfRegisterRoles = ['student', 'teacher', 'ateneoStaff', 'guest'];
+  const requestedRole = typeof role === 'string' ? role.trim() : '';
+  if (requestedRole && !allowedSelfRegisterRoles.includes(requestedRole)) {
+    return res.status(403).json({ message: 'Cannot self-register with this role' });
+  }
+
   try {
     const existingId = await User.findOne({ idNumber }).lean();
     if (existingId) {
@@ -81,7 +87,7 @@ export const registerUser = async (req, res) => {
       email,
       password: hashed,
       idNumber,
-      role: role || 'student',
+      role: requestedRole || 'student',
       university: university || 'ateneo',
       termsAccepted: true,
       termsAcceptedAt: new Date()
