@@ -121,7 +121,12 @@ app.use(cors(corsOptions));
 import { apiLimiter, authLimiter } from './config/rateLimits.js';
 
 // Apply rate limiting to all routes
-app.use(apiLimiter);
+app.use((req, res, next) => {
+  if (req.path === '/api/cashier/manual-availment' && req.method === 'POST') {
+    return next();
+  }
+  return apiLimiter(req, res, next);
+});
 
 // Add request timeout
 app.use((req, res, next) => {

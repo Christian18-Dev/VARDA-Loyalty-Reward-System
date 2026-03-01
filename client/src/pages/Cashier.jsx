@@ -67,9 +67,45 @@ export default function CashierPage() {
     totalItems: 0,
     itemsPerPage: 10
   });
+  const [manualAvailment, setManualAvailment] = useState({
+    idNumber: '',
+    mealType: 'breakfast',
+    availedAt: ''
+  });
+  const [isSubmittingManualAvailment, setIsSubmittingManualAvailment] = useState(false);
 
   const baseUrl = import.meta.env.VITE_API_BASE_URL;
   const token = user.token;
+
+  const handleSubmitManualAvailment = async (e) => {
+    e.preventDefault();
+    if (user.role !== 'cashierlima') return;
+
+    try {
+      setError('');
+      setSuccess('');
+      setIsSubmittingManualAvailment(true);
+
+      const payload = {
+        idNumber: manualAvailment.idNumber?.trim(),
+        mealType: manualAvailment.mealType,
+        availedAt: manualAvailment.availedAt
+      };
+
+      await axios.post(`${baseUrl}/api/cashier/manual-availment`, payload, {
+        headers: { Authorization: `Bearer ${token}` }
+      });
+
+      setSuccess('Manual availment added successfully.');
+      setManualAvailment({ idNumber: '', mealType: manualAvailment.mealType, availedAt: '' });
+      await fetchAvailHistory();
+    } catch (err) {
+      console.error('Error creating manual availment:', err);
+      setError(err?.response?.data?.message || 'Error creating manual availment');
+    } finally {
+      setIsSubmittingManualAvailment(false);
+    }
+  };
 
   const handleGenerateCode = async () => {
     try {
@@ -1644,6 +1680,60 @@ export default function CashierPage() {
                 </button>
               </div>
             </div>
+
+            <form onSubmit={handleSubmitManualAvailment} className="mb-6 rounded-xl border border-gray-200 p-4">
+              <div className="flex flex-col lg:flex-row lg:items-end gap-4">
+                <div className="flex-1">
+                  <label className="block text-xs font-medium text-gray-700 mb-1">Student ID Number</label>
+                  <input
+                    type="text"
+                    value={manualAvailment.idNumber}
+                    onChange={(e) => setManualAvailment(prev => ({ ...prev, idNumber: e.target.value }))}
+                    placeholder="e.g. 20-12345"
+                    className="w-full px-3 py-2 border border-gray-300 rounded-lg text-sm focus:ring-2 focus:ring-purple-500 focus:border-transparent"
+                    required
+                  />
+                </div>
+
+                <div>
+                  <label className="block text-xs font-medium text-gray-700 mb-1">Meal Type</label>
+                  <select
+                    value={manualAvailment.mealType}
+                    onChange={(e) => setManualAvailment(prev => ({ ...prev, mealType: e.target.value }))}
+                    className="w-full px-3 py-2 border border-gray-300 rounded-lg text-sm focus:ring-2 focus:ring-purple-500 focus:border-transparent"
+                  >
+                    <option value="breakfast">Breakfast</option>
+                    <option value="lunch">Lunch</option>
+                    <option value="dinner">Dinner</option>
+                  </select>
+                </div>
+
+                <div>
+                  <label className="block text-xs font-medium text-gray-700 mb-1">Availed At (PH time)</label>
+                  <input
+                    type="datetime-local"
+                    value={manualAvailment.availedAt}
+                    onChange={(e) => setManualAvailment(prev => ({ ...prev, availedAt: e.target.value }))}
+                    className="w-full px-3 py-2 border border-gray-300 rounded-lg text-sm focus:ring-2 focus:ring-purple-500 focus:border-transparent"
+                    required
+                  />
+                </div>
+
+                <div>
+                  <button
+                    type="submit"
+                    disabled={isSubmittingManualAvailment}
+                    className={`w-full px-4 py-2 rounded-lg text-sm font-medium transition-all ${
+                      isSubmittingManualAvailment
+                        ? 'bg-gray-300 text-gray-500 cursor-not-allowed'
+                        : 'bg-purple-600 text-white hover:bg-purple-700 shadow-md hover:shadow-lg'
+                    }`}
+                  >
+                    {isSubmittingManualAvailment ? 'Adding...' : 'Add Manual Availment'}
+                  </button>
+                </div>
+              </div>
+            </form>
 
             {/* Filters */}
             <div className="mb-6 grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-5 gap-4">

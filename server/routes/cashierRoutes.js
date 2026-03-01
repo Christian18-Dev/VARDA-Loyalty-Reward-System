@@ -1,5 +1,5 @@
 import express from 'express';
-import { generateCode, getClaimedRewards, getPointsUsageHistory, getLimaMealRegistrations, availMeal, getAvailHistory } from '../controllers/cashierController.js';
+import { generateCode, getClaimedRewards, getPointsUsageHistory, getLimaMealRegistrations, availMeal, getAvailHistory, manualAvailment } from '../controllers/cashierController.js';
 import { 
   getBorrowedItems, 
   createBorrowedItem, 
@@ -31,5 +31,6 @@ router.get('/points-usage', getPointsUsageHistory);
 router.get('/lima-meal-registrations', getLimaMealRegistrations);
 router.post('/avail-meal', availMeal);
 router.get('/avail-history', getAvailHistory);
+router.post('/manual-availment', manualAvailment);
 
 export default router;

@@ -5,6 +5,30 @@ import User from '../models/User.js';
 import MealRegistration from '../models/MealRegistration.js';
 import AvailHistory from '../models/AvailHistory.js';
 
+const computeMealWindowUTC = (inputDate) => {
+  const now = inputDate instanceof Date ? inputDate : new Date(inputDate);
+  if (Number.isNaN(now.getTime())) {
+    throw new Error('Invalid date');
+  }
+
+  // Convert to PH time (UTC+8)
+  const utcTime = now.getTime() + (now.getTimezoneOffset() * 60000);
+  const philNow = new Date(utcTime + (8 * 3600000));
+
+  // Compute the start of the current 5 AM–5 AM window in PH time
+  const windowStartPH = new Date(philNow);
+  windowStartPH.setHours(5, 0, 0, 0);
+  if (philNow.getHours() < 5) {
+    windowStartPH.setDate(windowStartPH.getDate() - 1);
+  }
+
+  // Convert window boundaries back to UTC
+  const windowStartUTC = new Date(windowStartPH.getTime() - (8 * 3600000));
+  const windowEndUTC = new Date(windowStartUTC.getTime() + (24 * 3600000));
+
+  return { windowStartUTC, windowEndUTC };
+};
+
 export const generateCode = async (req, res) => {
   try {
     const newCode = Math.floor(100000 + Math.random() * 900000).toString(); // 6-digit code
@@ -21,7 +45,6 @@ export const generateCode = async (req, res) => {
     res.status(500).json({ message: 'Server error' });
   }
 };
-
 
 export const getClaimedRewards = async (req, res) => {
   try {
@@ -336,5 +359,121 @@ export const getAvailHistory = async (req, res) => {
   } catch (error) {
     console.error('Error fetching avail history:', error);
     res.status(500).json({ message: 'Server error' });
+  }
+};
+
+// Manually add an availment to history with a custom date/time (only accessible by cashierlima)
+export const manualAvailment = async (req, res) => {
+  try {
+    if (req.user.role !== 'cashierlima') {
+      return res.status(403).json({ message: 'Access denied. Only cashierlima role can access this endpoint.' });
+    }
+
+    const { idNumber, mealType, availedAt } = req.body;
+
+    if (!idNumber || typeof idNumber !== 'string') {
+      return res.status(400).json({ message: 'idNumber is required.' });
+    }
+
+    if (!['breakfast', 'lunch', 'dinner'].includes(mealType)) {
+      return res.status(400).json({ message: 'Invalid meal type. Must be breakfast, lunch, or dinner.' });
+    }
+
+    if (!availedAt) {
+      return res.status(400).json({ message: 'availedAt is required.' });
+    }
+
+    const parsedAvailedAt = new Date(availedAt);
+    if (Number.isNaN(parsedAvailedAt.getTime())) {
+      return res.status(400).json({ message: 'availedAt must be a valid date.' });
+    }
+
+    const student = await User.findOne({ idNumber })
+      .select('idNumber accountID firstName lastName university')
+      .lean();
+
+    if (!student) {
+      return res.status(404).json({ message: 'Student not found.' });
+    }
+
+    if (student.university !== 'lima') {
+      return res.status(400).json({ message: 'Meal registration is only available for LIMA students.' });
+    }
+
+    const { windowStartUTC, windowEndUTC } = computeMealWindowUTC(parsedAvailedAt);
+
+    let registration = await MealRegistration.findOne({
+      idNumber,
+      registrationDate: {
+        $gte: windowStartUTC,
+        $lt: windowEndUTC
+      },
+      status: 'active'
+    });
+
+    if (!registration) {
+      registration = await MealRegistration.create({
+        idNumber: student.idNumber,
+        firstName: student.firstName,
+        lastName: student.lastName,
+        university: student.university,
+        meals: {
+          breakfast: mealType === 'breakfast',
+          lunch: mealType === 'lunch',
+          dinner: mealType === 'dinner'
+        },
+        mealsAvailed: {
+          breakfast: mealType === 'breakfast',
+          lunch: mealType === 'lunch',
+          dinner: mealType === 'dinner'
+        },
+        registrationDate: parsedAvailedAt
+      });
+    } else {
+      registration.meals = {
+        ...registration.meals,
+        [mealType]: true
+      };
+      registration.mealsAvailed = {
+        ...registration.mealsAvailed,
+        [mealType]: true
+      };
+      await registration.save();
+    }
+
+    const existingHistory = await AvailHistory.findOne({
+      registrationId: registration._id,
+      mealType
+    })
+      .select('_id')
+      .lean();
+
+    if (existingHistory) {
+      return res.status(400).json({ message: 'This meal already exists in avail history for that registration window.' });
+    }
+
+    const historyEntry = await AvailHistory.create({
+      registrationId: registration._id,
+      idNumber: student.idNumber,
+      accountID: student.accountID || null,
+      firstName: student.firstName,
+      lastName: student.lastName,
+      mealType,
+      availedBy: {
+        idNumber: student.idNumber,
+        name: `${student.firstName} ${student.lastName}`
+      },
+      availedAt: parsedAvailedAt,
+      registrationDate: registration.registrationDate
+    });
+
+    return res.status(201).json({
+      success: true,
+      message: 'Manual availment added to history successfully.',
+      historyEntry
+    });
+  } catch (error) {
+    console.error('Error creating manual availment:', error);
+    return res.status(500).json({ message: 'Server error' });
   }
 };
