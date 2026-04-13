@@ -232,9 +232,9 @@ export const availMeal = async (req, res) => {
       return res.status(400).json({ message: `${mealType.charAt(0).toUpperCase() + mealType.slice(1)} has already been availed.` });
     }
 
-    // Get user's accountID
+    // Get user's accountID and limaBatch
     const user = await User.findOne({ idNumber: registration.idNumber })
-      .select('accountID')
+      .select('accountID limaBatch')
       .lean();
 
     // Mark the meal as availed
@@ -246,6 +246,7 @@ export const availMeal = async (req, res) => {
       registrationId: registration._id,
       idNumber: registration.idNumber,
       accountID: user?.accountID || null,
+      limaBatch: user?.limaBatch || null,
       firstName: registration.firstName,
       lastName: registration.lastName,
       mealType: mealType,
@@ -267,7 +268,6 @@ export const availMeal = async (req, res) => {
   }
 };
 
-// Get avail history (only accessible by cashierlima)
 export const getAvailHistory = async (req, res) => {
   try {
     // Check if user has cashierlima role
@@ -276,7 +276,7 @@ export const getAvailHistory = async (req, res) => {
     }
 
     // Get query parameters for filtering and pagination
-    const { startDate, endDate, mealType, accountID, search, page = 1, limit = 10 } = req.query;
+    const { startDate, endDate, mealType, accountID, search, limaBatch, page = 1, limit = 10 } = req.query;
     const pageNum = parseInt(page);
     const limitNum = parseInt(limit);
     const skip = (pageNum - 1) * limitNum;
@@ -292,11 +292,11 @@ export const getAvailHistory = async (req, res) => {
         const start = new Date(startDate);
         const utcTime = start.getTime() + (start.getTimezoneOffset() * 60000);
         const startPH = new Date(utcTime + (8 * 3600000));
-        
+
         // Use 5 AM as start of day (same as meal registration logic)
         const windowStart = new Date(startPH);
         windowStart.setHours(5, 0, 0, 0); // 5:00 AM PH time
-        
+
         // Convert back to UTC for database query
         const startUTC = new Date(windowStart.getTime() - (8 * 3600000));
         query.registrationDate.$gte = startUTC;
@@ -306,12 +306,12 @@ export const getAvailHistory = async (req, res) => {
         const end = new Date(endDate);
         const utcTime = end.getTime() + (end.getTimezoneOffset() * 60000);
         const endPH = new Date(utcTime + (8 * 3600000));
-        
+
         // Use next day's 5 AM as end boundary (same as meal registration logic)
         const windowEnd = new Date(endPH);
         windowEnd.setHours(5, 0, 0, 0); // 5:00 AM next day PH time
         windowEnd.setDate(windowEnd.getDate() + 1);
-        
+
         // Convert back to UTC for database query
         const endUTC = new Date(windowEnd.getTime() - (8 * 3600000));
         query.registrationDate.$lt = endUTC; // Use $lt instead of $lte for exact window
@@ -337,6 +337,23 @@ export const getAvailHistory = async (req, res) => {
       ];
     }
 
+    // LIMA batch filter
+    if (limaBatch && (limaBatch === 'B29' || limaBatch === 'B31' || limaBatch === 'B32')) {
+      const usersWithBatch = await User.find({ university: 'lima', limaBatch })
+        .select('idNumber')
+        .lean();
+      const idNumbersWithBatch = usersWithBatch.map((u) => u.idNumber).filter(Boolean);
+
+      query.$and = query.$and || [];
+      query.$and.push({
+        $or: [
+          { limaBatch },
+          { limaBatch: null, idNumber: { $in: idNumbersWithBatch } },
+          { limaBatch: { $exists: false }, idNumber: { $in: idNumbersWithBatch } }
+        ]
+      });
+    }
+
     // Get total count for pagination
     const total = await AvailHistory.countDocuments(query);
 
@@ -347,8 +364,24 @@ export const getAvailHistory = async (req, res) => {
       .limit(limitNum)
       .lean();
 
+    const missingBatch = history.some((h) => !h.limaBatch);
+    let enrichedHistory = history;
+
+    if (missingBatch && history.length > 0) {
+      const idNumbers = [...new Set(history.map((h) => h.idNumber).filter(Boolean))];
+      const users = await User.find({ idNumber: { $in: idNumbers } })
+        .select('idNumber limaBatch')
+        .lean();
+      const batchMap = new Map(users.map((u) => [u.idNumber, u.limaBatch]));
+
+      enrichedHistory = history.map((h) => ({
+        ...h,
+        limaBatch: h.limaBatch || batchMap.get(h.idNumber) || null
+      }));
+    }
+
     res.json({
-      data: history,
+      data: enrichedHistory,
       pagination: {
         currentPage: pageNum,
         totalPages: Math.ceil(total / limitNum),
@@ -389,7 +422,7 @@ export const manualAvailment = async (req, res) => {
     }
 
     const student = await User.findOne({ idNumber })
-      .select('idNumber accountID firstName lastName university')
+      .select('idNumber accountID firstName lastName university limaBatch')
       .lean();
 
     if (!student) {
@@ -456,6 +489,7 @@ export const manualAvailment = async (req, res) => {
       registrationId: registration._id,
       idNumber: student.idNumber,
       accountID: student.accountID || null,
+      limaBatch: student.limaBatch || null,
       firstName: student.firstName,
       lastName: student.lastName,
       mealType,

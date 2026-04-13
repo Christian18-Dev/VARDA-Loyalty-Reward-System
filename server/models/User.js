@@ -49,6 +49,11 @@ const userSchema = new mongoose.Schema({
     ],
     default: 'ateneo'
   },
+  limaBatch: {
+    type: String,
+    enum: ['B29', 'B31', 'B32'],
+    default: null
+  },
   points: { type: Number, default: 0 },   // Loyalty points
   pointsUsed: { type: Number, default: 0 }, // Total loyalty points spent
   cateringPoints: {

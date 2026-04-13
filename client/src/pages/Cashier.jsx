@@ -49,6 +49,7 @@ export default function CashierPage() {
     startDate: '',
     endDate: '',
     mealType: '',
+    limaBatch: '',
     accountID: '',
     search: ''
   });
@@ -349,6 +350,7 @@ export default function CashierPage() {
       if (availHistoryFilters.startDate) params.append('startDate', availHistoryFilters.startDate);
       if (availHistoryFilters.endDate) params.append('endDate', availHistoryFilters.endDate);
       if (availHistoryFilters.mealType) params.append('mealType', availHistoryFilters.mealType);
+      if (availHistoryFilters.limaBatch) params.append('limaBatch', availHistoryFilters.limaBatch);
       if (availHistoryFilters.accountID) params.append('accountID', availHistoryFilters.accountID);
       if (availHistoryFilters.search) params.append('search', availHistoryFilters.search);
       // Add pagination parameters
@@ -495,6 +497,9 @@ export default function CashierPage() {
       } else if (filters.endDate) {
         parts.push(`Until ${formatDate(filters.endDate)}`);
       }
+      if (filters.limaBatch) {
+        parts.push(`Batch: ${filters.limaBatch}`);
+      }
       if (filters.mealType) {
         parts.push(`Meal Type: ${filters.mealType.charAt(0).toUpperCase() + filters.mealType.slice(1)}`);
       }
@@ -516,33 +521,39 @@ export default function CashierPage() {
           </View>
           <View style={availHistoryPDFStyles.table}>
             <View style={availHistoryPDFStyles.tableRow}>
-              <View style={[availHistoryPDFStyles.tableCol, { width: '15%' }]}>
+              <View style={[availHistoryPDFStyles.tableCol, { width: '13%' }]}>
                 <Text style={availHistoryPDFStyles.headerCell}>AccountID</Text>
+              </View>
+              <View style={[availHistoryPDFStyles.tableCol, { width: '10%' }]}>
+                <Text style={availHistoryPDFStyles.headerCell}>Batch</Text>
               </View>
               <View style={[availHistoryPDFStyles.tableCol, { width: '15%' }]}>
                 <Text style={availHistoryPDFStyles.headerCell}>Meal Type</Text>
               </View>
-              <View style={[availHistoryPDFStyles.tableCol, { width: '30%' }]}>
+              <View style={[availHistoryPDFStyles.tableCol, { width: '27%' }]}>
                 <Text style={availHistoryPDFStyles.headerCell}>Availed By</Text>
               </View>
-              <View style={[availHistoryPDFStyles.tableCol, { width: '40%' }]}>
+              <View style={[availHistoryPDFStyles.tableCol, { width: '35%' }]}>
                 <Text style={availHistoryPDFStyles.headerCell}>Availed At</Text>
               </View>
             </View>
             {data.map((item, index) => (
               <View key={index} style={availHistoryPDFStyles.tableRow}>
-                <View style={[availHistoryPDFStyles.tableCol, { width: '15%' }]}>
+                <View style={[availHistoryPDFStyles.tableCol, { width: '13%' }]}>
                   <Text style={availHistoryPDFStyles.tableCell}>{item.accountID || '-'}</Text>
+                </View>
+                <View style={[availHistoryPDFStyles.tableCol, { width: '10%' }]}>
+                  <Text style={availHistoryPDFStyles.tableCell}>{item.limaBatch || '-'}</Text>
                 </View>
                 <View style={[availHistoryPDFStyles.tableCol, { width: '15%' }]}>
                   <Text style={availHistoryPDFStyles.tableCell}>
                     {item.mealType ? item.mealType.charAt(0).toUpperCase() + item.mealType.slice(1) : '-'}
                   </Text>
                 </View>
-                <View style={[availHistoryPDFStyles.tableCol, { width: '30%' }]}>
+                <View style={[availHistoryPDFStyles.tableCol, { width: '27%' }]}>
                   <Text style={availHistoryPDFStyles.tableCell}>{item.availedBy?.name || 'Unknown'}</Text>
                 </View>
-                <View style={[availHistoryPDFStyles.tableCol, { width: '40%' }]}>
+                <View style={[availHistoryPDFStyles.tableCol, { width: '35%' }]}>
                   <Text style={availHistoryPDFStyles.tableCell}>{formatDate(item.availedAt)}</Text>
                 </View>
               </View>
@@ -560,6 +571,7 @@ export default function CashierPage() {
     if (availHistoryFilters.startDate) params.append('startDate', availHistoryFilters.startDate);
     if (availHistoryFilters.endDate) params.append('endDate', availHistoryFilters.endDate);
     if (availHistoryFilters.mealType) params.append('mealType', availHistoryFilters.mealType);
+    if (availHistoryFilters.limaBatch) params.append('limaBatch', availHistoryFilters.limaBatch);
     if (availHistoryFilters.accountID) params.append('accountID', availHistoryFilters.accountID);
     if (availHistoryFilters.search) params.append('search', availHistoryFilters.search);
     // Fetch all data by setting a very high limit
@@ -589,6 +601,7 @@ export default function CashierPage() {
       // Define columns
       worksheet.columns = [
         { header: 'AccountID', key: 'accountID', width: 15 },
+        { header: 'Batch', key: 'limaBatch', width: 10 },
         { header: 'ID Number', key: 'idNumber', width: 20 },
         { header: 'Meal Type', key: 'mealType', width: 15 },
         { header: 'Availed By', key: 'availedBy', width: 30 },
@@ -626,6 +639,7 @@ export default function CashierPage() {
       allHistory.forEach(item => {
         worksheet.addRow({
           accountID: item.accountID || '-',
+          limaBatch: item.limaBatch || '-',
           idNumber: item.idNumber || '-',
           mealType: item.mealType ? item.mealType.charAt(0).toUpperCase() + item.mealType.slice(1) : '-',
           availedBy: item.availedBy?.name || 'Unknown',
@@ -701,6 +715,7 @@ export default function CashierPage() {
       // Define columns for billing (only requested columns)
       worksheet.columns = [
         { header: 'AccountID', key: 'accountID', width: 15 },
+        { header: 'Batch', key: 'limaBatch', width: 10 },
         { header: 'ID Number', key: 'idNumber', width: 20 },
         { header: 'Availed By', key: 'availedBy', width: 30 },
         { header: 'Availed At', key: 'availedAt', width: 25 }
@@ -743,6 +758,7 @@ export default function CashierPage() {
           // First occurrence of this student - store the data
           studentMap.set(key, {
             accountID: item.accountID || '-',
+            limaBatch: item.limaBatch || '-',
             idNumber: item.idNumber || '-',
             availedBy: item.availedBy?.name || 'Unknown',
             availedAt: item.availedAt ? new Date(item.availedAt) : null
@@ -763,6 +779,7 @@ export default function CashierPage() {
       studentMap.forEach((studentData) => {
         worksheet.addRow({
           accountID: studentData.accountID,
+          limaBatch: studentData.limaBatch,
           idNumber: studentData.idNumber,
           availedBy: studentData.availedBy,
           availedAt: studentData.availedAt 
@@ -1778,6 +1795,22 @@ export default function CashierPage() {
                 </select>
               </div>
               <div>
+                <label className="block text-xs font-medium text-gray-700 mb-1">Batch</label>
+                <select
+                  value={availHistoryFilters.limaBatch}
+                  onChange={(e) => {
+                    setAvailHistoryFilters(prev => ({ ...prev, limaBatch: e.target.value }));
+                    setCurrentAvailHistoryPage(1);
+                  }}
+                  className="w-full px-3 py-2 border border-gray-300 rounded-lg text-sm focus:ring-2 focus:ring-purple-500 focus:border-transparent"
+                >
+                  <option value="">All Batches</option>
+                  <option value="B29">B29</option>
+                  <option value="B31">B31</option>
+                  <option value="B32">B32</option>
+                </select>
+              </div>
+              <div>
                 <label className="block text-xs font-medium text-gray-700 mb-1">AccountID</label>
                 <input
                   type="number"
@@ -1806,7 +1839,7 @@ export default function CashierPage() {
             </div>
 
             {/* Clear Filters Button */}
-            {(availHistoryFilters.startDate || availHistoryFilters.endDate || availHistoryFilters.mealType || availHistoryFilters.accountID || availHistoryFilters.search) && (
+            {(availHistoryFilters.startDate || availHistoryFilters.endDate || availHistoryFilters.mealType || availHistoryFilters.limaBatch || availHistoryFilters.accountID || availHistoryFilters.search) && (
               <div className="mb-4">
                 <button
                   onClick={() => {
@@ -1814,6 +1847,7 @@ export default function CashierPage() {
                       startDate: '',
                       endDate: '',
                       mealType: '',
+                      limaBatch: '',
                       accountID: '',
                       search: ''
                     });
@@ -1850,6 +1884,7 @@ export default function CashierPage() {
                     <thead>
                       <tr className="bg-gray-50">
                         <th className="px-4 sm:px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">AccountID</th>
+                        <th className="px-4 sm:px-6 py-3 text-center text-xs font-medium text-gray-500 uppercase tracking-wider">Batch</th>
                         <th className="px-4 sm:px-6 py-3 text-center text-xs font-medium text-gray-500 uppercase tracking-wider">Meal Type</th>
                         <th className="px-4 sm:px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Availed By</th>
                         <th className="px-4 sm:px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Availed At</th>
@@ -1861,6 +1896,11 @@ export default function CashierPage() {
                           <td className="px-4 sm:px-6 py-4 whitespace-nowrap">
                             <div className="text-sm font-medium text-gray-900">
                               {history.accountID || '-'}
+                            </div>
+                          </td>
+                          <td className="px-4 sm:px-6 py-4 whitespace-nowrap text-center">
+                            <div className="text-sm font-medium text-gray-900">
+                              {history.limaBatch || '-'}
                             </div>
                           </td>
                           <td className="px-4 sm:px-6 py-4 whitespace-nowrap text-center">

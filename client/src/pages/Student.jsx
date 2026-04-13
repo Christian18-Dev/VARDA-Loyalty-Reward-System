@@ -120,7 +120,7 @@ const checkLevelUp = (oldPointsUsed, newPointsUsed, setNewLevel, setPreviousLeve
 };
 
 export default function StudentPage() {
-  const { user, logout } = useAuth();
+  const { user, logout, updateUser } = useAuth();
   const navigate = useNavigate();
   const [points, setPoints] = useState(0);
   const [pointsUsed, setPointsUsed] = useState(0);
@@ -179,8 +179,47 @@ export default function StudentPage() {
   const [availedMealType, setAvailedMealType] = useState('');
   const [notifiedMeals, setNotifiedMeals] = useState({ breakfast: false, lunch: false, dinner: false });
 
+  const [showLimaBatchModal, setShowLimaBatchModal] = useState(false);
+  const [selectedLimaBatch, setSelectedLimaBatch] = useState('');
+  const [isSavingLimaBatch, setIsSavingLimaBatch] = useState(false);
+  const [limaBatchError, setLimaBatchError] = useState('');
+
   const baseUrl = import.meta.env.VITE_API_BASE_URL;
   const token = user.token;
+
+  useEffect(() => {
+    if (user?.university === 'lima' && !user?.limaBatch) {
+      setShowLimaBatchModal(true);
+    } else {
+      setShowLimaBatchModal(false);
+    }
+  }, [user?.university, user?.limaBatch]);
+
+  const handleSaveLimaBatch = async () => {
+    if (isSavingLimaBatch) return;
+    setLimaBatchError('');
+
+    if (selectedLimaBatch !== 'B29' && selectedLimaBatch !== 'B31' && selectedLimaBatch !== 'B32') {
+      setLimaBatchError('Please select your batch');
+      return;
+    }
+
+    try {
+      setIsSavingLimaBatch(true);
+      const response = await axios.patch(
+        `${baseUrl}/api/student/lima-batch`,
+        { limaBatch: selectedLimaBatch },
+        { headers: { Authorization: `Bearer ${token}` } }
+      );
+
+      updateUser({ limaBatch: response.data?.limaBatch || selectedLimaBatch });
+      setShowLimaBatchModal(false);
+    } catch (error) {
+      setLimaBatchError(error.response?.data?.message || 'Failed to save batch. Please try again.');
+    } finally {
+      setIsSavingLimaBatch(false);
+    }
+  };
 
   // Add fetchUserPoints function
   const fetchUserPoints = async () => {
@@ -813,6 +852,93 @@ export default function StudentPage() {
       className="min-h-screen bg-center bg-cover"
       style={{ backgroundImage: `url(${bgImage})` }}
     >
+      <AnimatePresence>
+        {showLimaBatchModal && (
+          <motion.div
+            className="fixed inset-0 z-[100] flex items-center justify-center bg-black/70 p-4"
+            initial={{ opacity: 0 }}
+            animate={{ opacity: 1 }}
+            exit={{ opacity: 0 }}
+          >
+            <motion.div
+              className="w-full max-w-md bg-gradient-to-br from-orange-100 via-orange-200 to-orange-100 rounded-2xl shadow-2xl border border-gray-100 p-6"
+              initial={{ scale: 0.95, opacity: 0 }}
+              animate={{ scale: 1, opacity: 1 }}
+              exit={{ scale: 0.95, opacity: 0 }}
+            >
+              <h3 className="text-xl font-bold text-black mb-2">Select Your LIMA Batch</h3>
+                <p className="text-sm text-gray-700 mb-4">
+                    Please select which batch you are assigned to.
+                </p>
+
+              <div className="space-y-3">
+                <button
+                  type="button"
+                  onClick={() => {
+                    setSelectedLimaBatch('B29');
+                    setLimaBatchError('');
+                  }}
+                  className={`w-full text-left px-4 py-3 rounded-xl border-2 transition ${
+                    selectedLimaBatch === 'B29'
+                      ? 'border-blue-600 bg-blue-50'
+                      : 'border-gray-200 bg-white hover:border-blue-300'
+                  }`}
+                >
+                  <div className="text-sm font-bold text-black">B29</div>
+                  <div className="text-xs text-gray-600">Batch 29</div>
+                </button>
+
+                <button
+                  type="button"
+                  onClick={() => {
+                    setSelectedLimaBatch('B31');
+                    setLimaBatchError('');
+                  }}
+                  className={`w-full text-left px-4 py-3 rounded-xl border-2 transition ${
+                    selectedLimaBatch === 'B31'
+                      ? 'border-blue-600 bg-blue-50'
+                      : 'border-gray-200 bg-white hover:border-blue-300'
+                  }`}
+                >
+                  <div className="text-sm font-bold text-black">B31</div>
+                  <div className="text-xs text-gray-600">Batch 31</div>
+                </button>
+
+                <button
+                  type="button"
+                  onClick={() => {
+                    setSelectedLimaBatch('B32');
+                    setLimaBatchError('');
+                  }}
+                  className={`w-full text-left px-4 py-3 rounded-xl border-2 transition ${
+                    selectedLimaBatch === 'B32'
+                      ? 'border-blue-600 bg-blue-50'
+                      : 'border-gray-200 bg-white hover:border-blue-300'
+                  }`}
+                >
+                  <div className="text-sm font-bold text-black">B32</div>
+                  <div className="text-xs text-gray-600">Batch 32</div>
+                </button>
+              </div>
+
+              {limaBatchError && (
+                <div className="mt-4 p-3 bg-red-900/50 border-l-4 border-red-500 rounded-lg">
+                  <span className="text-red-200 font-medium text-sm">{limaBatchError}</span>
+                </div>
+              )}
+
+              <button
+                type="button"
+                onClick={handleSaveLimaBatch}
+                disabled={isSavingLimaBatch}
+                className="mt-5 w-full bg-blue-600 hover:bg-blue-700 text-white font-semibold py-2 rounded-xl transition shadow-md disabled:opacity-70 disabled:cursor-not-allowed"
+              >
+                {isSavingLimaBatch ? 'Saving...' : 'Continue'}
+              </button>
+            </motion.div>
+          </motion.div>
+        )}
+      </AnimatePresence>
       <AnimatePresence>
         {message.text && <MessageDisplay />}
       </AnimatePresence>

@@ -9,7 +9,8 @@ import {
   getClaimedRewards,
   verifyRewardClaim,
   registerMeals,
-  getMealRegistration
+  getMealRegistration,
+  setLimaBatch
 } from '../controllers/studentController.js';
 import { protect, borrowAccess } from '../middleware/authMiddleware.js';
 import { getRewards } from '../controllers/rewardController.js';
@@ -21,6 +22,8 @@ const router = express.Router();
 
 // Protect all routes with authentication
 router.use(protect);
+
+router.patch('/lima-batch', protect, setLimaBatch);
 
 // Route for claiming a generated code
 router.post('/claim-code', protect, claimCode);

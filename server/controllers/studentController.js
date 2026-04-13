@@ -7,6 +7,38 @@ import MealRegistration from '../models/MealRegistration.js';
 import AvailHistory from '../models/AvailHistory.js';
 import bcrypt from 'bcryptjs';
 
+export const setLimaBatch = async (req, res) => {
+  try {
+    const { limaBatch } = req.body;
+
+    if (req.user?.university !== 'lima') {
+      return res.status(403).json({ message: 'Not authorized' });
+    }
+
+    if (limaBatch !== 'B29' && limaBatch !== 'B31' && limaBatch !== 'B32') {
+      return res.status(400).json({ message: 'Invalid batch selection' });
+    }
+
+    const user = await User.findById(req.user._id);
+    if (!user) {
+      return res.status(404).json({ message: 'User not found' });
+    }
+
+    if (user.limaBatch) {
+      return res.status(409).json({ message: 'Batch already set' });
+    }
+
+    user.limaBatch = limaBatch;
+    await user.save();
+
+    const { password: _, ...userWithoutPassword } = user.toObject();
+    return res.status(200).json(userWithoutPassword);
+  } catch (error) {
+    console.error('Error in setLimaBatch:', error);
+    return res.status(500).json({ message: 'Server error' });
+  }
+};
+
 export const claimCode = async (req, res) => {
   try {
     const { code } = req.body;
