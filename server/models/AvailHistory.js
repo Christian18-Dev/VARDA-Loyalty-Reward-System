@@ -8,7 +8,7 @@ const availHistorySchema = new mongoose.Schema({
   },
   idNumber: { type: String, required: true },
   accountID: { type: Number },
-  limaBatch: { type: String, enum: ['B31', 'B32'], default: null },
+  limaBatch: { type: String, enum: ['B29', 'B31', 'B32'], default: null },
   firstName: { type: String, required: true },
   lastName: { type: String, required: true },
   mealType: { 

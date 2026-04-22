@@ -508,6 +508,15 @@ export const manualAvailment = async (req, res) => {
     });
   } catch (error) {
     console.error('Error creating manual availment:', error);
+    if (error?.name === 'ValidationError') {
+      return res.status(400).json({
+        message: 'Validation error',
+        errors: Object.fromEntries(
+          Object.entries(error.errors || {}).map(([key, val]) => [key, val?.message || 'Invalid value'])
+        )
+      });
+    }
+
     return res.status(500).json({ message: 'Server error' });
   }
 };
