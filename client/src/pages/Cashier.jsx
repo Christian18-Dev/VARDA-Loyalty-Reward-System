@@ -1808,6 +1808,7 @@ export default function CashierPage() {
                   <option value="B29">B29</option>
                   <option value="B31">B31</option>
                   <option value="B32">B32</option>
+                  <option value="B33">B33</option>
                 </select>
               </div>
               <div>

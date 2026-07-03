@@ -338,7 +338,7 @@ export const getAvailHistory = async (req, res) => {
     }
 
     // LIMA batch filter
-    if (limaBatch && (limaBatch === 'B29' || limaBatch === 'B31' || limaBatch === 'B32')) {
+    if (limaBatch && (limaBatch === 'B29' || limaBatch === 'B31' || limaBatch === 'B32' || limaBatch === 'B33')) {
       const usersWithBatch = await User.find({ university: 'lima', limaBatch })
         .select('idNumber')
         .lean();

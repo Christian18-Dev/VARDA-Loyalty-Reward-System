@@ -51,7 +51,7 @@ const userSchema = new mongoose.Schema({
   },
   limaBatch: {
     type: String,
-    enum: ['B29', 'B31', 'B32'],
+    enum: ['B29', 'B31', 'B32', 'B33'],
     default: null
   },
   points: { type: Number, default: 0 },   // Loyalty points

@@ -15,7 +15,7 @@ export const setLimaBatch = async (req, res) => {
       return res.status(403).json({ message: 'Not authorized' });
     }
 
-    if (limaBatch !== 'B29' && limaBatch !== 'B31' && limaBatch !== 'B32') {
+    if (limaBatch !== 'B29' && limaBatch !== 'B31' && limaBatch !== 'B32' && limaBatch !== 'B33') {
       return res.status(400).json({ message: 'Invalid batch selection' });
     }
 

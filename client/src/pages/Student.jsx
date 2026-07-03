@@ -199,7 +199,7 @@ export default function StudentPage() {
     if (isSavingLimaBatch) return;
     setLimaBatchError('');
 
-    if (selectedLimaBatch !== 'B29' && selectedLimaBatch !== 'B31' && selectedLimaBatch !== 'B32') {
+    if (selectedLimaBatch !== 'B29' && selectedLimaBatch !== 'B31' && selectedLimaBatch !== 'B32' && selectedLimaBatch !== 'B33') {
       setLimaBatchError('Please select your batch');
       return;
     }
@@ -918,6 +918,22 @@ export default function StudentPage() {
                 >
                   <div className="text-sm font-bold text-black">B32</div>
                   <div className="text-xs text-gray-600">Batch 32</div>
+                </button>
+
+                <button
+                  type="button"
+                  onClick={() => {
+                    setSelectedLimaBatch('B33');
+                    setLimaBatchError('');
+                  }}
+                  className={`w-full text-left px-4 py-3 rounded-xl border-2 transition ${
+                    selectedLimaBatch === 'B33'
+                      ? 'border-blue-600 bg-blue-50'
+                      : 'border-gray-200 bg-white hover:border-blue-300'
+                  }`}
+                >
+                  <div className="text-sm font-bold text-black">B33</div>
+                  <div className="text-xs text-gray-600">Batch 33</div>
                 </button>
               </div>
 
