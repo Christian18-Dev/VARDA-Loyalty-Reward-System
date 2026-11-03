@@ -4,6 +4,7 @@ import { getStats, createReward, getUsers, getClaimedRewards, updateUserRole, up
 import { getBorrowedItems, getBorrowedItemHistory, getReturnedItemHistory, deleteReturnedItem } from '../controllers/borrowedItemController.js';
 import { exportBorrowedItems, exportReturnedItems } from '../controllers/exportController.js';
 import { getFeedbackStats, getFeedbackComments } from '../controllers/feedbackController.js';
+import { triggerSummaryReportEmail } from '../controllers/cashierController.js';
 
 const router = express.Router();
 
@@ -38,5 +39,7 @@ router.get('/feedback-comments', protect, admin, getFeedbackComments);
 
 // Admin verification route
 router.post('/verify-admin-code', protect, admin, verifyAdminCode);
+router.post('/trigger-summary-email', protect, admin, triggerSummaryReportEmail);
+router.post('/trigger-daily-summary-email', protect, admin, triggerSummaryReportEmail);
 
 export default router;

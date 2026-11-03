@@ -5,6 +5,8 @@ import ClaimedReward from '../models/ClaimedReward.js';
 import User from '../models/User.js';
 import MealRegistration from '../models/MealRegistration.js';
 import AvailHistory from '../models/AvailHistory.js';
+import Voucher from '../models/Voucher.js';
+import { syncTodayBreakfastVouchers, getTodayBreakfastVoucherWindow } from '../utils/breakfastVoucherService.js';
 import bcrypt from 'bcryptjs';
 
 export const setLimaBatch = async (req, res) => {
@@ -591,6 +593,116 @@ export const getMealRegistration = async (req, res) => {
     });
   } catch (error) {
     console.error('Error fetching meal registration:', error);
+    res.status(500).json({ message: 'Server error' });
+  }
+};
+
+
+export const getStudentVouchers = async (req, res) => {
+  try {
+    const user = req.user;
+    if (user.university !== 'lima') {
+      return res.status(403).json({
+        message: 'Breakfast vouchers are only available for LIMA students'
+      });
+    }
+
+    await syncTodayBreakfastVouchers();
+    const windowInfo = getTodayBreakfastVoucherWindow();
+
+    // Check if student availed breakfast today
+    const bfHistory = await AvailHistory.findOne({
+      idNumber: user.idNumber,
+      mealType: 'breakfast',
+      $or: [
+        { registrationDate: { $gte: windowInfo.windowStartUTC, $lt: windowInfo.windowEndUTC } },
+        { availedAt: { $gte: windowInfo.windowStartUTC, $lt: windowInfo.windowEndUTC } }
+      ]
+    }).lean();
+
+    const todayVoucher = await Voucher.findOne({
+      idNumber: user.idNumber,
+      mealDate: windowInfo.mealDate,
+      voucherType: 'unclaimed_breakfast'
+    }).lean();
+
+    res.json({
+      success: true,
+      todayVoucher: todayVoucher || null,
+      breakfastAvailedToday: !!bfHistory,
+      windowInfo: {
+        mealDate: windowInfo.mealDate,
+        breakfastCutoffUTC: windowInfo.breakfastCutoffUTC,
+        voucherExpiryUTC: windowInfo.voucherExpiryUTC,
+        isAfterBreakfastCutoff: windowInfo.isAfterBreakfastCutoff,
+        isBeforeVoucherExpiry: windowInfo.isBeforeVoucherExpiry,
+        isClaimWindowOpen: windowInfo.isClaimWindowOpen
+      }
+    });
+  } catch (error) {
+    console.error('Error fetching student vouchers:', error);
+    res.status(500).json({ message: 'Server error' });
+  }
+};
+
+export const claimStudentVoucher = async (req, res) => {
+  try {
+    const user = req.user;
+    if (user.university !== 'lima') {
+      return res.status(403).json({
+        message: 'Breakfast vouchers are only available for LIMA students'
+      });
+    }
+
+    await syncTodayBreakfastVouchers();
+    const windowInfo = getTodayBreakfastVoucherWindow();
+
+    if (!windowInfo.isAfterBreakfastCutoff) {
+      return res.status(400).json({
+        message: 'Breakfast vouchers are only issued after the 10:00 AM PH breakfast window ends.'
+      });
+    }
+
+    const voucher = await Voucher.findOne({
+      idNumber: user.idNumber,
+      mealDate: windowInfo.mealDate,
+      voucherType: 'unclaimed_breakfast'
+    });
+
+    if (!voucher) {
+      return res.status(404).json({
+        message: 'No Unclaimed Breakfast Voucher found for today.'
+      });
+    }
+
+    if (voucher.status === 'claimed') {
+      return res.status(400).json({
+        message: 'This Breakfast Voucher has already been claimed.',
+        voucher
+      });
+    }
+
+    if (!windowInfo.isBeforeVoucherExpiry || voucher.status === 'expired' || new Date() >= new Date(voucher.expiresAt)) {
+      if (voucher.status !== 'expired') {
+        voucher.status = 'expired';
+        await voucher.save();
+      }
+      return res.status(400).json({
+        message: 'This Breakfast Voucher expired at 11:00 PM PH time today.'
+      });
+    }
+
+    voucher.status = 'claimed';
+    voucher.claimedAt = new Date();
+    await voucher.save();
+
+    res.json({
+      success: true,
+      message: 'Breakfast Voucher claimed successfully!',
+      voucher
+    });
+  } catch (error) {
+    console.error('Error claiming student voucher:', error);
     res.status(500).json({ message: 'Server error' });
   }
 };

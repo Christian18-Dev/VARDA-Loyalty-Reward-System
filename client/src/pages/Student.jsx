@@ -184,6 +184,14 @@ export default function StudentPage() {
   const [isSavingLimaBatch, setIsSavingLimaBatch] = useState(false);
   const [limaBatchError, setLimaBatchError] = useState('');
 
+  // Breakfast Voucher state
+  const [todayVoucher, setTodayVoucher] = useState(null);
+  const [voucherWindowInfo, setVoucherWindowInfo] = useState(null);
+  const [breakfastAvailedToday, setBreakfastAvailedToday] = useState(false);
+  const [isLoadingVoucher, setIsLoadingVoucher] = useState(false);
+  const [isClaimingVoucher, setIsClaimingVoucher] = useState(false);
+  const [voucherMessage, setVoucherMessage] = useState({ type: '', text: '' });
+
   const baseUrl = import.meta.env.VITE_API_BASE_URL;
   const token = user.token;
 
@@ -275,6 +283,66 @@ export default function StudentPage() {
   useEffect(() => {
     fetchClaimedRewards();
   }, [token]);
+
+  const fetchStudentVouchers = useCallback(async () => {
+    if (user?.university !== 'lima') return;
+    try {
+      setIsLoadingVoucher(true);
+      const response = await axios.get(`${baseUrl}/api/student/vouchers`, {
+        headers: { Authorization: `Bearer ${token}` }
+      });
+      if (response.data?.success) {
+        setTodayVoucher(response.data.todayVoucher || null);
+        setBreakfastAvailedToday(!!response.data.breakfastAvailedToday);
+        setVoucherWindowInfo(response.data.windowInfo || null);
+      }
+    } catch (err) {
+      console.error('Error fetching student vouchers:', err);
+    } finally {
+      setIsLoadingVoucher(false);
+    }
+  }, [baseUrl, token, user?.university]);
+
+  useEffect(() => {
+    if (user?.university === 'lima') {
+      fetchStudentVouchers();
+    }
+  }, [user?.university, fetchStudentVouchers]);
+
+  useEffect(() => {
+    if (currentPage === 'lima-vouchers') {
+      setVoucherMessage({ type: '', text: '' });
+      fetchStudentVouchers();
+    }
+  }, [currentPage, fetchStudentVouchers]);
+
+  const handleClaimBreakfastVoucher = async () => {
+    if (isClaimingVoucher) return;
+    try {
+      setIsClaimingVoucher(true);
+      setVoucherMessage({ type: '', text: '' });
+      const response = await axios.post(
+        `${baseUrl}/api/student/vouchers/claim`,
+        {},
+        { headers: { Authorization: `Bearer ${token}` } }
+      );
+      if (response.data?.success) {
+        setTodayVoucher(response.data.voucher);
+        setVoucherMessage({
+          type: 'success',
+          text: response.data.message || 'Breakfast Voucher claimed successfully!'
+        });
+      }
+    } catch (err) {
+      setVoucherMessage({
+        type: 'error',
+        text: err.response?.data?.message || 'Failed to claim Breakfast Voucher.'
+      });
+      fetchStudentVouchers();
+    } finally {
+      setIsClaimingVoucher(false);
+    }
+  };
 
   // Use ref to track previous mealsAvailed state to avoid stale closures
   const prevMealsAvailedRef = useRef(mealsAvailed);
@@ -1150,17 +1218,34 @@ export default function StudentPage() {
               </motion.button>
 
               {user.university === 'lima' && (
-                <motion.button
-                  whileHover={{ scale: 1.05 }}
-                  whileTap={{ scale: 0.95 }}
-                  onClick={() => setCurrentPage('lima-meal-registration')}
-                  className="flex flex-col items-center p-3 sm:p-4 bg-gradient-to-br from-orange-100 via-orange-200 to-orange-100 rounded-lg sm:rounded-xl shadow-md hover:shadow-lg transition-all border border-gray-200 min-h-[80px] sm:min-h-[100px] col-span-2 sm:col-span-1"
-                >
-                  <svg xmlns="http://www.w3.org/2000/svg" className="h-6 w-6 sm:h-8 sm:w-8 text-orange-500" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M3 3h2l.4 2M7 13h10l4-8H5.4M7 13L5.4 5M7 13l-2.293 2.293c-.63.63-.184 1.707.707 1.707H17m0 0a2 2 0 100 4 2 2 0 000-4zm-8 2a2 2 0 11-4 0 2 2 0 014 0z" />
-                  </svg>
-                  <span className="mt-1.5 sm:mt-2 font-medium text-black text-sm sm:text-base">LIMA - Meal Registration</span>
-                </motion.button>
+                <>
+                  <motion.button
+                    whileHover={{ scale: 1.05 }}
+                    whileTap={{ scale: 0.95 }}
+                    onClick={() => setCurrentPage('lima-meal-registration')}
+                    className="flex flex-col items-center p-3 sm:p-4 bg-gradient-to-br from-orange-100 via-orange-200 to-orange-100 rounded-lg sm:rounded-xl shadow-md hover:shadow-lg transition-all border border-gray-200 min-h-[80px] sm:min-h-[100px]"
+                  >
+                    <svg xmlns="http://www.w3.org/2000/svg" className="h-6 w-6 sm:h-8 sm:w-8 text-orange-500" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M3 3h2l.4 2M7 13h10l4-8H5.4M7 13L5.4 5M7 13l-2.293 2.293c-.63.63-.184 1.707.707 1.707H17m0 0a2 2 0 100 4 2 2 0 000-4zm-8 2a2 2 0 11-4 0 2 2 0 014 0z" />
+                    </svg>
+                    <span className="mt-1.5 sm:mt-2 font-medium text-black text-sm sm:text-base">LIMA - Meal Registration</span>
+                  </motion.button>
+
+                  <motion.button
+                    whileHover={{ scale: 1.05 }}
+                    whileTap={{ scale: 0.95 }}
+                    onClick={() => setCurrentPage('lima-vouchers')}
+                    className="relative flex flex-col items-center p-3 sm:p-4 bg-gradient-to-br from-amber-100 via-yellow-200 to-orange-100 rounded-lg sm:rounded-xl shadow-md hover:shadow-lg transition-all border border-amber-300 min-h-[80px] sm:min-h-[100px]"
+                  >
+                    {todayVoucher?.status === 'unclaimed' && (
+                      <span className="absolute -top-2 -right-2 px-2 py-0.5 bg-red-600 text-white text-[10px] font-bold rounded-full shadow animate-bounce">
+                        1 NEW
+                      </span>
+                    )}
+                    <TicketIcon className="h-6 w-6 sm:h-8 sm:w-8 text-amber-600" />
+                    <span className="mt-1.5 sm:mt-2 font-medium text-black text-sm sm:text-base">Voucher</span>
+                  </motion.button>
+                </>
               )}
             </div>
 
@@ -1744,6 +1829,229 @@ export default function StudentPage() {
               </div>
 
             </motion.div>
+          </motion.div>
+        )}
+
+        {/* LIMA Breakfast Voucher Page */}
+        {currentPage === 'lima-vouchers' && user.university === 'lima' && (
+          <motion.div variants={itemVariants} className="space-y-4 sm:space-y-6 pb-8">
+            <div className="text-center px-2">
+              <img src={logo} alt="Varda Food Group Logo" className="h-12 sm:h-16 md:h-20 mx-auto mb-4" />
+              <h2 className="text-xl sm:text-2xl md:text-3xl font-bold text-amber-500 mb-1">
+                Voucher
+              </h2>
+              <p className="text-sm sm:text-base text-gray-600 px-4">
+                Claim your meal voucher before 11:00 PM PH today.
+              </p>
+            </div>
+
+            {voucherMessage.text && (
+              <div
+                className={`mx-2 sm:mx-0 p-4 rounded-xl border font-medium text-sm sm:text-base ${
+                  voucherMessage.type === 'success'
+                    ? 'bg-green-900/80 border-green-500 text-green-200'
+                    : 'bg-red-900/80 border-red-500 text-red-200'
+                }`}
+              >
+                {voucherMessage.text}
+              </div>
+            )}
+
+            {isLoadingVoucher ? (
+              <div className="bg-[#1e293b] p-8 rounded-2xl border border-gray-700/50 text-center mx-2 sm:mx-0">
+                <div className="animate-spin rounded-full h-10 w-10 border-b-2 border-amber-400 mx-auto mb-3"></div>
+                <p className="text-gray-300 text-sm">Checking your Breakfast Voucher status...</p>
+              </div>
+            ) : todayVoucher ? (
+              /* Perforated Ticket UI */
+              <div className="mx-2 sm:mx-0">
+                <div className="relative bg-gradient-to-br from-amber-50 via-white to-orange-50 rounded-2xl shadow-xl border-2 border-amber-400 overflow-hidden">
+                  {/* Top Banner */}
+                  <div
+                    className={`px-5 py-4 flex items-center justify-between ${
+                      todayVoucher.status === 'claimed'
+                        ? 'bg-gradient-to-r from-green-600 to-emerald-700 text-white'
+                        : todayVoucher.status === 'expired'
+                        ? 'bg-gradient-to-r from-gray-600 to-gray-700 text-white'
+                        : 'bg-gradient-to-r from-amber-500 via-orange-500 to-amber-600 text-white'
+                    }`}
+                  >
+                    <div className="flex items-center space-x-2.5">
+                      <TicketIcon className="h-6 w-6 text-white" />
+                      <div>
+                        <p className="text-xs uppercase tracking-widest opacity-90 font-semibold">
+                          VARDA CAFETERIA • LIMA VOUCHER
+                        </p>
+                        <h3 className="text-lg sm:text-xl font-extrabold leading-tight">
+                          Breakfast
+                        </h3>
+                      </div>
+                    </div>
+                    <span
+                      className={`px-3 py-1 rounded-full text-xs font-extrabold uppercase tracking-wider shadow ${
+                        todayVoucher.status === 'claimed'
+                          ? 'bg-white text-green-700'
+                          : todayVoucher.status === 'expired'
+                          ? 'bg-gray-200 text-gray-800'
+                          : 'bg-white text-amber-700'
+                      }`}
+                    >
+                      {todayVoucher.status === 'claimed'
+                        ? '✓ CLAIMED'
+                        : todayVoucher.status === 'expired'
+                        ? 'EXPIRED'
+                        : 'AVAILABLE'}
+                    </span>
+                  </div>
+
+                  {/* Ticket Body */}
+                  <div className="p-5 sm:p-6 space-y-4">
+                    <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 bg-amber-100/60 border border-amber-300 rounded-xl p-4">
+                      <div>
+                        <p className="text-xs font-semibold uppercase tracking-wider text-amber-800">
+                          Voucher Ticket Code
+                        </p>
+                        <p className="text-xl sm:text-2xl font-mono font-black text-gray-900 tracking-wider">
+                          {todayVoucher.voucherCode}
+                        </p>
+                      </div>
+                      <div className="sm:text-right">
+                        <p className="text-xs font-semibold uppercase tracking-wider text-amber-800">
+                          Account ID
+                        </p>
+                        <p className="text-xl sm:text-2xl font-mono font-black text-purple-800">
+                          {todayVoucher.accountID || user.accountID || '-'}
+                        </p>
+                      </div>
+                    </div>
+
+                    <div className="grid grid-cols-2 sm:grid-cols-3 gap-3 text-xs sm:text-sm">
+                      <div className="bg-gray-50 p-3 rounded-lg border border-gray-200">
+                        <span className="text-gray-500 block text-xs">Student Name</span>
+                        <span className="font-bold text-gray-900">
+                          {user.firstName} {user.lastName}
+                        </span>
+                      </div>
+                      <div className="bg-gray-50 p-3 rounded-lg border border-gray-200">
+                        <span className="text-gray-500 block text-xs">Batch / ID</span>
+                        <span className="font-bold text-gray-900">
+                          {todayVoucher.limaBatch || user.limaBatch || '-'} • {user.idNumber}
+                        </span>
+                      </div>
+                      <div className="bg-gray-50 p-3 rounded-lg border border-gray-200 col-span-2 sm:col-span-1">
+                        <span className="text-gray-500 block text-xs">Valid Until (Today)</span>
+                        <span className="font-bold text-red-600">
+                          {todayVoucher.mealDate} • 11:00 PM PH
+                        </span>
+                      </div>
+                    </div>
+
+                    {/* Dashed Ticket Divider */}
+                    <div className="relative py-2 flex items-center">
+                      <div className="w-6 h-6 rounded-full bg-gray-900/10 -ml-8 border border-amber-300"></div>
+                      <div className="flex-grow border-t-2 border-dashed border-amber-300 mx-2"></div>
+                      <div className="w-6 h-6 rounded-full bg-gray-900/10 -mr-8 border border-amber-300"></div>
+                    </div>
+
+                    {/* Action / Status Footer */}
+                    {todayVoucher.status === 'claimed' ? (
+                      <div className="bg-green-50 border-2 border-green-500 rounded-xl p-4 text-center space-y-1">
+                        <div className="flex items-center justify-center space-x-2 text-green-700 font-extrabold text-base sm:text-lg">
+                          <svg className="w-6 h-6 text-green-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="3" d="M5 13l4 4L19 7" />
+                          </svg>
+                          <span>Voucher Claimed!</span>
+                        </div>
+                        {todayVoucher.claimedAt && (
+                          <p className="text-xs sm:text-sm text-green-800 font-medium">
+                            Claimed at:{' '}
+                            {new Date(todayVoucher.claimedAt).toLocaleString('en-US', {
+                              timeZone: 'Asia/Manila',
+                              month: 'short',
+                              day: '2-digit',
+                              hour: '2-digit',
+                              minute: '2-digit',
+                              hour12: true
+                            })}{' '}
+                            (PH Time)
+                          </p>
+                        )}
+                        <p className="text-xs text-gray-600 pt-1">
+                          Present this claimed ticket to the cashier at the LIMA counter.
+                        </p>
+                      </div>
+                    ) : todayVoucher.status === 'expired' || (voucherWindowInfo && !voucherWindowInfo.isBeforeVoucherExpiry) ? (
+                      <div className="bg-gray-100 border border-gray-300 rounded-xl p-4 text-center">
+                        <p className="text-gray-700 font-bold text-sm sm:text-base">
+                          ⏰ This Breakfast Voucher expired at 11:00 PM PH today.
+                        </p>
+                      </div>
+                    ) : (
+                      <div className="space-y-3">
+                        <p className="text-xs sm:text-sm text-gray-600 text-center">
+                          Click below when claiming your breakfast voucher at the counter. Valid only until <strong>11:00 PM PH today</strong>.
+                        </p>
+                        <motion.button
+                          whileHover={{ scale: 1.02 }}
+                          whileTap={{ scale: 0.98 }}
+                          onClick={handleClaimBreakfastVoucher}
+                          disabled={isClaimingVoucher}
+                          className="w-full py-3.5 sm:py-4 bg-gradient-to-r from-amber-500 to-orange-600 hover:from-amber-600 hover:to-orange-700 text-white font-extrabold rounded-xl shadow-lg text-base sm:text-lg transition-all disabled:opacity-50"
+                        >
+                          {isClaimingVoucher ? 'Claiming...' : '🎟️ Claim Breakfast'}
+                        </motion.button>
+                      </div>
+                    )}
+                  </div>
+                </div>
+              </div>
+            ) : (
+              /* No voucher state */
+              <div className="bg-[#1e293b] p-6 sm:p-8 rounded-2xl border-2 border-gray-700/50 text-center space-y-3 mx-2 sm:mx-0">
+                <div className="w-14 h-14 bg-amber-500/20 rounded-full flex items-center justify-center mx-auto">
+                  <TicketIcon className="h-8 w-8 text-amber-400" />
+                </div>
+                {breakfastAvailedToday ? (
+                  <>
+                    <h3 className="text-lg sm:text-xl font-bold text-green-400">
+                      You Already Availed Breakfast Today
+                    </h3>
+                    <p className="text-gray-300 text-sm sm:text-base max-w-md mx-auto">
+                      Breakfast vouchers are only issued to students who missed claiming their breakfast during 5:00 AM – 10:00 AM PH.
+                    </p>
+                  </>
+                ) : voucherWindowInfo && !voucherWindowInfo.isAfterBreakfastCutoff ? (
+                  <>
+                    <h3 className="text-lg sm:text-xl font-bold text-amber-300">
+                      Breakfast Window Is Still Open (5:00 AM – 10:00 AM)
+                    </h3>
+                    <p className="text-gray-300 text-sm sm:text-base max-w-md mx-auto">
+                      Unclaimed Breakfast Vouchers are automatically generated at <strong>10:00 AM PH</strong> for students who missed breakfast, and remain claimable until <strong>11:00 PM PH</strong>.
+                    </p>
+                  </>
+                ) : (
+                  <>
+                    <h3 className="text-lg sm:text-xl font-bold text-gray-200">
+                      No Breakfast Voucher Available
+                    </h3>
+                    <p className="text-gray-400 text-sm sm:text-base max-w-md mx-auto">
+                      {!user.limaBatch
+                        ? 'Please select your LIMA Batch first to qualify for meal vouchers.'
+                        : 'You do not have an active unclaimed breakfast voucher for today.'}
+                    </p>
+                  </>
+                )}
+              </div>
+            )}
+
+            <div className="text-center">
+              <button
+                onClick={() => setCurrentPage('home')}
+                className="px-6 py-2.5 bg-gray-800 text-gray-200 rounded-xl font-medium hover:bg-gray-700 transition-all text-sm"
+              >
+                ← Back to Home
+              </button>
+            </div>
           </motion.div>
         )}
 

@@ -10,7 +10,9 @@ import {
   verifyRewardClaim,
   registerMeals,
   getMealRegistration,
-  setLimaBatch
+  setLimaBatch,
+  getStudentVouchers,
+  claimStudentVoucher
 } from '../controllers/studentController.js';
 import { protect, borrowAccess } from '../middleware/authMiddleware.js';
 import { getRewards } from '../controllers/rewardController.js';
@@ -74,5 +76,7 @@ router.post('/survey-feedback', protect, submitSurveyFeedback);
 // Meal registration routes
 router.post('/meal-registration', protect, registerMeals);
 router.get('/meal-registration', protect, getMealRegistration);
+router.get('/vouchers', protect, getStudentVouchers);
+router.post('/vouchers/claim', protect, claimStudentVoucher);
 
 export default router;

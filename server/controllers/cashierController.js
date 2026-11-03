@@ -4,6 +4,10 @@ import PointsUsage from '../models/PointsUsage.js';
 import User from '../models/User.js';
 import MealRegistration from '../models/MealRegistration.js';
 import AvailHistory from '../models/AvailHistory.js';
+import { getMealSummaryData, buildSummaryExcelWorkbook } from '../utils/summaryReportService.js';
+import { executeDailySummaryEmail } from '../utils/dailySummaryCron.js';
+import Voucher from '../models/Voucher.js';
+import { syncTodayBreakfastVouchers, getTodayBreakfastVoucherWindow } from '../utils/breakfastVoucherService.js';
 
 const computeMealWindowUTC = (inputDate) => {
   const now = inputDate instanceof Date ? inputDate : new Date(inputDate);
@@ -518,5 +522,170 @@ export const manualAvailment = async (req, res) => {
     }
 
     return res.status(500).json({ message: 'Server error' });
+  }
+};
+
+
+// Export Meal Summary Report to Excel
+export const exportSummaryReport = async (req, res) => {
+  try {
+    if (req.user.role !== 'cashierlima' && req.user.role !== 'admin') {
+      return res.status(403).json({ message: 'Access denied. Authorized roles only.' });
+    }
+
+    const { startDate, endDate, limaBatch } = req.query;
+    const summaryData = await getMealSummaryData({ startDate, endDate, limaBatch });
+    const workbook = buildSummaryExcelWorkbook(summaryData);
+
+    const filenameDate = (startDate || new Date().toISOString().split('T')[0]).replace(/[^a-zA-Z0-9-_]/g, '_');
+    const filename = `Meal_Summary_Report_${filenameDate}.xlsx`;
+
+    res.setHeader('Content-Type', 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet');
+    res.setHeader('Content-Disposition', `attachment; filename="${filename}"`);
+
+    await workbook.xlsx.write(res);
+    res.end();
+  } catch (error) {
+    console.error('Error generating summary report Excel:', error);
+    if (!res.headersSent) {
+      res.status(500).json({ message: 'Failed to generate summary report Excel' });
+    }
+  }
+};
+
+// Get Meal Summary Report Data (JSON for preview/dashboard)
+export const getMealSummaryMetrics = async (req, res) => {
+  try {
+    if (req.user.role !== 'cashierlima' && req.user.role !== 'admin') {
+      return res.status(403).json({ message: 'Access denied. Authorized roles only.' });
+    }
+
+    const { startDate, endDate, limaBatch } = req.query;
+    const summaryData = await getMealSummaryData({ startDate, endDate, limaBatch });
+
+    res.json({
+      success: true,
+      data: summaryData
+    });
+  } catch (error) {
+    console.error('Error fetching summary report data:', error);
+    res.status(500).json({ message: 'Failed to fetch summary report data' });
+  }
+};
+
+
+// Trigger / Send Daily Meal Summary Report Email (manual trigger or on-demand)
+export const triggerSummaryReportEmail = async (req, res) => {
+  try {
+    if (req.user.role !== 'cashierlima' && req.user.role !== 'admin') {
+      return res.status(403).json({ message: 'Access denied. Authorized roles only.' });
+    }
+
+    const { startDate, endDate, limaBatch, recipients } = {
+      ...req.query,
+      ...req.body
+    };
+
+    const result = await executeDailySummaryEmail({
+      startDate,
+      endDate,
+      limaBatch,
+      customRecipients: recipients
+    });
+
+    res.json({
+      success: true,
+      message: `Summary report email sent successfully to ${result.recipients}`,
+      data: result
+    });
+  } catch (error) {
+    console.error('Error sending summary report email:', error);
+    res.status(500).json({
+      success: false,
+      message: error.message || 'Failed to send summary report email'
+    });
+  }
+};
+
+
+// Get Breakfast Vouchers list (claimed, unclaimed, expired) for Cashier Lima / Admin
+export const getBreakfastVouchers = async (req, res) => {
+  try {
+    if (req.user.role !== 'cashierlima' && req.user.role !== 'admin') {
+      return res.status(403).json({ message: 'Access denied. Authorized roles only.' });
+    }
+
+    await syncTodayBreakfastVouchers();
+    const windowInfo = getTodayBreakfastVoucherWindow();
+
+    const { status, search, limaBatch, mealDate } = req.query;
+    const targetDate = mealDate || windowInfo.mealDate;
+
+    const baseQuery = {
+      mealDate: targetDate,
+      voucherType: 'unclaimed_breakfast'
+    };
+
+    if (limaBatch && ['B29', 'B31', 'B32', 'B33'].includes(limaBatch)) {
+      baseQuery.limaBatch = limaBatch;
+    }
+
+    // Fetch all vouchers matching date & batch for accurate summary counts
+    const allDateVouchers = await Voucher.find(baseQuery).lean();
+    const counts = {
+      total: allDateVouchers.length,
+      claimed: allDateVouchers.filter(v => v.status === 'claimed').length,
+      unclaimed: allDateVouchers.filter(v => v.status === 'unclaimed').length,
+      expired: allDateVouchers.filter(v => v.status === 'expired').length
+    };
+
+    let filtered = allDateVouchers;
+
+    if (status && status !== 'all') {
+      if (status === 'unclaimed') {
+        // Show both unclaimed and expired under unclaimed if desired, or exact status
+        filtered = filtered.filter(v => v.status === 'unclaimed' || v.status === 'expired');
+      } else {
+        filtered = filtered.filter(v => v.status === status);
+      }
+    }
+
+    if (search && search.trim()) {
+      const q = search.trim().toLowerCase();
+      filtered = filtered.filter(v => {
+        const nameMatch = (v.studentName || '').toLowerCase().includes(q);
+        const firstLastMatch = `${v.firstName || ''} ${v.lastName || ''}`.toLowerCase().includes(q);
+        const idMatch = (v.idNumber || '').toLowerCase().includes(q);
+        const accMatch = v.accountID ? String(v.accountID).includes(q) : false;
+        const codeMatch = (v.voucherCode || '').toLowerCase().includes(q);
+        return nameMatch || firstLastMatch || idMatch || accMatch || codeMatch;
+      });
+    }
+
+    // Sort claimed first (most recently claimed at top), then by studentName
+    filtered.sort((a, b) => {
+      if (a.status === 'claimed' && b.status !== 'claimed') return -1;
+      if (a.status !== 'claimed' && b.status === 'claimed') return 1;
+      if (a.status === 'claimed' && b.status === 'claimed') {
+        return new Date(b.claimedAt || 0) - new Date(a.claimedAt || 0);
+      }
+      return (a.studentName || '').localeCompare(b.studentName || '');
+    });
+
+    res.json({
+      success: true,
+      mealDate: targetDate,
+      windowInfo: {
+        isAfterBreakfastCutoff: windowInfo.isAfterBreakfastCutoff,
+        isBeforeVoucherExpiry: windowInfo.isBeforeVoucherExpiry,
+        isClaimWindowOpen: windowInfo.isClaimWindowOpen,
+        voucherExpiryUTC: windowInfo.voucherExpiryUTC
+      },
+      counts,
+      vouchers: filtered
+    });
+  } catch (error) {
+    console.error('Error fetching breakfast vouchers:', error);
+    res.status(500).json({ message: 'Failed to fetch breakfast vouchers' });
   }
 };

@@ -11,7 +11,8 @@ import {
   CheckIcon,
   PrinterIcon,
   ClipboardListIcon,
-  ClockIcon
+  ClockIcon,
+  TicketIcon
 } from '@heroicons/react/outline';
 import { motion, AnimatePresence } from 'framer-motion';
 import ExcelJS from 'exceljs';
@@ -56,6 +57,14 @@ export default function CashierPage() {
   const [isExportingExcel, setIsExportingExcel] = useState(false);
   const [isExportingBilling, setIsExportingBilling] = useState(false);
   const [isExportingPDF, setIsExportingPDF] = useState(false);
+  const [isExportingSummary, setIsExportingSummary] = useState(false);
+  const [isSendingSummaryEmail, setIsSendingSummaryEmail] = useState(false);
+  const [breakfastVouchers, setBreakfastVouchers] = useState([]);
+  const [voucherCounts, setVoucherCounts] = useState({ total: 0, claimed: 0, unclaimed: 0, expired: 0 });
+  const [voucherStatusFilter, setVoucherStatusFilter] = useState('all');
+  const [voucherBatchFilter, setVoucherBatchFilter] = useState('');
+  const [voucherSearchTerm, setVoucherSearchTerm] = useState('');
+  const [isLoadingVouchers, setIsLoadingVouchers] = useState(false);
   const [availHistoryPagination, setAvailHistoryPagination] = useState({
     currentPage: 1,
     totalPages: 1,
@@ -339,6 +348,40 @@ export default function CashierPage() {
       if (pollInterval) clearInterval(pollInterval);
     };
   }, [activeTab, token, user.role, currentMealRegistrationsPage, mealRegistrationsSearchTerm]);
+
+  const fetchBreakfastVouchers = async () => {
+    if (user.role !== 'cashierlima') return;
+    try {
+      setIsLoadingVouchers(true);
+      const params = new URLSearchParams();
+      if (voucherStatusFilter && voucherStatusFilter !== 'all') params.append('status', voucherStatusFilter);
+      if (voucherBatchFilter) params.append('limaBatch', voucherBatchFilter);
+      if (voucherSearchTerm.trim()) params.append('search', voucherSearchTerm.trim());
+
+      const res = await axios.get(`${baseUrl}/api/cashier/breakfast-vouchers?${params.toString()}`, {
+        headers: { Authorization: `Bearer ${token}` }
+      });
+      if (res.data?.success) {
+        setBreakfastVouchers(res.data.vouchers || []);
+        setVoucherCounts(res.data.counts || { total: 0, claimed: 0, unclaimed: 0, expired: 0 });
+      }
+    } catch (err) {
+      console.error('Error fetching breakfast vouchers:', err);
+    } finally {
+      setIsLoadingVouchers(false);
+    }
+  };
+
+  useEffect(() => {
+    let voucherInterval;
+    if (activeTab === 'meal-registrations' && user.role === 'cashierlima') {
+      fetchBreakfastVouchers();
+      voucherInterval = setInterval(fetchBreakfastVouchers, 15000);
+    }
+    return () => {
+      if (voucherInterval) clearInterval(voucherInterval);
+    };
+  }, [activeTab, token, user.role, voucherStatusFilter, voucherBatchFilter, voucherSearchTerm]);
 
   // Fetch avail history
   const fetchAvailHistory = async () => {
@@ -897,6 +940,76 @@ export default function CashierPage() {
     }
   };
 
+  // Export Summary Report to Excel (Counts + Availed + Unavailed students)
+  const handleExportSummaryReport = async () => {
+    setIsExportingSummary(true);
+    try {
+      const params = new URLSearchParams();
+      if (availHistoryFilters.startDate) params.append('startDate', availHistoryFilters.startDate);
+      if (availHistoryFilters.endDate) params.append('endDate', availHistoryFilters.endDate);
+      if (availHistoryFilters.limaBatch) params.append('limaBatch', availHistoryFilters.limaBatch);
+
+      const response = await axios.get(`${baseUrl}/api/cashier/export-summary-report?${params.toString()}`, {
+        headers: { Authorization: `Bearer ${token}` },
+        responseType: 'blob'
+      });
+
+      const contentDisposition = response.headers['content-disposition'];
+      let filename = `Meal_Summary_Report_${new Date().toISOString().split('T')[0]}.xlsx`;
+      if (contentDisposition) {
+        const filenameMatch = contentDisposition.match(/filename="?([^";]+)"?/);
+        if (filenameMatch && filenameMatch[1]) {
+          filename = filenameMatch[1];
+        }
+      }
+
+      const blob = new Blob([response.data], {
+        type: 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet'
+      });
+      const url = window.URL.createObjectURL(blob);
+      const a = document.createElement('a');
+      a.href = url;
+      a.download = filename;
+      document.body.appendChild(a);
+      a.click();
+      window.URL.revokeObjectURL(url);
+      document.body.removeChild(a);
+
+      setSuccess('Summary Report exported successfully!');
+      setTimeout(() => setSuccess(''), 3000);
+    } catch (error) {
+      console.error('Error exporting summary report:', error);
+      setError('Failed to export Summary Report. Please try again.');
+      setTimeout(() => setError(''), 4000);
+    } finally {
+      setIsExportingSummary(false);
+    }
+  };
+
+  // Send Summary Report via Email on-demand (same payload as 11:00 PM automated cron)
+  const handleSendSummaryEmail = async () => {
+    setIsSendingSummaryEmail(true);
+    try {
+      const payload = {};
+      if (availHistoryFilters.startDate) payload.startDate = availHistoryFilters.startDate;
+      if (availHistoryFilters.endDate) payload.endDate = availHistoryFilters.endDate;
+      if (availHistoryFilters.limaBatch) payload.limaBatch = availHistoryFilters.limaBatch;
+
+      const response = await axios.post(`${baseUrl}/api/cashier/send-summary-report-email`, payload, {
+        headers: { Authorization: `Bearer ${token}` }
+      });
+
+      setSuccess(response.data?.message || 'Summary Report email sent successfully!');
+      setTimeout(() => setSuccess(''), 4000);
+    } catch (error) {
+      console.error('Error sending summary report email:', error);
+      setError(error?.response?.data?.message || 'Failed to send Summary Report email.');
+      setTimeout(() => setError(''), 4000);
+    } finally {
+      setIsSendingSummaryEmail(false);
+    }
+  };
+
   const handleLogoutClick = () => {
     setShowLogoutModal(true);
   };
@@ -1203,7 +1316,7 @@ export default function CashierPage() {
                   <div className="mt-6 p-6 bg-gray-50 rounded-xl border border-gray-200">
                     <div className="flex justify-between items-center mb-4">
                       <h3 className="text-lg font-medium text-gray-900">Generated {generatedCodes.length} Codes</h3>
-                      <div className="flex space-x-2">
+                      <div className="flex flex-wrap gap-2">
                         <button
                           onClick={() => {
                             const text = generatedCodes.join('\n');
@@ -1251,7 +1364,7 @@ export default function CashierPage() {
                   >
                     <div className="flex items-center justify-between mb-3">
                       <h3 className="text-lg font-medium text-green-800">Generated Code</h3>
-                      <div className="flex space-x-2">
+                      <div className="flex flex-wrap gap-2">
                         <button
                           onClick={printCode}
                           disabled={isPrinting}
@@ -1598,6 +1711,186 @@ export default function CashierPage() {
         )}
 
         {/* Avail History Tab - Only visible to cashierlima */}
+        {activeTab === 'meal-registrations' && user.role === 'cashierlima' && (
+          <motion.div
+            initial={{ opacity: 0, y: 20 }}
+            animate={{ opacity: 1, y: 0 }}
+            className="bg-white rounded-2xl shadow-lg p-4 sm:p-6 mt-6"
+          >
+            <div className="flex flex-col lg:flex-row justify-between items-start lg:items-center mb-6 gap-4">
+              <div className="flex items-center space-x-3">
+                <div className="p-2 bg-amber-100 rounded-lg">
+                  <TicketIcon className="w-6 h-6 text-amber-600" />
+                </div>
+                <div>
+                  <h2 className="text-xl sm:text-2xl font-bold text-gray-800">
+                    LIMA Vouchers (10:00 AM – 11:00 PM PH)
+                  </h2>
+                  <p className="text-gray-600 text-sm mt-0.5">
+                    Real-time list of unclaimed and claimed meal vouchers today
+                  </p>
+                </div>
+              </div>
+
+              <div className="flex flex-wrap items-center gap-2">
+                <span className="px-3 py-1 rounded-full text-xs font-bold bg-gray-100 text-gray-800 border border-gray-200">
+                  Total Issued: {voucherCounts.total}
+                </span>
+                <span className="px-3 py-1 rounded-full text-xs font-bold bg-green-100 text-green-800 border border-green-300">
+                  ✓ Claimed: {voucherCounts.claimed}
+                </span>
+                <span className="px-3 py-1 rounded-full text-xs font-bold bg-amber-100 text-amber-800 border border-amber-300">
+                  Unclaimed: {voucherCounts.unclaimed}
+                </span>
+                {voucherCounts.expired > 0 && (
+                  <span className="px-3 py-1 rounded-full text-xs font-bold bg-red-100 text-red-800 border border-red-300">
+                    Expired (11 PM): {voucherCounts.expired}
+                  </span>
+                )}
+                <button
+                  onClick={fetchBreakfastVouchers}
+                  className="px-3 py-1.5 bg-purple-50 hover:bg-purple-100 text-purple-700 border border-purple-200 rounded-lg text-xs font-semibold transition-colors"
+                >
+                  ↻ Refresh
+                </button>
+              </div>
+            </div>
+
+            {/* Filters for Vouchers */}
+            <div className="flex flex-col sm:flex-row items-stretch sm:items-center justify-between gap-3 mb-4">
+              <div className="flex flex-wrap gap-2">
+                {[
+                  { key: 'all', label: `All (${voucherCounts.total})` },
+                  { key: 'claimed', label: `Claimed (${voucherCounts.claimed})` },
+                  { key: 'unclaimed', label: `Unclaimed (${voucherCounts.unclaimed + voucherCounts.expired})` }
+                ].map(tab => (
+                  <button
+                    key={tab.key}
+                    onClick={() => setVoucherStatusFilter(tab.key)}
+                    className={`px-3.5 py-1.5 rounded-lg text-xs sm:text-sm font-semibold transition-all ${
+                      voucherStatusFilter === tab.key
+                        ? 'bg-amber-600 text-white shadow'
+                        : 'bg-gray-100 text-gray-700 hover:bg-gray-200'
+                    }`}
+                  >
+                    {tab.label}
+                  </button>
+                ))}
+              </div>
+
+              <div className="flex flex-col sm:flex-row gap-2 sm:items-center">
+                <select
+                  value={voucherBatchFilter}
+                  onChange={(e) => setVoucherBatchFilter(e.target.value)}
+                  className="px-3 py-2 border border-gray-300 rounded-xl text-sm focus:ring-2 focus:ring-amber-500 focus:border-transparent"
+                >
+                  <option value="">All Batches</option>
+                  <option value="B29">B29</option>
+                  <option value="B31">B31</option>
+                  <option value="B32">B32</option>
+                  <option value="B33">B33</option>
+                </select>
+
+                <div className="relative w-full sm:w-64">
+                  <input
+                    type="text"
+                    placeholder="Search AccountID, name, code..."
+                    value={voucherSearchTerm}
+                    onChange={(e) => setVoucherSearchTerm(e.target.value)}
+                    className="w-full px-4 py-2 pl-9 border border-gray-300 rounded-xl text-sm focus:ring-2 focus:ring-amber-500 focus:border-transparent"
+                  />
+                  <svg className="w-4 h-4 text-gray-400 absolute left-3 top-2.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z" />
+                  </svg>
+                </div>
+              </div>
+            </div>
+
+            {/* Vouchers Table */}
+            <div className="overflow-x-auto rounded-xl border border-gray-200">
+              <table className="min-w-full table-auto">
+                <thead>
+                  <tr className="bg-gray-50">
+                    <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">AccountID</th>
+                    <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Batch</th>
+                    <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Student Name & ID</th>
+                    <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Meal</th>
+                    <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Voucher Code</th>
+                    <th className="px-4 py-3 text-center text-xs font-medium text-gray-500 uppercase tracking-wider">Status</th>
+                    <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Claimed At (PH)</th>
+                  </tr>
+                </thead>
+                <tbody className="divide-y divide-gray-200">
+                  {breakfastVouchers.map(v => (
+                    <tr
+                      key={v._id || v.voucherCode}
+                      className={`transition-colors ${
+                        v.status === 'claimed' ? 'bg-green-50/50 hover:bg-green-50' : 'hover:bg-gray-50'
+                      }`}
+                    >
+                      <td className="px-4 py-3 whitespace-nowrap text-sm font-bold text-gray-900">
+                        {v.accountID || '-'}
+                      </td>
+                      <td className="px-4 py-3 whitespace-nowrap text-sm text-gray-700 font-medium">
+                        {v.limaBatch || '-'}
+                      </td>
+                      <td className="px-4 py-3">
+                        <div className="text-sm font-medium text-gray-900">{v.studentName}</div>
+                        <div className="text-xs text-gray-500">{v.idNumber}</div>
+                      </td>
+                      <td className="px-4 py-3 whitespace-nowrap text-sm font-semibold text-gray-800">
+                        Breakfast
+                      </td>
+                      <td className="px-4 py-3 whitespace-nowrap">
+                        <span className="font-mono text-xs sm:text-sm font-bold text-amber-800 bg-amber-50 px-2.5 py-1 rounded border border-amber-200">
+                          {v.voucherCode}
+                        </span>
+                      </td>
+                      <td className="px-4 py-3 whitespace-nowrap text-center">
+                        {v.status === 'claimed' ? (
+                          <span className="inline-flex items-center px-3 py-1 rounded-full text-xs font-bold bg-green-100 text-green-800 border border-green-300">
+                            ✓ Claimed
+                          </span>
+                        ) : v.status === 'expired' ? (
+                          <span className="inline-flex items-center px-3 py-1 rounded-full text-xs font-bold bg-gray-100 text-gray-600 border border-gray-300">
+                            Expired (11 PM)
+                          </span>
+                        ) : (
+                          <span className="inline-flex items-center px-3 py-1 rounded-full text-xs font-bold bg-amber-100 text-amber-800 border border-amber-300">
+                            Unclaimed
+                          </span>
+                        )}
+                      </td>
+                      <td className="px-4 py-3 whitespace-nowrap text-sm text-gray-700">
+                        {v.claimedAt
+                          ? new Date(v.claimedAt).toLocaleString('en-US', {
+                              timeZone: 'Asia/Manila',
+                              month: 'short',
+                              day: '2-digit',
+                              hour: '2-digit',
+                              minute: '2-digit',
+                              hour12: true
+                            })
+                          : '-'}
+                      </td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+              {breakfastVouchers.length === 0 && (
+                <div className="text-center py-10">
+                  <p className="text-gray-500 text-sm">
+                    {isLoadingVouchers
+                      ? 'Loading breakfast vouchers...'
+                      : 'No breakfast vouchers found for the selected filter (vouchers are generated after 10:00 AM PH for students who missed breakfast).'}
+                  </p>
+                </div>
+              )}
+            </div>
+          </motion.div>
+        )}
+
+        {/* Avail History Tab - Only visible to cashierlima */}
         {activeTab === 'avail-history' && user.role === 'cashierlima' && (
           <motion.div
             initial={{ opacity: 0, y: 20 }}
@@ -1616,7 +1909,7 @@ export default function CashierPage() {
                   </p>
                 </div>
               </div>
-              <div className="flex space-x-2">
+              <div className="flex flex-wrap gap-2">
                 <button
                   onClick={handleExportToExcel}
                   disabled={isExportingExcel || isLoadingAvailHistory || availHistory.length === 0}
@@ -1692,6 +1985,60 @@ export default function CashierPage() {
                         <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M7 21h10a2 2 0 002-2V9.414a1 1 0 00-.293-.707l-5.414-5.414A1 1 0 0012.586 3H7a2 2 0 00-2 2v14a2 2 0 002 2z" />
                       </svg>
                       <span>Export PDF</span>
+                    </>
+                  )}
+                </button>
+                <button
+                  onClick={handleExportSummaryReport}
+                  disabled={isExportingSummary || isLoadingAvailHistory}
+                  className={`flex items-center space-x-2 px-4 py-2 rounded-lg transition-all ${
+                    isExportingSummary || isLoadingAvailHistory
+                      ? 'bg-gray-300 text-gray-500 cursor-not-allowed'
+                      : 'bg-purple-600 text-white hover:bg-purple-700 shadow-md hover:shadow-lg'
+                  }`}
+                  title="Export Meal Summary Report with counts and availed/unavailed student lists"
+                >
+                  {isExportingSummary ? (
+                    <>
+                      <svg className="animate-spin h-5 w-5" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24">
+                        <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4"></circle>
+                        <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path>
+                      </svg>
+                      <span>Exporting...</span>
+                    </>
+                  ) : (
+                    <>
+                      <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M9 17v-2m3 2v-4m3 4v-6m2 10H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z" />
+                      </svg>
+                      <span>Summary Report</span>
+                    </>
+                  )}
+                </button>
+                <button
+                  onClick={handleSendSummaryEmail}
+                  disabled={isSendingSummaryEmail || isLoadingAvailHistory}
+                  className={`flex items-center space-x-2 px-4 py-2 rounded-lg transition-all ${
+                    isSendingSummaryEmail || isLoadingAvailHistory
+                      ? 'bg-gray-300 text-gray-500 cursor-not-allowed'
+                      : 'bg-indigo-600 text-white hover:bg-indigo-700 shadow-md hover:shadow-lg'
+                  }`}
+                  title="Send Meal Summary Report Excel via email now (also sent automatically at 11:00 PM)"
+                >
+                  {isSendingSummaryEmail ? (
+                    <>
+                      <svg className="animate-spin h-5 w-5" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24">
+                        <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4"></circle>
+                        <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path>
+                      </svg>
+                      <span>Sending Email...</span>
+                    </>
+                  ) : (
+                    <>
+                      <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M3 8l7.89 5.26a2 2 0 002.22 0L21 8M5 19h14a2 2 0 002-2V7a2 2 0 00-2-2H5a2 2 0 00-2 2v10a2 2 0 002 2z" />
+                      </svg>
+                      <span>Email Summary</span>
                     </>
                   )}
                 </button>

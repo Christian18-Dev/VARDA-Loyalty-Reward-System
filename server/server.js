@@ -13,6 +13,8 @@ import cashierRoutes from './routes/cashierRoutes.js';
 import codeRoutes from './routes/codeRoutes.js';
 import conciergeRoutes from './routes/conciergeRoutes.js';
 import mongoose from 'mongoose';
+import { initDailySummaryCron, executeDailySummaryEmail } from './utils/dailySummaryCron.js';
+import { initBreakfastVoucherCron, syncTodayBreakfastVouchers } from './utils/breakfastVoucherService.js';
 
 dotenv.config();
 const app = express();
@@ -173,9 +175,31 @@ app.use('/api/concierge', conciergeRoutes);
 // Routes
 app.get('/', (req, res) => res.send('API is running...'));
 
+// Webhook endpoint for external backup schedulers (e.g. cron-job.org or manual cURL)
+app.all('/api/cron/trigger-daily-summary', async (req, res) => {
+  const secret = req.headers['x-cron-secret'] || req.query.secret || req.body?.secret;
+  const expectedSecret = process.env.CRON_SECRET || process.env.ADMIN_VERIFICATION_CODE || '000000';
+
+  if (!secret || secret !== expectedSecret) {
+    return res.status(403).json({ success: false, message: 'Invalid or missing cron secret' });
+  }
+
+  try {
+    const { startDate, endDate, limaBatch, recipients } = { ...req.query, ...req.body };
+    const result = await executeDailySummaryEmail({ startDate, endDate, limaBatch, customRecipients: recipients });
+    res.json({ success: true, message: 'Daily summary email sent successfully', result });
+  } catch (error) {
+    console.error('External cron trigger error:', error);
+    res.status(500).json({ success: false, message: error.message || 'Failed to send summary email' });
+  }
+});
+
 function startServer() {
   app.listen(PORT, () => {
     console.log(`✅ Server running on port ${PORT}`);
+    initDailySummaryCron();
+    initBreakfastVoucherCron();
+    syncTodayBreakfastVouchers().catch(err => console.error('Initial voucher sync error:', err));
   });
 }
 
