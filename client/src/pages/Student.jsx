@@ -1840,14 +1840,19 @@ export default function StudentPage() {
               <h2 className="text-xl sm:text-2xl md:text-3xl font-bold text-amber-500 mb-1">
                 Voucher
               </h2>
-              <p className="text-sm sm:text-base text-gray-600 px-4">
-                Claim your meal voucher before 11:00 PM PH today.
+            </div>
+
+            {/* Policy Notes */}
+            <div className="mx-2 sm:mx-0 p-3.5 sm:p-4 rounded-xl bg-[#1e293b] border-2 border-amber-500/80 shadow-lg text-left">
+              <p className="text-xs sm:text-sm text-gray-100 leading-relaxed">
+                <strong className="text-amber-400 font-bold block mb-1 text-sm sm:text-base">Notes:</strong>
+                The voucher can only be claimed in Dorm 2. Late breakfast vouchers are for students with valid reasons only. We kindly encourage responsible use of this privilege.
               </p>
             </div>
 
             {voucherMessage.text && (
               <div
-                className={`mx-2 sm:mx-0 p-4 rounded-xl border font-medium text-sm sm:text-base ${
+                className={`mx-2 sm:mx-0 p-3.5 rounded-xl border text-xs sm:text-sm font-medium ${
                   voucherMessage.type === 'success'
                     ? 'bg-green-900/80 border-green-500 text-green-200'
                     : 'bg-red-900/80 border-red-500 text-red-200'
@@ -1858,9 +1863,9 @@ export default function StudentPage() {
             )}
 
             {isLoadingVoucher ? (
-              <div className="bg-[#1e293b] p-8 rounded-2xl border border-gray-700/50 text-center mx-2 sm:mx-0">
-                <div className="animate-spin rounded-full h-10 w-10 border-b-2 border-amber-400 mx-auto mb-3"></div>
-                <p className="text-gray-300 text-sm">Checking your Breakfast Voucher status...</p>
+              <div className="bg-[#1e293b] p-6 rounded-2xl border border-gray-700/50 text-center mx-2 sm:mx-0">
+                <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-amber-400 mx-auto mb-2"></div>
+                <p className="text-gray-300 text-xs sm:text-sm">Checking voucher status...</p>
               </div>
             ) : todayVoucher ? (
               /* Perforated Ticket UI */
@@ -1868,7 +1873,7 @@ export default function StudentPage() {
                 <div className="relative bg-gradient-to-br from-amber-50 via-white to-orange-50 rounded-2xl shadow-xl border-2 border-amber-400 overflow-hidden">
                   {/* Top Banner */}
                   <div
-                    className={`px-5 py-4 flex items-center justify-between ${
+                    className={`px-5 py-3.5 flex items-center justify-between ${
                       todayVoucher.status === 'claimed'
                         ? 'bg-gradient-to-r from-green-600 to-emerald-700 text-white'
                         : todayVoucher.status === 'expired'
@@ -1876,19 +1881,14 @@ export default function StudentPage() {
                         : 'bg-gradient-to-r from-amber-500 via-orange-500 to-amber-600 text-white'
                     }`}
                   >
-                    <div className="flex items-center space-x-2.5">
-                      <TicketIcon className="h-6 w-6 text-white" />
-                      <div>
-                        <p className="text-xs uppercase tracking-widest opacity-90 font-semibold">
-                          VARDA CAFETERIA • LIMA VOUCHER
-                        </p>
-                        <h3 className="text-lg sm:text-xl font-extrabold leading-tight">
-                          Breakfast
-                        </h3>
-                      </div>
+                    <div className="flex items-center space-x-2">
+                      <TicketIcon className="h-5 w-5 text-white" />
+                      <h3 className="text-base sm:text-lg font-bold">
+                        Breakfast
+                      </h3>
                     </div>
                     <span
-                      className={`px-3 py-1 rounded-full text-xs font-extrabold uppercase tracking-wider shadow ${
+                      className={`px-2.5 py-0.5 rounded-full text-[11px] font-extrabold uppercase tracking-wider shadow ${
                         todayVoucher.status === 'claimed'
                           ? 'bg-white text-green-700'
                           : todayVoucher.status === 'expired'
@@ -1897,7 +1897,7 @@ export default function StudentPage() {
                       }`}
                     >
                       {todayVoucher.status === 'claimed'
-                        ? '✓ CLAIMED'
+                        ? 'CLAIMED'
                         : todayVoucher.status === 'expired'
                         ? 'EXPIRED'
                         : 'AVAILABLE'}
@@ -1905,139 +1905,129 @@ export default function StudentPage() {
                   </div>
 
                   {/* Ticket Body */}
-                  <div className="p-5 sm:p-6 space-y-4">
-                    <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 bg-amber-100/60 border border-amber-300 rounded-xl p-4">
+                  <div className="p-4 sm:p-5 space-y-3.5">
+                    <div className="flex items-center justify-between bg-amber-100/60 border border-amber-300 rounded-xl px-4 py-3">
                       <div>
-                        <p className="text-xs font-semibold uppercase tracking-wider text-amber-800">
-                          Voucher Ticket Code
+                        <p className="text-[10px] uppercase font-semibold text-amber-800">
+                          Code
                         </p>
-                        <p className="text-xl sm:text-2xl font-mono font-black text-gray-900 tracking-wider">
+                        <p className="text-lg sm:text-xl font-mono font-bold text-gray-900">
                           {todayVoucher.voucherCode}
                         </p>
                       </div>
-                      <div className="sm:text-right">
-                        <p className="text-xs font-semibold uppercase tracking-wider text-amber-800">
+                      <div className="text-right">
+                        <p className="text-[10px] uppercase font-semibold text-amber-800">
                           Account ID
                         </p>
-                        <p className="text-xl sm:text-2xl font-mono font-black text-purple-800">
+                        <p className="text-lg sm:text-xl font-mono font-bold text-purple-800">
                           {todayVoucher.accountID || user.accountID || '-'}
                         </p>
                       </div>
                     </div>
 
-                    <div className="grid grid-cols-2 sm:grid-cols-3 gap-3 text-xs sm:text-sm">
-                      <div className="bg-gray-50 p-3 rounded-lg border border-gray-200">
-                        <span className="text-gray-500 block text-xs">Student Name</span>
-                        <span className="font-bold text-gray-900">
+                    <div className="grid grid-cols-2 sm:grid-cols-3 gap-2.5 text-xs">
+                      <div className="bg-gray-50 p-2.5 rounded-lg border border-gray-200">
+                        <span className="text-gray-500 block text-[11px]">Student</span>
+                        <span className="font-bold text-gray-900 truncate block">
                           {user.firstName} {user.lastName}
                         </span>
                       </div>
-                      <div className="bg-gray-50 p-3 rounded-lg border border-gray-200">
-                        <span className="text-gray-500 block text-xs">Batch / ID</span>
-                        <span className="font-bold text-gray-900">
+                      <div className="bg-gray-50 p-2.5 rounded-lg border border-gray-200">
+                        <span className="text-gray-500 block text-[11px]">Batch • ID</span>
+                        <span className="font-bold text-gray-900 truncate block">
                           {todayVoucher.limaBatch || user.limaBatch || '-'} • {user.idNumber}
                         </span>
                       </div>
-                      <div className="bg-gray-50 p-3 rounded-lg border border-gray-200 col-span-2 sm:col-span-1">
-                        <span className="text-gray-500 block text-xs">Valid Until (Today)</span>
-                        <span className="font-bold text-red-600">
-                          {todayVoucher.mealDate} • 11:00 PM PH
+                      <div className="bg-gray-50 p-2.5 rounded-lg border border-gray-200 col-span-2 sm:col-span-1">
+                        <span className="text-gray-500 block text-[11px]">Valid Until</span>
+                        <span className="font-bold text-red-600 block">
+                          11:00 PM Today
                         </span>
                       </div>
                     </div>
 
                     {/* Dashed Ticket Divider */}
-                    <div className="relative py-2 flex items-center">
-                      <div className="w-6 h-6 rounded-full bg-gray-900/10 -ml-8 border border-amber-300"></div>
+                    <div className="relative py-1 flex items-center">
+                      <div className="w-5 h-5 rounded-full bg-gray-900/10 -ml-7 border border-amber-300"></div>
                       <div className="flex-grow border-t-2 border-dashed border-amber-300 mx-2"></div>
-                      <div className="w-6 h-6 rounded-full bg-gray-900/10 -mr-8 border border-amber-300"></div>
+                      <div className="w-5 h-5 rounded-full bg-gray-900/10 -mr-7 border border-amber-300"></div>
                     </div>
 
                     {/* Action / Status Footer */}
                     {todayVoucher.status === 'claimed' ? (
-                      <div className="bg-green-50 border-2 border-green-500 rounded-xl p-4 text-center space-y-1">
-                        <div className="flex items-center justify-center space-x-2 text-green-700 font-extrabold text-base sm:text-lg">
-                          <svg className="w-6 h-6 text-green-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="3" d="M5 13l4 4L19 7" />
+                      <div className="bg-green-50 border border-green-500 rounded-xl p-3 text-center space-y-0.5">
+                        <div className="flex items-center justify-center space-x-1.5 text-green-700 font-bold text-sm sm:text-base">
+                          <svg className="w-4 h-4 text-green-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2.5" d="M5 13l4 4L19 7" />
                           </svg>
-                          <span>Voucher Claimed!</span>
+                          <span>Claimed</span>
                         </div>
                         {todayVoucher.claimedAt && (
-                          <p className="text-xs sm:text-sm text-green-800 font-medium">
-                            Claimed at:{' '}
+                          <p className="text-xs text-green-800">
                             {new Date(todayVoucher.claimedAt).toLocaleString('en-US', {
                               timeZone: 'Asia/Manila',
                               month: 'short',
-                              day: '2-digit',
-                              hour: '2-digit',
+                              day: 'numeric',
+                              hour: 'numeric',
                               minute: '2-digit',
                               hour12: true
-                            })}{' '}
-                            (PH Time)
+                            })}
                           </p>
                         )}
-                        <p className="text-xs text-gray-600 pt-1">
-                          Present this claimed ticket to the cashier at the LIMA counter.
-                        </p>
                       </div>
                     ) : todayVoucher.status === 'expired' || (voucherWindowInfo && !voucherWindowInfo.isBeforeVoucherExpiry) ? (
-                      <div className="bg-gray-100 border border-gray-300 rounded-xl p-4 text-center">
-                        <p className="text-gray-700 font-bold text-sm sm:text-base">
-                          ⏰ This Breakfast Voucher expired at 11:00 PM PH today.
+                      <div className="bg-gray-100 border border-gray-300 rounded-xl p-3 text-center">
+                        <p className="text-gray-600 font-medium text-xs sm:text-sm">
+                          Expired at 11:00 PM
                         </p>
                       </div>
                     ) : (
-                      <div className="space-y-3">
-                        <p className="text-xs sm:text-sm text-gray-600 text-center">
-                          Click below when claiming your breakfast voucher at the counter. Valid only until <strong>11:00 PM PH today</strong>.
-                        </p>
-                        <motion.button
-                          whileHover={{ scale: 1.02 }}
-                          whileTap={{ scale: 0.98 }}
-                          onClick={handleClaimBreakfastVoucher}
-                          disabled={isClaimingVoucher}
-                          className="w-full py-3.5 sm:py-4 bg-gradient-to-r from-amber-500 to-orange-600 hover:from-amber-600 hover:to-orange-700 text-white font-extrabold rounded-xl shadow-lg text-base sm:text-lg transition-all disabled:opacity-50"
-                        >
-                          {isClaimingVoucher ? 'Claiming...' : '🎟️ Claim Breakfast'}
-                        </motion.button>
-                      </div>
+                      <motion.button
+                        whileHover={{ scale: 1.01 }}
+                        whileTap={{ scale: 0.98 }}
+                        onClick={handleClaimBreakfastVoucher}
+                        disabled={isClaimingVoucher}
+                        className="w-full py-3 bg-gradient-to-r from-amber-500 to-orange-600 hover:from-amber-600 hover:to-orange-700 text-white font-bold rounded-xl shadow text-sm sm:text-base transition-all disabled:opacity-50"
+                      >
+                        {isClaimingVoucher ? 'Claiming...' : 'Claim Voucher'}
+                      </motion.button>
                     )}
                   </div>
                 </div>
               </div>
             ) : (
               /* No voucher state */
-              <div className="bg-[#1e293b] p-6 sm:p-8 rounded-2xl border-2 border-gray-700/50 text-center space-y-3 mx-2 sm:mx-0">
-                <div className="w-14 h-14 bg-amber-500/20 rounded-full flex items-center justify-center mx-auto">
-                  <TicketIcon className="h-8 w-8 text-amber-400" />
+              <div className="bg-[#1e293b] p-6 rounded-2xl border border-gray-700/50 text-center space-y-2 mx-2 sm:mx-0">
+                <div className="w-12 h-12 bg-amber-500/20 rounded-full flex items-center justify-center mx-auto">
+                  <TicketIcon className="h-6 w-6 text-amber-400" />
                 </div>
                 {breakfastAvailedToday ? (
                   <>
-                    <h3 className="text-lg sm:text-xl font-bold text-green-400">
-                      You Already Availed Breakfast Today
+                    <h3 className="text-base font-bold text-green-400">
+                      Breakfast Already Availed
                     </h3>
-                    <p className="text-gray-300 text-sm sm:text-base max-w-md mx-auto">
-                      Breakfast vouchers are only issued to students who missed claiming their breakfast during 5:00 AM – 10:00 AM PH.
+                    <p className="text-gray-400 text-xs sm:text-sm">
+                      You already claimed your breakfast today.
                     </p>
                   </>
                 ) : voucherWindowInfo && !voucherWindowInfo.isAfterBreakfastCutoff ? (
                   <>
-                    <h3 className="text-lg sm:text-xl font-bold text-amber-300">
-                      Breakfast Window Is Still Open (5:00 AM – 10:00 AM)
+                    <h3 className="text-base font-bold text-amber-300">
+                      Breakfast Ongoing (5:00 AM – 10:00 AM)
                     </h3>
-                    <p className="text-gray-300 text-sm sm:text-base max-w-md mx-auto">
-                      Unclaimed Breakfast Vouchers are automatically generated at <strong>10:00 AM PH</strong> for students who missed breakfast, and remain claimable until <strong>11:00 PM PH</strong>.
+                    <p className="text-gray-400 text-xs sm:text-sm">
+                      Unclaimed vouchers are available after 10:00 AM.
                     </p>
                   </>
                 ) : (
                   <>
-                    <h3 className="text-lg sm:text-xl font-bold text-gray-200">
-                      No Breakfast Voucher Available
+                    <h3 className="text-base font-bold text-gray-300">
+                      No Voucher Available
                     </h3>
-                    <p className="text-gray-400 text-sm sm:text-base max-w-md mx-auto">
+                    <p className="text-gray-400 text-xs sm:text-sm">
                       {!user.limaBatch
-                        ? 'Please select your LIMA Batch first to qualify for meal vouchers.'
-                        : 'You do not have an active unclaimed breakfast voucher for today.'}
+                        ? 'Please select your LIMA batch.'
+                        : 'No active voucher for today.'}
                     </p>
                   </>
                 )}
@@ -2047,7 +2037,7 @@ export default function StudentPage() {
             <div className="text-center">
               <button
                 onClick={() => setCurrentPage('home')}
-                className="px-6 py-2.5 bg-gray-800 text-gray-200 rounded-xl font-medium hover:bg-gray-700 transition-all text-sm"
+                className="px-6 py-2 bg-gray-800 text-gray-300 rounded-xl font-medium hover:bg-gray-700 transition-all text-xs sm:text-sm"
               >
                 ← Back to Home
               </button>
