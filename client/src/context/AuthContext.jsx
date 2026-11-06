@@ -24,6 +24,7 @@ export function AuthProvider({ children }) {
           }
           // Clear user data and redirect
           localStorage.removeItem('cafeteria-user');
+          sessionStorage.clear();
           setUser(null);
           window.location.href = '/login';
         }
@@ -38,6 +39,7 @@ export function AuthProvider({ children }) {
 
   const login = (data) => {
     localStorage.setItem('cafeteria-user', JSON.stringify(data));
+    sessionStorage.clear();
     setUser(data);
   };
 
@@ -52,6 +54,7 @@ export function AuthProvider({ children }) {
 
   const logout = () => {
     localStorage.removeItem('cafeteria-user');
+    sessionStorage.clear();
     setUser(null);
   };
 

@@ -191,6 +191,10 @@ export default function StudentPage() {
   const [isLoadingVoucher, setIsLoadingVoucher] = useState(false);
   const [isClaimingVoucher, setIsClaimingVoucher] = useState(false);
   const [voucherMessage, setVoucherMessage] = useState({ type: '', text: '' });
+  const [showVoucherNewsModal, setShowVoucherNewsModal] = useState(false);
+  const [allStudentVouchers, setAllStudentVouchers] = useState([]);
+  const [voucherHistoryStatus, setVoucherHistoryStatus] = useState('all');
+  const [voucherHistoryDate, setVoucherHistoryDate] = useState('');
 
   const baseUrl = import.meta.env.VITE_API_BASE_URL;
   const token = user.token;
@@ -202,6 +206,26 @@ export default function StudentPage() {
       setShowLimaBatchModal(false);
     }
   }, [user?.university, user?.limaBatch]);
+
+  // Show news popup on login for LIMA students
+  useEffect(() => {
+    if (user?.university === 'lima' && user?.limaBatch) {
+      const seenKey = `voucher_news_seen_${user._id || user.idNumber || 'lima'}`;
+      const hasSeen = sessionStorage.getItem(seenKey);
+      if (!hasSeen) {
+        setShowVoucherNewsModal(true);
+      }
+    }
+  }, [user?.university, user?.limaBatch, user?._id, user?.idNumber]);
+
+  const handleDismissVoucherNews = (navigateVouchers = false) => {
+    const seenKey = `voucher_news_seen_${user?._id || user?.idNumber || 'lima'}`;
+    sessionStorage.setItem(seenKey, 'true');
+    setShowVoucherNewsModal(false);
+    if (navigateVouchers) {
+      setCurrentPage('lima-vouchers');
+    }
+  };
 
   const handleSaveLimaBatch = async () => {
     if (isSavingLimaBatch) return;
@@ -222,6 +246,7 @@ export default function StudentPage() {
 
       updateUser({ limaBatch: response.data?.limaBatch || selectedLimaBatch });
       setShowLimaBatchModal(false);
+      setShowVoucherNewsModal(true);
     } catch (error) {
       setLimaBatchError(error.response?.data?.message || 'Failed to save batch. Please try again.');
     } finally {
@@ -295,6 +320,7 @@ export default function StudentPage() {
         setTodayVoucher(response.data.todayVoucher || null);
         setBreakfastAvailedToday(!!response.data.breakfastAvailedToday);
         setVoucherWindowInfo(response.data.windowInfo || null);
+        setAllStudentVouchers(response.data.allVouchers || []);
       }
     } catch (err) {
       console.error('Error fetching student vouchers:', err);
@@ -1019,6 +1045,121 @@ export default function StudentPage() {
               >
                 {isSavingLimaBatch ? 'Saving...' : 'Continue'}
               </button>
+            </motion.div>
+          </motion.div>
+        )}
+
+        {/* Voucher News Announcement Modal */}
+        {showVoucherNewsModal && user?.university === 'lima' && (
+          <motion.div
+            className="fixed inset-0 z-[120] flex items-center justify-center bg-black/80 backdrop-blur-sm p-4 overflow-y-auto"
+            initial={{ opacity: 0 }}
+            animate={{ opacity: 1 }}
+            exit={{ opacity: 0 }}
+          >
+            <motion.div
+              className="relative w-full max-w-lg bg-[#1e293b] rounded-2xl sm:rounded-3xl shadow-2xl border-2 border-amber-500/80 overflow-hidden text-left my-auto"
+              initial={{ scale: 0.9, opacity: 0, y: 20 }}
+              animate={{ scale: 1, opacity: 1, y: 0 }}
+              exit={{ scale: 0.9, opacity: 0, y: 20 }}
+              transition={{ type: 'spring', damping: 25, stiffness: 300 }}
+            >
+              {/* Header Banner */}
+              <div className="bg-gradient-to-r from-amber-600 via-orange-600 to-amber-700 p-4 sm:p-5 text-white relative">
+                <button
+                  type="button"
+                  onClick={() => handleDismissVoucherNews(false)}
+                  className="absolute top-3.5 right-3.5 w-8 h-8 rounded-full bg-black/20 hover:bg-black/40 flex items-center justify-center text-white/90 hover:text-white transition font-bold"
+                  aria-label="Close"
+                >
+                  ✕
+                </button>
+                <div className="inline-flex items-center space-x-1.5 px-2.5 py-0.5 rounded-full bg-white/20 text-white text-[11px] font-extrabold uppercase tracking-wider backdrop-blur-sm mb-2">
+                  <span>✨ New Feature</span>
+                </div>
+                <h3 className="text-xl sm:text-2xl font-black tracking-tight text-white flex items-center space-x-2">
+                  <span>🎟️ Breakfast Voucher</span>
+                </h3>
+                <p className="text-xs sm:text-sm text-orange-100 mt-1">
+                  Missed regular breakfast? Here is how your voucher works:
+                </p>
+              </div>
+
+              {/* Body Content / Instructions */}
+              <div className="p-4 sm:p-6 space-y-3 sm:space-y-3.5 max-h-[60vh] overflow-y-auto">
+                {/* Step 1 */}
+                <div className="flex items-start space-x-3 bg-slate-800/80 p-3 sm:p-3.5 rounded-xl border border-gray-700/60">
+                  <div className="flex-shrink-0 w-8 h-8 sm:w-9 sm:h-9 rounded-lg bg-amber-500/20 text-amber-400 font-bold flex items-center justify-center text-sm border border-amber-500/30">
+                    1
+                  </div>
+                  <div className="flex-1 min-w-0">
+                    <h4 className="text-xs sm:text-sm font-bold text-gray-100">
+                      Auto-Issued at 10:00 AM
+                    </h4>
+                    <p className="text-xs text-gray-300 mt-0.5 leading-relaxed">
+                      If you missed claiming breakfast during regular hours (5:00 AM – 10:00 AM PH), your unclaimed voucher is automatically available at <strong>10:00 AM</strong>.
+                    </p>
+                  </div>
+                </div>
+
+                {/* Step 2 */}
+                <div className="flex items-start space-x-3 bg-slate-800/80 p-3 sm:p-3.5 rounded-xl border border-gray-700/60">
+                  <div className="flex-shrink-0 w-8 h-8 sm:w-9 sm:h-9 rounded-lg bg-orange-500/20 text-orange-400 font-bold flex items-center justify-center text-sm border border-orange-500/30">
+                    2
+                  </div>
+                  <div className="flex-1 min-w-0">
+                    <h4 className="text-xs sm:text-sm font-bold text-gray-100">
+                      Claim Only in Dorm 2 (Until 11:00 PM)
+                    </h4>
+                    <p className="text-xs text-gray-300 mt-0.5 leading-relaxed">
+                      Late breakfast vouchers can <strong>only be claimed in Dorm 2</strong> until <strong>11:00 PM PH today</strong>. Unclaimed vouchers expire nightly and do not roll over.
+                    </p>
+                  </div>
+                </div>
+
+                {/* Step 3 */}
+                <div className="flex items-start space-x-3 bg-slate-800/80 p-3 sm:p-3.5 rounded-xl border border-gray-700/60">
+                  <div className="flex-shrink-0 w-8 h-8 sm:w-9 sm:h-9 rounded-lg bg-emerald-500/20 text-emerald-400 font-bold flex items-center justify-center text-sm border border-emerald-500/30">
+                    3
+                  </div>
+                  <div className="flex-1 min-w-0">
+                    <h4 className="text-xs sm:text-sm font-bold text-gray-100">
+                      Tap Claim & Show to Staff
+                    </h4>
+                    <p className="text-xs text-gray-300 mt-0.5 leading-relaxed">
+                      Go to the <strong>Voucher</strong> tab, tap <strong>Claim Voucher</strong>, and present your voucher Code or Account ID to the Dorm 2 cashier.
+                    </p>
+                  </div>
+                </div>
+
+                {/* Policy Notice */}
+                <div className="p-3 rounded-xl bg-amber-950/60 border border-amber-500/50 text-left">
+                  <p className="text-xs text-amber-200/90 leading-relaxed">
+                    <strong className="text-amber-400 font-semibold block mb-0.5">⚠️ Notes:</strong>
+                    The voucher can only be claimed in dorm 2. Late breakfast vouchers are for students with valid reasons only. We kindly encourage responsible use of this privilege.
+                  </p>
+                </div>
+              </div>
+
+              {/* Action Buttons */}
+              <div className="p-4 sm:p-5 bg-slate-900/90 border-t border-gray-800 flex flex-col-reverse sm:flex-row items-center gap-2 sm:gap-3">
+                <button
+                  type="button"
+                  onClick={() => handleDismissVoucherNews(false)}
+                  className="w-full sm:flex-1 py-2.5 px-4 bg-gray-800 hover:bg-gray-700 text-gray-300 text-xs sm:text-sm font-semibold rounded-xl transition text-center"
+                >
+                  Got It
+                </button>
+                <motion.button
+                  whileHover={{ scale: 1.02 }}
+                  whileTap={{ scale: 0.98 }}
+                  type="button"
+                  onClick={() => handleDismissVoucherNews(true)}
+                  className="w-full sm:flex-1 py-2.5 px-4 bg-gradient-to-r from-amber-500 to-orange-600 hover:from-amber-600 hover:to-orange-700 text-white text-xs sm:text-sm font-bold rounded-xl shadow-md transition text-center"
+                >
+                  View Voucher →
+                </motion.button>
+              </div>
             </motion.div>
           </motion.div>
         )}
@@ -1837,9 +1978,19 @@ export default function StudentPage() {
           <motion.div variants={itemVariants} className="space-y-4 sm:space-y-6 pb-8">
             <div className="text-center px-2">
               <img src={logo} alt="Varda Food Group Logo" className="h-12 sm:h-16 md:h-20 mx-auto mb-4" />
-              <h2 className="text-xl sm:text-2xl md:text-3xl font-bold text-amber-500 mb-1">
-                Voucher
-              </h2>
+              <div className="flex items-center justify-center space-x-2 mb-1">
+                <h2 className="text-xl sm:text-2xl md:text-3xl font-bold text-amber-500">
+                  Voucher
+                </h2>
+                <button
+                  type="button"
+                  onClick={() => setShowVoucherNewsModal(true)}
+                  className="ml-2 inline-flex items-center space-x-1 px-2.5 py-1 rounded-full bg-amber-500/20 hover:bg-amber-500/30 text-amber-300 border border-amber-500/40 text-xs font-semibold transition"
+                  title="View Voucher Mechanics"
+                >
+                  <span>ℹ️ Mechanics</span>
+                </button>
+              </div>
             </div>
 
             {/* Policy Notes */}
@@ -2033,6 +2184,134 @@ export default function StudentPage() {
                 )}
               </div>
             )}
+
+            {/* Voucher History Section with Data & Date Filtering */}
+            <div className="mx-2 sm:mx-0 bg-[#1e293b] rounded-2xl p-4 sm:p-5 border border-gray-700/60 shadow-lg text-left space-y-3.5">
+              <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2 border-b border-gray-700/60 pb-3">
+                <div>
+                  <h3 className="text-base sm:text-lg font-bold text-gray-100 flex items-center space-x-2">
+                    <span>Voucher History</span>
+                    <span className="text-xs px-2 py-0.5 rounded-full bg-gray-700 text-gray-300 font-semibold">
+                      {allStudentVouchers.length}
+                    </span>
+                  </h3>
+                  <p className="text-xs text-gray-400">
+                    View previous claimed and unclaimed vouchers
+                  </p>
+                </div>
+
+                {/* Date Filter */}
+                <div className="flex items-center space-x-1.5 self-start sm:self-auto">
+                  <span className="text-xs text-gray-400 font-medium">Date:</span>
+                  <input
+                    type="date"
+                    value={voucherHistoryDate}
+                    onChange={(e) => setVoucherHistoryDate(e.target.value)}
+                    className="px-2 py-1 bg-gray-800 text-gray-200 border border-gray-600 rounded-lg text-xs focus:ring-1 focus:ring-amber-500 focus:outline-none"
+                  />
+                  {voucherHistoryDate && (
+                    <button
+                      type="button"
+                      onClick={() => setVoucherHistoryDate('')}
+                      className="text-xs text-amber-400 hover:text-amber-300 px-1 font-medium"
+                      title="Clear date filter"
+                    >
+                      Clear
+                    </button>
+                  )}
+                </div>
+              </div>
+
+              {/* Status Filter Tabs */}
+              <div className="flex flex-wrap gap-1.5">
+                {[
+                  { key: 'all', label: 'All' },
+                  { key: 'claimed', label: 'Claimed' },
+                  { key: 'unclaimed', label: 'Unclaimed / Expired' }
+                ].map(tab => (
+                  <button
+                    key={tab.key}
+                    type="button"
+                    onClick={() => setVoucherHistoryStatus(tab.key)}
+                    className={`px-3 py-1 rounded-lg text-xs font-semibold transition ${
+                      voucherHistoryStatus === tab.key
+                        ? 'bg-amber-500 text-black shadow'
+                        : 'bg-gray-800 hover:bg-gray-700 text-gray-300'
+                    }`}
+                  >
+                    {tab.label}
+                  </button>
+                ))}
+              </div>
+
+              {/* History List */}
+              <div className="space-y-2 max-h-72 overflow-y-auto pr-1">
+                {allStudentVouchers
+                  .filter(v => {
+                    if (voucherHistoryStatus === 'claimed' && v.status !== 'claimed') return false;
+                    if (voucherHistoryStatus === 'unclaimed' && v.status === 'claimed') return false;
+                    if (voucherHistoryDate && v.mealDate !== voucherHistoryDate) return false;
+                    return true;
+                  })
+                  .map(v => (
+                    <div
+                      key={v._id || v.voucherCode}
+                      className="flex items-center justify-between p-3 rounded-xl bg-gray-800/70 border border-gray-700/50 hover:bg-gray-800 transition"
+                    >
+                      <div className="space-y-0.5">
+                        <div className="flex items-center space-x-2">
+                          <span className="font-mono text-xs font-bold text-amber-400 bg-amber-950/60 px-2 py-0.5 rounded border border-amber-600/40">
+                            {v.voucherCode}
+                          </span>
+                          <span className="text-xs font-semibold text-gray-200">
+                            Breakfast
+                          </span>
+                        </div>
+                        <p className="text-[11px] text-gray-400">
+                          Meal Date: <strong className="text-gray-300">{v.mealDate}</strong>
+                          {v.claimedAt && (
+                            <> • Claimed: {new Date(v.claimedAt).toLocaleString('en-US', {
+                              timeZone: 'Asia/Manila',
+                              month: 'short',
+                              day: 'numeric',
+                              hour: 'numeric',
+                              minute: '2-digit',
+                              hour12: true
+                            })}</>
+                          )}
+                        </p>
+                      </div>
+
+                      <div>
+                        {v.status === 'claimed' ? (
+                          <span className="px-2.5 py-1 rounded-full text-[11px] font-bold bg-green-900/60 text-green-300 border border-green-500/50">
+                            ✓ Claimed
+                          </span>
+                        ) : v.status === 'expired' ? (
+                          <span className="px-2.5 py-1 rounded-full text-[11px] font-bold bg-gray-700/80 text-gray-300 border border-gray-600">
+                            Expired
+                          </span>
+                        ) : (
+                          <span className="px-2.5 py-1 rounded-full text-[11px] font-bold bg-amber-900/60 text-amber-300 border border-amber-500/50">
+                            Unclaimed
+                          </span>
+                        )}
+                      </div>
+                    </div>
+                  ))}
+
+                {allStudentVouchers.filter(v => {
+                  if (voucherHistoryStatus === 'claimed' && v.status !== 'claimed') return false;
+                  if (voucherHistoryStatus === 'unclaimed' && v.status === 'claimed') return false;
+                  if (voucherHistoryDate && v.mealDate !== voucherHistoryDate) return false;
+                  return true;
+                }).length === 0 && (
+                  <div className="py-6 text-center text-xs text-gray-400">
+                    No vouchers found matching this filter.
+                  </div>
+                )}
+              </div>
+            </div>
 
             <div className="text-center">
               <button

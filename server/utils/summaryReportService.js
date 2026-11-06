@@ -1,6 +1,8 @@
 import ExcelJS from 'exceljs';
 import AvailHistory from '../models/AvailHistory.js';
 import User from '../models/User.js';
+import Voucher from '../models/Voucher.js';
+import { getTodayBreakfastVoucherWindow } from './breakfastVoucherService.js';
 
 /**
  * Format a Date to Philippine Time string
@@ -269,11 +271,103 @@ export const getMealSummaryData = async ({ startDate, endDate, limaBatch } = {})
     }
   });
 
+  // 8. Fetch Breakfast Vouchers for the period
+  const voucherQuery = {
+    voucherType: 'unclaimed_breakfast'
+  };
+
+  if (startDate && endDate) {
+    voucherQuery.mealDate = { $gte: startDate, $lte: endDate };
+  } else if (startDate) {
+    voucherQuery.mealDate = startDate;
+  } else {
+    // Default active mealDate
+    const windowInfo = getTodayBreakfastVoucherWindow();
+    voucherQuery.mealDate = windowInfo.mealDate;
+  }
+
+  if (limaBatch && ['B29', 'B31', 'B32', 'B33'].includes(limaBatch)) {
+    voucherQuery.limaBatch = limaBatch;
+  }
+
+  const vouchers = await Voucher.find(voucherQuery)
+    .sort({ mealDate: -1, claimedAt: -1, studentName: 1 })
+    .lean();
+
+  const voucherCounts = {
+    total: vouchers.length,
+    claimed: vouchers.filter(v => v.status === 'claimed').length,
+    unclaimed: vouchers.filter(v => v.status === 'unclaimed').length,
+    expired: vouchers.filter(v => v.status === 'expired').length
+  };
+  voucherCounts.totalUnclaimed = voucherCounts.unclaimed + voucherCounts.expired;
+  voucherCounts.rate = voucherCounts.total > 0
+    ? Number(((voucherCounts.claimed / voucherCounts.total) * 100).toFixed(1))
+    : 0;
+
+  metrics.vouchers = voucherCounts;
+
+  const voucherBatchBreakdown = BATCHES.map(batch => {
+    const bVouchers = vouchers.filter(v => v.limaBatch === batch);
+    const bTotal = bVouchers.length;
+    const bClaimed = bVouchers.filter(v => v.status === 'claimed').length;
+    const bUnclaimed = bVouchers.filter(v => v.status === 'unclaimed').length;
+    const bExpired = bVouchers.filter(v => v.status === 'expired').length;
+    const bTotalUnclaimed = bUnclaimed + bExpired;
+    return {
+      batch,
+      total: bTotal,
+      claimed: bClaimed,
+      unclaimed: bUnclaimed,
+      expired: bExpired,
+      totalUnclaimed: bTotalUnclaimed,
+      rate: bTotal > 0 ? Number(((bClaimed / bTotal) * 100).toFixed(1)) : 0
+    };
+  });
+
+  const claimedVouchersList = vouchers
+    .filter(v => v.status === 'claimed')
+    .map(v => {
+      const s = studentMap.get(v.idNumber);
+      return {
+        accountID: v.accountID || s?.accountID || '-',
+        limaBatch: v.limaBatch || s?.limaBatch || '-',
+        idNumber: v.idNumber,
+        studentName: v.studentName || `${s?.lastName || ''}, ${s?.firstName || ''}`.trim() || 'Unknown',
+        voucherCode: v.voucherCode,
+        mealType: 'Breakfast',
+        mealDate: v.mealDate,
+        claimedAt: v.claimedAt,
+        status: 'Claimed'
+      };
+    });
+
+  const unclaimedVouchersList = vouchers
+    .filter(v => v.status !== 'claimed')
+    .map(v => {
+      const s = studentMap.get(v.idNumber);
+      return {
+        accountID: v.accountID || s?.accountID || '-',
+        limaBatch: v.limaBatch || s?.limaBatch || '-',
+        idNumber: v.idNumber,
+        studentName: v.studentName || `${s?.lastName || ''}, ${s?.firstName || ''}`.trim() || 'Unknown',
+        voucherCode: v.voucherCode,
+        mealType: 'Breakfast',
+        mealDate: v.mealDate,
+        expiresAt: v.expiresAt,
+        status: v.status === 'expired' ? 'Expired (11:00 PM)' : 'Unclaimed'
+      };
+    });
+
   return {
     dateRangeLabel: label,
     generatedAt: new Date(),
     metrics,
     batchBreakdown,
+    voucherBatchBreakdown,
+    claimedVouchersList,
+    unclaimedVouchersList,
+    vouchersList: vouchers,
     availedList,
     unavailedList
   };
@@ -283,7 +377,17 @@ export const getMealSummaryData = async ({ startDate, endDate, limaBatch } = {})
  * Build a 3-sheet Excel workbook for the summary report.
  */
 export const buildSummaryExcelWorkbook = (summaryData) => {
-  const { dateRangeLabel, generatedAt, metrics, batchBreakdown, availedList, unavailedList } = summaryData;
+  const {
+    dateRangeLabel,
+    generatedAt,
+    metrics,
+    batchBreakdown,
+    voucherBatchBreakdown,
+    claimedVouchersList,
+    unclaimedVouchersList,
+    availedList,
+    unavailedList
+  } = summaryData;
 
   const workbook = new ExcelJS.Workbook();
   workbook.creator = 'VGConcierge';
@@ -438,6 +542,91 @@ export const buildSummaryExcelWorkbook = (summaryData) => {
     });
   }
 
+  summarySheet.addRow([]); // Spacer
+
+  // Section 3: Breakfast Vouchers Summary
+  const sec3RowIdx = summarySheet.rowCount + 1;
+  summarySheet.mergeCells(`A${sec3RowIdx}:E${sec3RowIdx}`);
+  const sec3Cell = summarySheet.getCell(`A${sec3RowIdx}`);
+  sec3Cell.value = '3. BREAKFAST VOUCHERS SUMMARY (DORM 2 COMPENSATORY)';
+  sec3Cell.font = { name: 'Calibri', size: 12, bold: true, color: { argb: '1E1B4B' } };
+  summarySheet.getRow(sec3RowIdx).height = 22;
+
+  const voucherHeaderRow = summarySheet.addRow([
+    'Voucher Category',
+    'Total Issued',
+    'Claimed (Dorm 2)',
+    'Unclaimed / Expired',
+    'Claim Rate (%)'
+  ]);
+  voucherHeaderRow.height = 26;
+  voucherHeaderRow.eachCell(cell => {
+    cell.font = { name: 'Calibri', bold: true, size: 11, color: { argb: 'FFFFFF' } };
+    cell.fill = { type: 'pattern', pattern: 'solid', fgColor: { argb: 'B45309' } };
+    cell.alignment = { vertical: 'middle', horizontal: 'center' };
+    cell.border = borderThin;
+  });
+
+  const vMetrics = metrics.vouchers || { total: 0, claimed: 0, unclaimed: 0, expired: 0, totalUnclaimed: 0, rate: 0 };
+  const vRow = summarySheet.addRow([
+    'Unclaimed Breakfast Vouchers',
+    vMetrics.total,
+    vMetrics.claimed,
+    vMetrics.totalUnclaimed,
+    `${vMetrics.rate}%`
+  ]);
+  vRow.height = 24;
+  vRow.eachCell((cell, colNum) => {
+    cell.border = borderMediumBottom;
+    cell.alignment = { vertical: 'middle', horizontal: colNum === 1 ? 'left' : 'center' };
+    cell.fill = { type: 'pattern', pattern: 'solid', fgColor: { argb: 'FEF3C7' } };
+    cell.font = { name: 'Calibri', bold: true, size: 11, color: { argb: '78350F' } };
+  });
+
+  // Batch breakdown for vouchers if available
+  if (voucherBatchBreakdown && voucherBatchBreakdown.length > 0) {
+    summarySheet.addRow([]); // Spacer
+    const sec3bRowIdx = summarySheet.rowCount + 1;
+    summarySheet.mergeCells(`A${sec3bRowIdx}:E${sec3bRowIdx}`);
+    const sec3bCell = summarySheet.getCell(`A${sec3bRowIdx}`);
+    sec3bCell.value = 'BREAKFAST VOUCHERS BY BATCH';
+    sec3bCell.font = { name: 'Calibri', size: 11, bold: true, color: { argb: '4B5563' } };
+    summarySheet.getRow(sec3bRowIdx).height = 20;
+
+    const vBatchHeaderRow = summarySheet.addRow([
+      'Batch',
+      'Vouchers Issued',
+      'Claimed',
+      'Unclaimed / Expired',
+      'Claim Rate (%)'
+    ]);
+    vBatchHeaderRow.height = 24;
+    vBatchHeaderRow.eachCell(cell => {
+      cell.font = { name: 'Calibri', bold: true, size: 10, color: { argb: 'FFFFFF' } };
+      cell.fill = { type: 'pattern', pattern: 'solid', fgColor: { argb: '6B7280' } };
+      cell.alignment = { vertical: 'middle', horizontal: 'center' };
+      cell.border = borderThin;
+    });
+
+    voucherBatchBreakdown.forEach((vb, idx) => {
+      const vbRow = summarySheet.addRow([
+        vb.batch,
+        vb.total,
+        vb.claimed,
+        vb.totalUnclaimed,
+        `${vb.rate}%`
+      ]);
+      vbRow.height = 20;
+      const isEven = idx % 2 === 0;
+      vbRow.eachCell((cell, colNum) => {
+        cell.border = borderThin;
+        cell.alignment = { vertical: 'middle', horizontal: colNum === 1 ? 'left' : 'center' };
+        cell.fill = { type: 'pattern', pattern: 'solid', fgColor: { argb: isEven ? 'F9FAFB' : 'FFFFFF' } };
+        cell.font = { name: 'Calibri', size: 10, color: { argb: '111827' } };
+      });
+    });
+  }
+
   // ==========================================
   // SHEET 2: AVAILED STUDENTS
   // ==========================================
@@ -532,6 +721,114 @@ export const buildSummaryExcelWorkbook = (summaryData) => {
     });
   } else {
     const emptyRow = unavailedSheet.addRow({ idNumber: 'All registered students availed all meals! (0 unavailed)' });
+    emptyRow.height = 22;
+    emptyRow.getCell(1).font = { name: 'Calibri', italic: true, color: { argb: '6B7280' } };
+  }
+
+  // ==========================================
+  // SHEET 4: CLAIMED VOUCHERS
+  // ==========================================
+  const claimedVouchersSheet = workbook.addWorksheet('Claimed Vouchers');
+
+  claimedVouchersSheet.columns = [
+    { header: 'Account ID', key: 'accountID', width: 14 },
+    { header: 'Batch', key: 'limaBatch', width: 12 },
+    { header: 'Student ID Number', key: 'idNumber', width: 20 },
+    { header: 'Student Name', key: 'studentName', width: 30 },
+    { header: 'Voucher Code', key: 'voucherCode', width: 16 },
+    { header: 'Meal Type', key: 'mealType', width: 14 },
+    { header: 'Meal Date', key: 'mealDate', width: 14 },
+    { header: 'Claimed Date & Time (PH)', key: 'claimedAt', width: 26 },
+    { header: 'Status', key: 'status', width: 14 }
+  ];
+
+  const claimedVoucherHeaderRow = claimedVouchersSheet.getRow(1);
+  claimedVoucherHeaderRow.height = 28;
+  claimedVoucherHeaderRow.eachCell(cell => {
+    cell.font = { name: 'Calibri', bold: true, size: 11, color: { argb: 'FFFFFF' } };
+    cell.fill = { type: 'pattern', pattern: 'solid', fgColor: { argb: '047857' } };
+    cell.alignment = { vertical: 'middle', horizontal: 'center' };
+    cell.border = borderThin;
+  });
+
+  if (claimedVouchersList && claimedVouchersList.length > 0) {
+    claimedVouchersList.forEach((item, idx) => {
+      const row = claimedVouchersSheet.addRow({
+        accountID: item.accountID,
+        limaBatch: item.limaBatch,
+        idNumber: item.idNumber,
+        studentName: item.studentName,
+        voucherCode: item.voucherCode,
+        mealType: item.mealType,
+        mealDate: item.mealDate,
+        claimedAt: formatManilaDateTime(item.claimedAt),
+        status: item.status
+      });
+      row.height = 20;
+      const isEven = idx % 2 === 0;
+      row.eachCell((cell, colNum) => {
+        cell.border = borderThin;
+        cell.font = { name: 'Calibri', size: 10, color: { argb: '111827' } };
+        cell.alignment = { vertical: 'middle', horizontal: [1, 2, 5, 6, 7, 9].includes(colNum) ? 'center' : 'left' };
+        cell.fill = { type: 'pattern', pattern: 'solid', fgColor: { argb: isEven ? 'F0FDF4' : 'FFFFFF' } };
+      });
+    });
+  } else {
+    const emptyRow = claimedVouchersSheet.addRow({ idNumber: 'No claimed breakfast vouchers for this period (0 claimed)' });
+    emptyRow.height = 22;
+    emptyRow.getCell(1).font = { name: 'Calibri', italic: true, color: { argb: '6B7280' } };
+  }
+
+  // ==========================================
+  // SHEET 5: UNCLAIMED VOUCHERS
+  // ==========================================
+  const unclaimedVouchersSheet = workbook.addWorksheet('Unclaimed Vouchers');
+
+  unclaimedVouchersSheet.columns = [
+    { header: 'Account ID', key: 'accountID', width: 14 },
+    { header: 'Batch', key: 'limaBatch', width: 12 },
+    { header: 'Student ID Number', key: 'idNumber', width: 20 },
+    { header: 'Student Name', key: 'studentName', width: 30 },
+    { header: 'Voucher Code', key: 'voucherCode', width: 16 },
+    { header: 'Meal Type', key: 'mealType', width: 14 },
+    { header: 'Meal Date', key: 'mealDate', width: 14 },
+    { header: 'Expiry Time (PH)', key: 'expiresAt', width: 26 },
+    { header: 'Status', key: 'status', width: 20 }
+  ];
+
+  const unclaimedVoucherHeaderRow = unclaimedVouchersSheet.getRow(1);
+  unclaimedVoucherHeaderRow.height = 28;
+  unclaimedVoucherHeaderRow.eachCell(cell => {
+    cell.font = { name: 'Calibri', bold: true, size: 11, color: { argb: 'FFFFFF' } };
+    cell.fill = { type: 'pattern', pattern: 'solid', fgColor: { argb: 'B45309' } };
+    cell.alignment = { vertical: 'middle', horizontal: 'center' };
+    cell.border = borderThin;
+  });
+
+  if (unclaimedVouchersList && unclaimedVouchersList.length > 0) {
+    unclaimedVouchersList.forEach((item, idx) => {
+      const row = unclaimedVouchersSheet.addRow({
+        accountID: item.accountID,
+        limaBatch: item.limaBatch,
+        idNumber: item.idNumber,
+        studentName: item.studentName,
+        voucherCode: item.voucherCode,
+        mealType: item.mealType,
+        mealDate: item.mealDate,
+        expiresAt: formatManilaDateTime(item.expiresAt),
+        status: item.status
+      });
+      row.height = 20;
+      const isEven = idx % 2 === 0;
+      row.eachCell((cell, colNum) => {
+        cell.border = borderThin;
+        cell.font = { name: 'Calibri', size: 10, color: { argb: '111827' } };
+        cell.alignment = { vertical: 'middle', horizontal: [1, 2, 5, 6, 7, 9].includes(colNum) ? 'center' : 'left' };
+        cell.fill = { type: 'pattern', pattern: 'solid', fgColor: { argb: isEven ? 'FFFBEB' : 'FFFFFF' } };
+      });
+    });
+  } else {
+    const emptyRow = unclaimedVouchersSheet.addRow({ idNumber: 'No unclaimed vouchers found (all claimed or none issued)' });
     emptyRow.height = 22;
     emptyRow.getCell(1).font = { name: 'Calibri', italic: true, color: { argb: '6B7280' } };
   }

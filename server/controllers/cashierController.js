@@ -618,13 +618,19 @@ export const getBreakfastVouchers = async (req, res) => {
     await syncTodayBreakfastVouchers();
     const windowInfo = getTodayBreakfastVoucherWindow();
 
-    const { status, search, limaBatch, mealDate } = req.query;
-    const targetDate = mealDate || windowInfo.mealDate;
+    const { status, search, limaBatch, mealDate, startDate, endDate } = req.query;
 
     const baseQuery = {
-      mealDate: targetDate,
       voucherType: 'unclaimed_breakfast'
     };
+
+    if (startDate && endDate) {
+      baseQuery.mealDate = { $gte: startDate, $lte: endDate };
+    } else if (mealDate && mealDate !== 'all') {
+      baseQuery.mealDate = mealDate;
+    } else if (!mealDate && !startDate && !endDate) {
+      baseQuery.mealDate = windowInfo.mealDate;
+    }
 
     if (limaBatch && ['B29', 'B31', 'B32', 'B33'].includes(limaBatch)) {
       baseQuery.limaBatch = limaBatch;
@@ -662,8 +668,11 @@ export const getBreakfastVouchers = async (req, res) => {
       });
     }
 
-    // Sort claimed first (most recently claimed at top), then by studentName
+    // Sort by mealDate desc first, then claimed first (most recently claimed at top), then by studentName
     filtered.sort((a, b) => {
+      if (a.mealDate !== b.mealDate) {
+        return (b.mealDate || '').localeCompare(a.mealDate || '');
+      }
       if (a.status === 'claimed' && b.status !== 'claimed') return -1;
       if (a.status !== 'claimed' && b.status === 'claimed') return 1;
       if (a.status === 'claimed' && b.status === 'claimed') {
@@ -674,7 +683,7 @@ export const getBreakfastVouchers = async (req, res) => {
 
     res.json({
       success: true,
-      mealDate: targetDate,
+      mealDate: mealDate || windowInfo.mealDate,
       windowInfo: {
         isAfterBreakfastCutoff: windowInfo.isAfterBreakfastCutoff,
         isBeforeVoucherExpiry: windowInfo.isBeforeVoucherExpiry,

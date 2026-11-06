@@ -626,9 +626,18 @@ export const getStudentVouchers = async (req, res) => {
       voucherType: 'unclaimed_breakfast'
     }).lean();
 
+    // Fetch all vouchers for history & filtering
+    const allVouchers = await Voucher.find({
+      idNumber: user.idNumber,
+      voucherType: 'unclaimed_breakfast'
+    })
+      .sort({ mealDate: -1, createdAt: -1 })
+      .lean();
+
     res.json({
       success: true,
       todayVoucher: todayVoucher || null,
+      allVouchers: allVouchers || [],
       breakfastAvailedToday: !!bfHistory,
       windowInfo: {
         mealDate: windowInfo.mealDate,

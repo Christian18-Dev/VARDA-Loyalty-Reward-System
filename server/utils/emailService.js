@@ -200,6 +200,9 @@ export const sendDailyMealSummaryEmail = async ({ recipients, summaryData, excel
     console.log(`🥐 Breakfast: ${metrics.breakfast.availed}/${metrics.breakfast.registered} (${metrics.breakfast.rate}%)`);
     console.log(`🍱 Lunch: ${metrics.lunch.availed}/${metrics.lunch.registered} (${metrics.lunch.rate}%)`);
     console.log(`🍲 Dinner: ${metrics.dinner.availed}/${metrics.dinner.registered} (${metrics.dinner.rate}%)`);
+    if (metrics.vouchers) {
+      console.log(`🎟️ Vouchers: ${metrics.vouchers.claimed}/${metrics.vouchers.total} claimed (${metrics.vouchers.rate}%) | Unclaimed: ${metrics.vouchers.totalUnclaimed}`);
+    }
     console.log('━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━\n');
     return { sent: true, mode: 'console', recipients: targetRecipients };
   }
@@ -287,9 +290,34 @@ export const sendDailyMealSummaryEmail = async ({ recipients, summaryData, excel
             </tbody>
           </table>
 
+          <h3 style="color: #1e1b4b; font-size: 15px; margin: 24px 0 12px 0; border-bottom: 2px solid #e0e7ff; padding-bottom: 6px;">
+            3. Breakfast Vouchers Summary (Dorm 2)
+          </h3>
+          <table style="width: 100%; border-collapse: collapse; font-size: 14px; margin-bottom: 20px;">
+            <thead>
+              <tr style="background-color: #b45309; color: #ffffff;">
+                <th style="padding: 10px 12px; text-align: left;">Voucher Category</th>
+                <th style="padding: 10px 12px; text-align: center;">Total Issued</th>
+                <th style="padding: 10px 12px; text-align: center;">Claimed (Dorm 2)</th>
+                <th style="padding: 10px 12px; text-align: center;">Unclaimed / Expired</th>
+                <th style="padding: 10px 12px; text-align: center;">Claim Rate</th>
+              </tr>
+            </thead>
+            <tbody>
+              <tr style="background-color: #fffbeb;">
+                <td style="padding: 10px 12px; border-bottom: 1px solid #fef3c7; font-weight: 600;">🎟️ Breakfast Vouchers</td>
+                <td style="padding: 10px 12px; border-bottom: 1px solid #fef3c7; text-align: center; font-weight: 600;">${metrics.vouchers?.total || 0}</td>
+                <td style="padding: 10px 12px; border-bottom: 1px solid #fef3c7; text-align: center; color: #059669; font-weight: 600;">${metrics.vouchers?.claimed || 0}</td>
+                <td style="padding: 10px 12px; border-bottom: 1px solid #fef3c7; text-align: center; color: #dc2626;">${metrics.vouchers?.totalUnclaimed || 0}</td>
+                <td style="padding: 10px 12px; border-bottom: 1px solid #fef3c7; text-align: center; font-weight: 600;">${metrics.vouchers?.rate || 0}%</td>
+              </tr>
+            </tbody>
+          </table>
+
           <div style="background-color: #eef2ff; border-left: 4px solid #4338ca; padding: 14px 16px; border-radius: 4px; margin-top: 20px;">
             <p style="margin: 0; color: #312e81; font-size: 13.5px;">
-              📎 <strong>Full Excel Report Attached:</strong> Please open the attached file (<code>${filename}</code>) for the complete 3-tab report including the itemized <strong>Availed List</strong> and <strong>Unavailed List</strong> of students.
+              📎 <strong>Full Excel Report Attached:</strong> Please open the attached file (<code>${filename}</code>) for the complete 5-sheet report including:
+              <strong>Meal Summary</strong>, <strong>Availed List</strong>, <strong>Unavailed List</strong>, <strong>Claimed Vouchers</strong>, and <strong>Unclaimed Vouchers</strong>.
             </p>
           </div>
         </div>

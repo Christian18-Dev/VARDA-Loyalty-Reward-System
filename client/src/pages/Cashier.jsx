@@ -63,6 +63,7 @@ export default function CashierPage() {
   const [voucherCounts, setVoucherCounts] = useState({ total: 0, claimed: 0, unclaimed: 0, expired: 0 });
   const [voucherStatusFilter, setVoucherStatusFilter] = useState('all');
   const [voucherBatchFilter, setVoucherBatchFilter] = useState('');
+  const [voucherDateFilter, setVoucherDateFilter] = useState('');
   const [voucherSearchTerm, setVoucherSearchTerm] = useState('');
   const [isLoadingVouchers, setIsLoadingVouchers] = useState(false);
   const [availHistoryPagination, setAvailHistoryPagination] = useState({
@@ -357,6 +358,7 @@ export default function CashierPage() {
       if (voucherStatusFilter && voucherStatusFilter !== 'all') params.append('status', voucherStatusFilter);
       if (voucherBatchFilter) params.append('limaBatch', voucherBatchFilter);
       if (voucherSearchTerm.trim()) params.append('search', voucherSearchTerm.trim());
+      if (voucherDateFilter) params.append('mealDate', voucherDateFilter);
 
       const res = await axios.get(`${baseUrl}/api/cashier/breakfast-vouchers?${params.toString()}`, {
         headers: { Authorization: `Bearer ${token}` }
@@ -381,7 +383,7 @@ export default function CashierPage() {
     return () => {
       if (voucherInterval) clearInterval(voucherInterval);
     };
-  }, [activeTab, token, user.role, voucherStatusFilter, voucherBatchFilter, voucherSearchTerm]);
+  }, [activeTab, token, user.role, voucherStatusFilter, voucherBatchFilter, voucherSearchTerm, voucherDateFilter]);
 
   // Fetch avail history
   const fetchAvailHistory = async () => {
@@ -1757,8 +1759,8 @@ export default function CashierPage() {
             </div>
 
             {/* Filters for Vouchers */}
-            <div className="flex flex-col sm:flex-row items-stretch sm:items-center justify-between gap-3 mb-4">
-              <div className="flex flex-wrap gap-2">
+            <div className="flex flex-col lg:flex-row items-stretch lg:items-center justify-between gap-3 mb-4">
+              <div className="flex flex-wrap items-center gap-2">
                 {[
                   { key: 'all', label: `All (${voucherCounts.total})` },
                   { key: 'claimed', label: `Claimed (${voucherCounts.claimed})` },
@@ -1778,7 +1780,43 @@ export default function CashierPage() {
                 ))}
               </div>
 
-              <div className="flex flex-col sm:flex-row gap-2 sm:items-center">
+              <div className="flex flex-wrap items-center gap-2">
+                {/* Date Filter */}
+                <div className="flex items-center space-x-1.5 bg-gray-50 p-1 rounded-xl border border-gray-300">
+                  <span className="text-xs font-semibold text-gray-600 pl-1.5">Date:</span>
+                  <input
+                    type="date"
+                    value={voucherDateFilter === 'all' ? '' : voucherDateFilter}
+                    onChange={(e) => setVoucherDateFilter(e.target.value)}
+                    className="px-2 py-1 bg-white border border-gray-200 rounded-lg text-xs sm:text-sm focus:ring-2 focus:ring-amber-500 focus:border-transparent"
+                    title="Filter by specific date"
+                  />
+                  <button
+                    type="button"
+                    onClick={() => setVoucherDateFilter('')}
+                    className={`px-2 py-1 rounded-lg text-xs font-semibold transition ${
+                      voucherDateFilter === ''
+                        ? 'bg-amber-600 text-white shadow'
+                        : 'bg-white hover:bg-gray-100 text-gray-700 border border-gray-200'
+                    }`}
+                    title="View today's vouchers"
+                  >
+                    Today
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => setVoucherDateFilter('all')}
+                    className={`px-2 py-1 rounded-lg text-xs font-semibold transition ${
+                      voucherDateFilter === 'all'
+                        ? 'bg-amber-600 text-white shadow'
+                        : 'bg-white hover:bg-gray-100 text-gray-700 border border-gray-200'
+                    }`}
+                    title="View vouchers across all dates"
+                  >
+                    All Dates
+                  </button>
+                </div>
+
                 <select
                   value={voucherBatchFilter}
                   onChange={(e) => setVoucherBatchFilter(e.target.value)}
@@ -1791,7 +1829,7 @@ export default function CashierPage() {
                   <option value="B33">B33</option>
                 </select>
 
-                <div className="relative w-full sm:w-64">
+                <div className="relative w-full sm:w-56">
                   <input
                     type="text"
                     placeholder="Search AccountID, name, code..."
@@ -1811,6 +1849,7 @@ export default function CashierPage() {
               <table className="min-w-full table-auto">
                 <thead>
                   <tr className="bg-gray-50">
+                    <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Date</th>
                     <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">AccountID</th>
                     <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Batch</th>
                     <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Student Name & ID</th>
@@ -1828,6 +1867,9 @@ export default function CashierPage() {
                         v.status === 'claimed' ? 'bg-green-50/50 hover:bg-green-50' : 'hover:bg-gray-50'
                       }`}
                     >
+                      <td className="px-4 py-3 whitespace-nowrap text-xs font-bold text-gray-700">
+                        {v.mealDate || '-'}
+                      </td>
                       <td className="px-4 py-3 whitespace-nowrap text-sm font-bold text-gray-900">
                         {v.accountID || '-'}
                       </td>
