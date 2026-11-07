@@ -1109,10 +1109,10 @@ export default function StudentPage() {
                   </div>
                   <div className="flex-1 min-w-0">
                     <h4 className="text-xs sm:text-sm font-bold text-gray-100">
-                      Claim Only in Dorm 2 (Until 11:00 PM)
+                      Claim Only in Dorm 2 (Until 12:00 PM)
                     </h4>
                     <p className="text-xs text-gray-300 mt-0.5 leading-relaxed">
-                      Late breakfast vouchers can <strong>only be claimed in Dorm 2</strong> until <strong>11:00 PM PH today</strong>. Unclaimed vouchers expire nightly and do not roll over.
+                      Late breakfast vouchers can <strong>only be claimed in Dorm 2</strong> until <strong>12:00 PM (Noon) PH today</strong>. Unclaimed vouchers expire at noon and do not roll over.
                     </p>
                   </div>
                 </div>
@@ -2092,7 +2092,7 @@ export default function StudentPage() {
                       <div className="bg-gray-50 p-2.5 rounded-lg border border-gray-200 col-span-2 sm:col-span-1">
                         <span className="text-gray-500 block text-[11px]">Valid Until</span>
                         <span className="font-bold text-red-600 block">
-                          11:00 PM Today
+                          12:00 PM Today
                         </span>
                       </div>
                     </div>
@@ -2129,7 +2129,7 @@ export default function StudentPage() {
                     ) : todayVoucher.status === 'expired' || (voucherWindowInfo && !voucherWindowInfo.isBeforeVoucherExpiry) ? (
                       <div className="bg-gray-100 border border-gray-300 rounded-xl p-3 text-center">
                         <p className="text-gray-600 font-medium text-xs sm:text-sm">
-                          Expired at 11:00 PM
+                          Expired at 12:00 PM
                         </p>
                       </div>
                     ) : (

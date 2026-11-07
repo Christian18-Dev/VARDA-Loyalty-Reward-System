@@ -697,7 +697,7 @@ export const claimStudentVoucher = async (req, res) => {
         await voucher.save();
       }
       return res.status(400).json({
-        message: 'This Breakfast Voucher expired at 11:00 PM PH time today.'
+        message: 'This Breakfast Voucher expired at 12:00 PM PH time today.'
       });
     }
 

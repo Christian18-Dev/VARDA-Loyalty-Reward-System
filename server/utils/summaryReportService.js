@@ -355,7 +355,7 @@ export const getMealSummaryData = async ({ startDate, endDate, limaBatch } = {})
         mealType: 'Breakfast',
         mealDate: v.mealDate,
         expiresAt: v.expiresAt,
-        status: v.status === 'expired' ? 'Expired (11:00 PM)' : 'Unclaimed'
+        status: v.status === 'expired' ? 'Expired (12:00 PM)' : 'Unclaimed'
       };
     });
 

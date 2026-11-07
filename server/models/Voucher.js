@@ -49,7 +49,7 @@ const voucherSchema = new mongoose.Schema(
     },
     description: {
       type: String,
-      default: 'Breakfast compensation voucher — valid until 11:00 PM PH time today'
+      default: 'Breakfast compensation voucher — valid until 12:00 PM PH time today'
     },
     status: {
       type: String,

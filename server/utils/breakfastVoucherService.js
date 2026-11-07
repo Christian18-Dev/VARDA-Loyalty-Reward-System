@@ -32,8 +32,8 @@ export const getTodayBreakfastVoucherWindow = (referenceDate = new Date()) => {
   const windowEndUTC = new Date(Date.UTC(year, month, day, 21, 0, 0, 0));
   // 10:00 AM PH (Breakfast ends) = same day 02:00 UTC
   const breakfastCutoffUTC = new Date(Date.UTC(year, month, day, 2, 0, 0, 0));
-  // 11:00 PM PH (23:00 PH — Voucher expires) = same day 15:00 UTC
-  const voucherExpiryUTC = new Date(Date.UTC(year, month, day, 15, 0, 0, 0));
+  // 12:00 PM PH (Noon — Voucher expires) = same day 04:00 UTC
+  const voucherExpiryUTC = new Date(Date.UTC(year, month, day, 4, 0, 0, 0));
 
   return {
     now,
@@ -152,7 +152,7 @@ export const syncTodayBreakfastVouchers = async () => {
             mealDate,
             voucherType: 'unclaimed_breakfast',
             title: 'Breakfast',
-            description: 'Valid for 1 breakfast compensation claim until 11:00 PM PH time today',
+            description: 'Valid for 1 breakfast compensation claim until 12:00 PM PH time today',
             status: initialStatus,
             issuedAt: now,
             expiresAt: voucherExpiryUTC,
@@ -179,7 +179,7 @@ let voucherExpireCron = null;
 /**
  * Schedules automated cron jobs for Unclaimed Breakfast Vouchers:
  * - 10:00 AM PH (Asia/Manila): Issue vouchers to students who missed breakfast.
- * - 11:00 PM PH (Asia/Manila): Expire all remaining unclaimed vouchers for the day.
+ * - 12:00 PM PH (Asia/Manila): Expire all remaining unclaimed vouchers for the day.
  */
 export const initBreakfastVoucherCron = () => {
   if (!voucherIssueCron) {
@@ -204,14 +204,14 @@ export const initBreakfastVoucherCron = () => {
 
   if (!voucherExpireCron) {
     voucherExpireCron = cron.schedule(
-      '0 23 * * *',
+      '0 12 * * *',
       async () => {
-        console.log('⏰ [Cron 11:00 PM PH] Expiring unclaimed breakfast vouchers...');
+        console.log('⏰ [Cron 12:00 PM PH] Expiring unclaimed breakfast vouchers...');
         try {
           const res = await syncTodayBreakfastVouchers();
-          console.log(`✅ [Cron 11:00 PM PH] Breakfast voucher expiration check complete for ${res.mealDate}`);
+          console.log(`✅ [Cron 12:00 PM PH] Breakfast voucher expiration check complete for ${res.mealDate}`);
         } catch (err) {
-          console.error('❌ [Cron 11:00 PM PH] Error expiring breakfast vouchers:', err);
+          console.error('❌ [Cron 12:00 PM PH] Error expiring breakfast vouchers:', err);
         }
       },
       {
@@ -222,6 +222,6 @@ export const initBreakfastVoucherCron = () => {
     );
   }
 
-  console.log('🎟️ Scheduled Breakfast Voucher cron jobs at 10:00 AM & 11:00 PM (Asia/Manila)');
+  console.log('🎟️ Scheduled Breakfast Voucher cron jobs at 10:00 AM & 12:00 PM (Asia/Manila)');
 };
 

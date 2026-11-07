@@ -1726,7 +1726,7 @@ export default function CashierPage() {
                 </div>
                 <div>
                   <h2 className="text-xl sm:text-2xl font-bold text-gray-800">
-                    LIMA Vouchers (10:00 AM – 11:00 PM PH)
+                    LIMA Vouchers (10:00 AM – 12:00 PM PH)
                   </h2>
                   <p className="text-gray-600 text-sm mt-0.5">
                     Real-time list of unclaimed and claimed meal vouchers today
