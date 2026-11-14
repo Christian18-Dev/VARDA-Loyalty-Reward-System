@@ -1857,6 +1857,7 @@ export default function CashierPage() {
                     <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Voucher Code</th>
                     <th className="px-4 py-3 text-center text-xs font-medium text-gray-500 uppercase tracking-wider">Status</th>
                     <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Claimed At (PH)</th>
+                    <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Reason</th>
                   </tr>
                 </thead>
                 <tbody className="divide-y divide-gray-200">
@@ -1895,7 +1896,7 @@ export default function CashierPage() {
                           </span>
                         ) : v.status === 'expired' ? (
                           <span className="inline-flex items-center px-3 py-1 rounded-full text-xs font-bold bg-gray-100 text-gray-600 border border-gray-300">
-                            Expired (11 PM)
+                            Expired (12 PM)
                           </span>
                         ) : (
                           <span className="inline-flex items-center px-3 py-1 rounded-full text-xs font-bold bg-amber-100 text-amber-800 border border-amber-300">
@@ -1914,6 +1915,13 @@ export default function CashierPage() {
                               hour12: true
                             })
                           : '-'}
+                      </td>
+                      <td className="px-4 py-3 text-xs text-gray-700 max-w-xs truncate" title={v.claimReason || ''}>
+                        {v.claimReason ? (
+                          <span className="font-medium text-gray-800 italic">&ldquo;{v.claimReason}&rdquo;</span>
+                        ) : (
+                          <span className="text-gray-400">-</span>
+                        )}
                       </td>
                     </tr>
                   ))}

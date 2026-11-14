@@ -68,6 +68,10 @@ const voucherSchema = new mongoose.Schema(
     claimedAt: {
       type: Date,
       default: null
+    },
+    claimReason: {
+      type: String,
+      default: ''
     }
   },
   { timestamps: true }

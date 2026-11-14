@@ -338,9 +338,22 @@ export const getMealSummaryData = async ({ startDate, endDate, limaBatch } = {})
         mealType: 'Breakfast',
         mealDate: v.mealDate,
         claimedAt: v.claimedAt,
+        claimReason: v.claimReason || '-',
         status: 'Claimed'
       };
     });
+
+  const voucherReasonsList = claimedVouchersList.map(v => ({
+    accountID: v.accountID,
+    limaBatch: v.limaBatch,
+    idNumber: v.idNumber,
+    studentName: v.studentName,
+    voucherCode: v.voucherCode,
+    mealType: v.mealType,
+    mealDate: v.mealDate,
+    claimedAt: v.claimedAt,
+    claimReason: v.claimReason || '-'
+  }));
 
   const unclaimedVouchersList = vouchers
     .filter(v => v.status !== 'claimed')
@@ -367,6 +380,7 @@ export const getMealSummaryData = async ({ startDate, endDate, limaBatch } = {})
     voucherBatchBreakdown,
     claimedVouchersList,
     unclaimedVouchersList,
+    voucherReasonsList,
     vouchersList: vouchers,
     availedList,
     unavailedList
@@ -385,6 +399,7 @@ export const buildSummaryExcelWorkbook = (summaryData) => {
     voucherBatchBreakdown,
     claimedVouchersList,
     unclaimedVouchersList,
+    voucherReasonsList,
     availedList,
     unavailedList
   } = summaryData;
@@ -739,6 +754,7 @@ export const buildSummaryExcelWorkbook = (summaryData) => {
     { header: 'Meal Type', key: 'mealType', width: 14 },
     { header: 'Meal Date', key: 'mealDate', width: 14 },
     { header: 'Claimed Date & Time (PH)', key: 'claimedAt', width: 26 },
+    { header: 'Reason for Claim', key: 'claimReason', width: 36 },
     { header: 'Status', key: 'status', width: 14 }
   ];
 
@@ -762,6 +778,7 @@ export const buildSummaryExcelWorkbook = (summaryData) => {
         mealType: item.mealType,
         mealDate: item.mealDate,
         claimedAt: formatManilaDateTime(item.claimedAt),
+        claimReason: item.claimReason || '-',
         status: item.status
       });
       row.height = 20;
@@ -769,7 +786,7 @@ export const buildSummaryExcelWorkbook = (summaryData) => {
       row.eachCell((cell, colNum) => {
         cell.border = borderThin;
         cell.font = { name: 'Calibri', size: 10, color: { argb: '111827' } };
-        cell.alignment = { vertical: 'middle', horizontal: [1, 2, 5, 6, 7, 9].includes(colNum) ? 'center' : 'left' };
+        cell.alignment = { vertical: 'middle', horizontal: [1, 2, 5, 6, 7, 10].includes(colNum) ? 'center' : 'left' };
         cell.fill = { type: 'pattern', pattern: 'solid', fgColor: { argb: isEven ? 'F0FDF4' : 'FFFFFF' } };
       });
     });
@@ -829,6 +846,75 @@ export const buildSummaryExcelWorkbook = (summaryData) => {
     });
   } else {
     const emptyRow = unclaimedVouchersSheet.addRow({ idNumber: 'No unclaimed vouchers found (all claimed or none issued)' });
+    emptyRow.height = 22;
+    emptyRow.getCell(1).font = { name: 'Calibri', italic: true, color: { argb: '6B7280' } };
+  }
+
+  // ==========================================
+  // SHEET 6: VOUCHER REASONS
+  // ==========================================
+  const voucherReasonsSheet = workbook.addWorksheet('Voucher Reasons');
+
+  voucherReasonsSheet.columns = [
+    { header: 'Account ID', key: 'accountID', width: 14 },
+    { header: 'Batch', key: 'limaBatch', width: 12 },
+    { header: 'Student ID Number', key: 'idNumber', width: 20 },
+    { header: 'Student Name', key: 'studentName', width: 30 },
+    { header: 'Voucher Code', key: 'voucherCode', width: 16 },
+    { header: 'Meal Date', key: 'mealDate', width: 14 },
+    { header: 'Claimed Date & Time (PH)', key: 'claimedAt', width: 26 },
+    { header: 'Reason for Claim', key: 'claimReason', width: 45 }
+  ];
+
+  const voucherReasonsHeaderRow = voucherReasonsSheet.getRow(1);
+  voucherReasonsHeaderRow.height = 28;
+  voucherReasonsHeaderRow.eachCell(cell => {
+    cell.font = { name: 'Calibri', bold: true, size: 11, color: { argb: 'FFFFFF' } };
+    cell.fill = { type: 'pattern', pattern: 'solid', fgColor: { argb: '6D28D9' } };
+    cell.alignment = { vertical: 'middle', horizontal: 'center' };
+    cell.border = borderThin;
+  });
+
+  const reasonsData = voucherReasonsList && voucherReasonsList.length > 0
+    ? voucherReasonsList
+    : (claimedVouchersList || []).map(item => ({
+        accountID: item.accountID,
+        limaBatch: item.limaBatch,
+        idNumber: item.idNumber,
+        studentName: item.studentName,
+        voucherCode: item.voucherCode,
+        mealDate: item.mealDate,
+        claimedAt: item.claimedAt,
+        claimReason: item.claimReason || '-'
+      }));
+
+  if (reasonsData && reasonsData.length > 0) {
+    reasonsData.forEach((item, idx) => {
+      const row = voucherReasonsSheet.addRow({
+        accountID: item.accountID,
+        limaBatch: item.limaBatch,
+        idNumber: item.idNumber,
+        studentName: item.studentName,
+        voucherCode: item.voucherCode,
+        mealDate: item.mealDate,
+        claimedAt: formatManilaDateTime(item.claimedAt),
+        claimReason: item.claimReason || '-'
+      });
+      row.height = 22;
+      const isEven = idx % 2 === 0;
+      row.eachCell((cell, colNum) => {
+        cell.border = borderThin;
+        cell.font = { name: 'Calibri', size: 10, color: { argb: '111827' } };
+        cell.alignment = {
+          vertical: 'middle',
+          horizontal: [1, 2, 5, 6, 7].includes(colNum) ? 'center' : 'left',
+          wrapText: colNum === 8
+        };
+        cell.fill = { type: 'pattern', pattern: 'solid', fgColor: { argb: isEven ? 'F5F3FF' : 'FFFFFF' } };
+      });
+    });
+  } else {
+    const emptyRow = voucherReasonsSheet.addRow({ idNumber: 'No voucher claim reasons recorded for this period' });
     emptyRow.height = 22;
     emptyRow.getCell(1).font = { name: 'Calibri', italic: true, color: { argb: '6B7280' } };
   }

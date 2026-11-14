@@ -190,6 +190,9 @@ export default function StudentPage() {
   const [breakfastAvailedToday, setBreakfastAvailedToday] = useState(false);
   const [isLoadingVoucher, setIsLoadingVoucher] = useState(false);
   const [isClaimingVoucher, setIsClaimingVoucher] = useState(false);
+  const [showClaimReasonModal, setShowClaimReasonModal] = useState(false);
+  const [claimReasonText, setClaimReasonText] = useState('');
+  const [claimReasonError, setClaimReasonError] = useState('');
   const [voucherMessage, setVoucherMessage] = useState({ type: '', text: '' });
   const [showVoucherNewsModal, setShowVoucherNewsModal] = useState(false);
   const [allStudentVouchers, setAllStudentVouchers] = useState([]);
@@ -342,27 +345,44 @@ export default function StudentPage() {
     }
   }, [currentPage, fetchStudentVouchers]);
 
+  const handleOpenClaimReasonModal = () => {
+    setClaimReasonText('');
+    setClaimReasonError('');
+    setShowClaimReasonModal(true);
+  };
+
   const handleClaimBreakfastVoucher = async () => {
     if (isClaimingVoucher) return;
+    const trimmedReason = claimReasonText.trim();
+    if (!trimmedReason) {
+      setClaimReasonError('Please enter a valid reason for claiming your breakfast voucher.');
+      return;
+    }
     try {
       setIsClaimingVoucher(true);
+      setClaimReasonError('');
       setVoucherMessage({ type: '', text: '' });
       const response = await axios.post(
         `${baseUrl}/api/student/vouchers/claim`,
-        {},
+        { reason: trimmedReason },
         { headers: { Authorization: `Bearer ${token}` } }
       );
       if (response.data?.success) {
         setTodayVoucher(response.data.voucher);
+        setShowClaimReasonModal(false);
+        setClaimReasonText('');
         setVoucherMessage({
           type: 'success',
           text: response.data.message || 'Breakfast Voucher claimed successfully!'
         });
+        fetchStudentVouchers();
       }
     } catch (err) {
+      const errMsg = err.response?.data?.message || 'Failed to claim Breakfast Voucher.';
+      setClaimReasonError(errMsg);
       setVoucherMessage({
         type: 'error',
-        text: err.response?.data?.message || 'Failed to claim Breakfast Voucher.'
+        text: errMsg
       });
       fetchStudentVouchers();
     } finally {
@@ -1124,10 +1144,10 @@ export default function StudentPage() {
                   </div>
                   <div className="flex-1 min-w-0">
                     <h4 className="text-xs sm:text-sm font-bold text-gray-100">
-                      Tap Claim & Show to Staff
+                      Tap Claim, Enter Reason & Show to Staff
                     </h4>
                     <p className="text-xs text-gray-300 mt-0.5 leading-relaxed">
-                      Go to the <strong>Voucher</strong> tab, tap <strong>Claim Voucher</strong>, and present your voucher Code or Account ID to the Dorm 2 cashier.
+                      Go to the <strong>Voucher</strong> tab, tap <strong>Claim Voucher</strong>, enter your valid reason, and present your voucher Code or Account ID to the Dorm 2 cashier.
                     </p>
                   </div>
                 </div>
@@ -1159,6 +1179,121 @@ export default function StudentPage() {
                 >
                   View Voucher →
                 </motion.button>
+              </div>
+            </motion.div>
+          </motion.div>
+        )}
+        {/* Voucher Claim Reason Modal */}
+        {showClaimReasonModal && (
+          <motion.div
+            className="fixed inset-0 z-[130] flex items-center justify-center bg-black/80 backdrop-blur-sm p-4 overflow-y-auto"
+            initial={{ opacity: 0 }}
+            animate={{ opacity: 1 }}
+            exit={{ opacity: 0 }}
+          >
+            <motion.div
+              className="relative w-full max-w-md bg-[#1e293b] rounded-2xl sm:rounded-3xl shadow-2xl border-2 border-amber-500/80 overflow-hidden text-left my-auto"
+              initial={{ scale: 0.9, opacity: 0, y: 20 }}
+              animate={{ scale: 1, opacity: 1, y: 0 }}
+              exit={{ scale: 0.9, opacity: 0, y: 20 }}
+              transition={{ type: 'spring', damping: 25, stiffness: 300 }}
+            >
+              {/* Header */}
+              <div className="bg-gradient-to-r from-amber-600 via-orange-600 to-amber-700 p-4 sm:p-5 text-white relative">
+                <button
+                  type="button"
+                  onClick={() => {
+                    if (!isClaimingVoucher) {
+                      setShowClaimReasonModal(false);
+                      setClaimReasonError('');
+                    }
+                  }}
+                  className="absolute top-3.5 right-3.5 w-8 h-8 rounded-full bg-black/20 hover:bg-black/40 flex items-center justify-center text-white/90 hover:text-white transition font-bold"
+                  aria-label="Close"
+                >
+                  ✕
+                </button>
+                <div className="inline-flex items-center space-x-1.5 px-2.5 py-0.5 rounded-full bg-white/20 text-white text-[11px] font-extrabold uppercase tracking-wider backdrop-blur-sm mb-1.5">
+                  <span>☕ Late Breakfast Claim</span>
+                </div>
+                <h3 className="text-lg sm:text-xl font-black text-white">
+                  State Your Reason
+                </h3>
+                <p className="text-xs text-orange-100 mt-1">
+                  Valid for 1 breakfast claim in Dorm 2 until 12:00 PM today.
+                </p>
+              </div>
+
+              {/* Form Body */}
+              <div className="p-4 sm:p-5 space-y-3.5">
+                <div className="p-3 rounded-xl bg-amber-950/60 border border-amber-500/50 text-left">
+                  <p className="text-xs text-amber-200/90 leading-relaxed">
+                    <strong className="text-amber-400 font-semibold block mb-0.5">⚠️ Dorm 2 Policy Notice:</strong>
+                    Late breakfast vouchers are for students with valid reasons only (e.g. duty, clinic, late class dismissal). Please state your reason below before proceeding.
+                  </p>
+                </div>
+
+                <div>
+                  <label className="block text-xs font-bold text-gray-200 mb-1.5">
+                    Reason for Missing Regular Breakfast <span className="text-red-400">*</span>
+                  </label>
+                  <textarea
+                    value={claimReasonText}
+                    onChange={(e) => {
+                      setClaimReasonText(e.target.value);
+                      if (claimReasonError) setClaimReasonError('');
+                    }}
+                    placeholder="e.g., Early morning duty / Late dismiss from lecture"
+                    rows={3}
+                    maxLength={300}
+                    disabled={isClaimingVoucher}
+                    className="w-full px-3.5 py-2.5 bg-slate-900 border border-gray-600 rounded-xl text-sm text-gray-100 placeholder-gray-500 focus:outline-none focus:ring-2 focus:ring-amber-500 focus:border-amber-500 transition resize-none"
+                  />
+                  <div className="flex justify-between items-center mt-1">
+                    {claimReasonError ? (
+                      <p className="text-xs text-red-400 font-medium">
+                        ⚠️ {claimReasonError}
+                      </p>
+                    ) : (
+                      <span className="text-[11px] text-gray-400">Please provide a clear and truthful reason.</span>
+                    )}
+                    <span className="text-[11px] text-gray-500">{claimReasonText.length}/300</span>
+                  </div>
+                </div>
+
+                {/* Modal Buttons */}
+                <div className="pt-2 flex items-center justify-end space-x-2.5">
+                  <button
+                    type="button"
+                    onClick={() => {
+                      if (!isClaimingVoucher) {
+                        setShowClaimReasonModal(false);
+                        setClaimReasonError('');
+                      }
+                    }}
+                    disabled={isClaimingVoucher}
+                    className="px-4 py-2 bg-gray-800 hover:bg-gray-700 text-gray-300 text-xs sm:text-sm font-semibold rounded-xl transition"
+                  >
+                    Cancel
+                  </button>
+                  <motion.button
+                    whileHover={{ scale: 1.02 }}
+                    whileTap={{ scale: 0.98 }}
+                    type="button"
+                    onClick={handleClaimBreakfastVoucher}
+                    disabled={isClaimingVoucher || !claimReasonText.trim()}
+                    className="px-5 py-2.5 bg-gradient-to-r from-amber-500 to-orange-600 hover:from-amber-600 hover:to-orange-700 text-white text-xs sm:text-sm font-bold rounded-xl shadow-md transition disabled:opacity-50 flex items-center space-x-1.5"
+                  >
+                    {isClaimingVoucher ? (
+                      <span>Claiming...</span>
+                    ) : (
+                      <>
+                        <span>Claim Voucher</span>
+                        <span>→</span>
+                      </>
+                    )}
+                  </motion.button>
+                </div>
               </div>
             </motion.div>
           </motion.div>
@@ -2125,6 +2260,13 @@ export default function StudentPage() {
                             })}
                           </p>
                         )}
+                        {todayVoucher.claimReason && (
+                          <div className="mt-1.5 pt-1.5 border-t border-green-200">
+                            <p className="text-[11px] text-green-900 bg-green-100/90 border border-green-300 rounded-lg px-2.5 py-1 inline-block">
+                              <span className="font-semibold">Reason:</span> &ldquo;{todayVoucher.claimReason}&rdquo;
+                            </p>
+                          </div>
+                        )}
                       </div>
                     ) : todayVoucher.status === 'expired' || (voucherWindowInfo && !voucherWindowInfo.isBeforeVoucherExpiry) ? (
                       <div className="bg-gray-100 border border-gray-300 rounded-xl p-3 text-center">
@@ -2136,7 +2278,7 @@ export default function StudentPage() {
                       <motion.button
                         whileHover={{ scale: 1.01 }}
                         whileTap={{ scale: 0.98 }}
-                        onClick={handleClaimBreakfastVoucher}
+                        onClick={handleOpenClaimReasonModal}
                         disabled={isClaimingVoucher}
                         className="w-full py-3 bg-gradient-to-r from-amber-500 to-orange-600 hover:from-amber-600 hover:to-orange-700 text-white font-bold rounded-xl shadow text-sm sm:text-base transition-all disabled:opacity-50"
                       >
@@ -2280,6 +2422,11 @@ export default function StudentPage() {
                             })}</>
                           )}
                         </p>
+                        {v.claimReason && (
+                          <p className="text-[11px] text-amber-300/90 italic truncate max-w-xs sm:max-w-md">
+                            Reason: &ldquo;{v.claimReason}&rdquo;
+                          </p>
+                        )}
                       </div>
 
                       <div>

@@ -167,7 +167,68 @@ export const sendDailyMealSummaryEmail = async ({ recipients, summaryData, excel
     throw new Error('No email recipients configured (SUMMARY_EMAIL_RECIPIENTS or EMAIL_USER)');
   }
 
-  const { dateRangeLabel, metrics, batchBreakdown = [] } = summaryData;
+  const {
+    dateRangeLabel,
+    metrics,
+    batchBreakdown = [],
+    voucherReasonsList = [],
+    claimedVouchersList = []
+  } = summaryData;
+
+  const reasonsData = (voucherReasonsList && voucherReasonsList.length > 0)
+    ? voucherReasonsList
+    : (claimedVouchersList || []);
+
+  const formatClaimTime = (date) => {
+    if (!date) return '-';
+    const d = new Date(date);
+    if (isNaN(d.getTime())) return '-';
+    return d.toLocaleString('en-US', {
+      timeZone: 'Asia/Manila',
+      month: 'short',
+      day: '2-digit',
+      hour: '2-digit',
+      minute: '2-digit',
+      hour12: true
+    });
+  };
+
+  const reasonsTableHtml = reasonsData.length > 0
+    ? `
+      <div style="margin-top: 14px;">
+        <h4 style="color: #4338ca; font-size: 13.5px; margin: 0 0 8px 0; font-weight: 700;">
+          📝 Voucher Claim Reasons Log (Dorm 2):
+        </h4>
+        <table style="width: 100%; border-collapse: collapse; font-size: 13px; margin-bottom: 12px;">
+          <thead>
+            <tr style="background-color: #6d28d9; color: #ffffff;">
+              <th style="padding: 8px 10px; text-align: left;">ID Number</th>
+              <th style="padding: 8px 10px; text-align: left;">Name</th>
+              <th style="padding: 8px 10px; text-align: center;">Batch</th>
+              <th style="padding: 8px 10px; text-align: center;">Claimed At (PH)</th>
+              <th style="padding: 8px 10px; text-align: left;">Reason</th>
+            </tr>
+          </thead>
+          <tbody>
+            ${reasonsData.map((item, idx) => `
+              <tr style="background-color: ${idx % 2 === 0 ? '#f5f3ff' : '#ffffff'};">
+                <td style="padding: 8px 10px; border-bottom: 1px solid #e9d5ff; font-weight: 600; color: #1e1b4b;">${item.idNumber}</td>
+                <td style="padding: 8px 10px; border-bottom: 1px solid #e9d5ff; color: #334155;">${item.studentName}</td>
+                <td style="padding: 8px 10px; border-bottom: 1px solid #e9d5ff; text-align: center; color: #4b5563;">${item.limaBatch || '-'}</td>
+                <td style="padding: 8px 10px; border-bottom: 1px solid #e9d5ff; text-align: center; color: #64748b; font-size: 12px;">${formatClaimTime(item.claimedAt)}</td>
+                <td style="padding: 8px 10px; border-bottom: 1px solid #e9d5ff; color: #1e293b; font-style: italic;">&ldquo;${item.claimReason || '-'}&rdquo;</td>
+              </tr>
+            `).join('')}
+          </tbody>
+        </table>
+      </div>
+    `
+    : `
+      <p style="color: #64748b; font-size: 12.5px; font-style: italic; margin: 8px 0 16px 0;">
+        No breakfast voucher claim reasons recorded for this period.
+      </p>
+    `;
+
   const generatedTime = new Date().toLocaleString('en-US', {
     timeZone: 'Asia/Manila',
     year: 'numeric',
@@ -314,10 +375,12 @@ export const sendDailyMealSummaryEmail = async ({ recipients, summaryData, excel
             </tbody>
           </table>
 
+          ${reasonsTableHtml}
+
           <div style="background-color: #eef2ff; border-left: 4px solid #4338ca; padding: 14px 16px; border-radius: 4px; margin-top: 20px;">
             <p style="margin: 0; color: #312e81; font-size: 13.5px;">
-              📎 <strong>Full Excel Report Attached:</strong> Please open the attached file (<code>${filename}</code>) for the complete 5-sheet report including:
-              <strong>Meal Summary</strong>, <strong>Availed List</strong>, <strong>Unavailed List</strong>, <strong>Claimed Vouchers</strong>, and <strong>Unclaimed Vouchers</strong>.
+              📎 <strong>Full Excel Report Attached:</strong> Please open the attached file (<code>${filename}</code>) for the complete 6-sheet report including:
+              <strong>Meal Summary</strong>, <strong>Availed List</strong>, <strong>Unavailed List</strong>, <strong>Claimed Vouchers</strong>, <strong>Unclaimed Vouchers</strong>, and <strong>Voucher Reasons</strong>.
             </p>
           </div>
         </div>

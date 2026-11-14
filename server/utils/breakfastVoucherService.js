@@ -156,7 +156,8 @@ export const syncTodayBreakfastVouchers = async () => {
             status: initialStatus,
             issuedAt: now,
             expiresAt: voucherExpiryUTC,
-            claimedAt: null
+            claimedAt: null,
+            claimReason: ''
           }
         },
         upsert: true

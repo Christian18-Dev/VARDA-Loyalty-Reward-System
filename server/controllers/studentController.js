@@ -663,6 +663,13 @@ export const claimStudentVoucher = async (req, res) => {
       });
     }
 
+    const { reason } = req.body;
+    if (!reason || typeof reason !== 'string' || !reason.trim()) {
+      return res.status(400).json({
+        message: 'Please provide a valid reason for claiming your breakfast voucher.'
+      });
+    }
+
     await syncTodayBreakfastVouchers();
     const windowInfo = getTodayBreakfastVoucherWindow();
 
@@ -703,6 +710,7 @@ export const claimStudentVoucher = async (req, res) => {
 
     voucher.status = 'claimed';
     voucher.claimedAt = new Date();
+    voucher.claimReason = reason.trim();
     await voucher.save();
 
     res.json({
