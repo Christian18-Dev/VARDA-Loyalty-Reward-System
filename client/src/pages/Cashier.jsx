@@ -56,6 +56,7 @@ export default function CashierPage() {
   });
   const [isExportingExcel, setIsExportingExcel] = useState(false);
   const [isExportingBilling, setIsExportingBilling] = useState(false);
+  const [isExportingVouchers, setIsExportingVouchers] = useState(false);
   const [isExportingPDF, setIsExportingPDF] = useState(false);
   const [isExportingSummary, setIsExportingSummary] = useState(false);
   const [isSendingSummaryEmail, setIsSendingSummaryEmail] = useState(false);
@@ -64,6 +65,8 @@ export default function CashierPage() {
   const [voucherStatusFilter, setVoucherStatusFilter] = useState('all');
   const [voucherBatchFilter, setVoucherBatchFilter] = useState('');
   const [voucherDateFilter, setVoucherDateFilter] = useState('');
+  const [voucherStartDate, setVoucherStartDate] = useState('');
+  const [voucherEndDate, setVoucherEndDate] = useState('');
   const [voucherSearchTerm, setVoucherSearchTerm] = useState('');
   const [isLoadingVouchers, setIsLoadingVouchers] = useState(false);
   const [availHistoryPagination, setAvailHistoryPagination] = useState({
@@ -358,7 +361,9 @@ export default function CashierPage() {
       if (voucherStatusFilter && voucherStatusFilter !== 'all') params.append('status', voucherStatusFilter);
       if (voucherBatchFilter) params.append('limaBatch', voucherBatchFilter);
       if (voucherSearchTerm.trim()) params.append('search', voucherSearchTerm.trim());
-      if (voucherDateFilter) params.append('mealDate', voucherDateFilter);
+      if (voucherStartDate) params.append('startDate', voucherStartDate);
+      if (voucherEndDate) params.append('endDate', voucherEndDate);
+      if (!voucherStartDate && !voucherEndDate && voucherDateFilter) params.append('mealDate', voucherDateFilter);
 
       const res = await axios.get(`${baseUrl}/api/cashier/breakfast-vouchers?${params.toString()}`, {
         headers: { Authorization: `Bearer ${token}` }
@@ -383,7 +388,7 @@ export default function CashierPage() {
     return () => {
       if (voucherInterval) clearInterval(voucherInterval);
     };
-  }, [activeTab, token, user.role, voucherStatusFilter, voucherBatchFilter, voucherSearchTerm, voucherDateFilter]);
+  }, [activeTab, token, user.role, voucherStatusFilter, voucherBatchFilter, voucherSearchTerm, voucherDateFilter, voucherStartDate, voucherEndDate]);
 
   // Fetch avail history
   const fetchAvailHistory = async () => {
@@ -627,6 +632,107 @@ export default function CashierPage() {
       headers: { Authorization: `Bearer ${token}` },
     });
     return res.data.data;
+  };
+
+  // Export Lima Vouchers to Excel (same design/columns as Avail History export)
+  const handleExportVouchersExcel = async () => {
+    setIsExportingVouchers(true);
+    try {
+      const params = new URLSearchParams();
+      params.append('status', 'claimed'); // export claimed vouchers only
+      if (voucherBatchFilter) params.append('limaBatch', voucherBatchFilter);
+      if (voucherSearchTerm.trim()) params.append('search', voucherSearchTerm.trim());
+      if (voucherStartDate) params.append('startDate', voucherStartDate);
+      if (voucherEndDate) params.append('endDate', voucherEndDate);
+      if (!voucherStartDate && !voucherEndDate && voucherDateFilter) params.append('mealDate', voucherDateFilter);
+      const res = await axios.get(`${baseUrl}/api/cashier/breakfast-vouchers?${params.toString()}`, {
+        headers: { Authorization: `Bearer ${token}` },
+      });
+      const vouchers = (res.data?.vouchers || []).filter(v => v.status === 'claimed');
+
+      if (vouchers.length === 0) {
+        setError('No data to export');
+        setTimeout(() => setError(''), 3000);
+        return;
+      }
+
+      const workbook = new ExcelJS.Workbook();
+      const worksheet = workbook.addWorksheet('Lima Vouchers');
+      worksheet.columns = [
+        { header: 'AccountID', key: 'accountID', width: 15 },
+        { header: 'Batch', key: 'limaBatch', width: 10 },
+        { header: 'ID Number', key: 'idNumber', width: 20 },
+        { header: 'Meal Type', key: 'mealType', width: 15 },
+        { header: 'Availed By', key: 'availedBy', width: 30 },
+        { header: 'Availed At', key: 'availedAt', width: 25 }
+      ];
+
+      const borderStyle = {
+        top: { style: 'thin', color: { argb: 'bfbfbf' } },
+        left: { style: 'thin', color: { argb: 'bfbfbf' } },
+        bottom: { style: 'thin', color: { argb: 'bfbfbf' } },
+        right: { style: 'thin', color: { argb: 'bfbfbf' } }
+      };
+
+      const headerRow = worksheet.getRow(1);
+      headerRow.height = 25;
+      headerRow.eachCell((cell) => {
+        cell.font = { bold: true, size: 12, color: { argb: '1a1a1a' }, name: 'Helvetica-Bold' };
+        cell.fill = { type: 'pattern', pattern: 'solid', fgColor: { argb: 'f0f0f0' } };
+        cell.alignment = { vertical: 'middle', horizontal: 'center' };
+        cell.border = borderStyle;
+      });
+
+      vouchers.forEach(v => {
+        worksheet.addRow({
+          accountID: v.accountID || '-',
+          limaBatch: v.limaBatch || '-',
+          idNumber: v.idNumber || '-',
+          mealType: 'Breakfast',
+          availedBy: v.studentName || `${v.firstName || ''} ${v.lastName || ''}`.trim() || 'Unknown',
+          availedAt: v.claimedAt ? new Date(v.claimedAt).toLocaleDateString('en-US', { timeZone: 'Asia/Manila' }) : '-'
+        });
+      });
+
+      worksheet.eachRow((row, rowNumber) => {
+        if (rowNumber > 1) {
+          row.eachCell((cell) => {
+            cell.border = borderStyle;
+            cell.alignment = { vertical: 'middle', horizontal: 'left' };
+          });
+        }
+      });
+
+      let datePart = '';
+      if (voucherStartDate && voucherEndDate) {
+        datePart = `_${voucherStartDate}_to_${voucherEndDate}`;
+      } else if (voucherStartDate) {
+        datePart = `_from_${voucherStartDate}`;
+      } else if (voucherEndDate) {
+        datePart = `_until_${voucherEndDate}`;
+      } else if (voucherDateFilter && voucherDateFilter !== 'all') {
+        datePart = `_${voucherDateFilter}`;
+      }
+      const filename = `lima_vouchers${datePart}_${new Date().toISOString().split('T')[0]}.xlsx`;
+
+      const buffer = await workbook.xlsx.writeBuffer();
+      const blob = new Blob([buffer], { type: 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet' });
+      const url = window.URL.createObjectURL(blob);
+      const a = document.createElement('a');
+      a.href = url;
+      a.download = filename;
+      a.click();
+      window.URL.revokeObjectURL(url);
+
+      setSuccess('Excel file exported successfully!');
+      setTimeout(() => setSuccess(''), 3000);
+    } catch (error) {
+      console.error('Error exporting vouchers to Excel:', error);
+      setError('Error exporting to Excel');
+      setTimeout(() => setError(''), 3000);
+    } finally {
+      setIsExportingVouchers(false);
+    }
   };
 
   const handleExportToExcel = async () => {
@@ -1755,6 +1861,13 @@ export default function CashierPage() {
                 >
                   ↻ Refresh
                 </button>
+                <button
+                  onClick={handleExportVouchersExcel}
+                  disabled={isExportingVouchers || isLoadingVouchers || voucherCounts.claimed === 0}
+                  className="px-3 py-1.5 bg-green-50 hover:bg-green-100 text-green-700 border border-green-200 rounded-lg text-xs font-semibold transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
+                >
+                  {isExportingVouchers ? 'Exporting...' : 'Export Excel'}
+                </button>
               </div>
             </div>
 
@@ -1782,20 +1895,42 @@ export default function CashierPage() {
 
               <div className="flex flex-wrap items-center gap-2">
                 {/* Date Filter */}
-                <div className="flex items-center space-x-1.5 bg-gray-50 p-1 rounded-xl border border-gray-300">
-                  <span className="text-xs font-semibold text-gray-600 pl-1.5">Date:</span>
-                  <input
-                    type="date"
-                    value={voucherDateFilter === 'all' ? '' : voucherDateFilter}
-                    onChange={(e) => setVoucherDateFilter(e.target.value)}
-                    className="px-2 py-1 bg-white border border-gray-200 rounded-lg text-xs sm:text-sm focus:ring-2 focus:ring-amber-500 focus:border-transparent"
-                    title="Filter by specific date"
-                  />
+                <div className="flex flex-wrap items-center gap-1.5 bg-gray-50 p-1 rounded-xl border border-gray-300">
+                  <div className="flex items-center space-x-1">
+                    <span className="text-xs font-semibold text-gray-600 pl-1.5">From:</span>
+                    <input
+                      type="date"
+                      value={voucherStartDate}
+                      onChange={(e) => {
+                        setVoucherStartDate(e.target.value);
+                        if (e.target.value) setVoucherDateFilter('');
+                      }}
+                      className="px-2 py-1 bg-white border border-gray-200 rounded-lg text-xs sm:text-sm focus:ring-2 focus:ring-amber-500 focus:border-transparent"
+                      title="Filter start date"
+                    />
+                  </div>
+                  <div className="flex items-center space-x-1">
+                    <span className="text-xs font-semibold text-gray-600">To:</span>
+                    <input
+                      type="date"
+                      value={voucherEndDate}
+                      onChange={(e) => {
+                        setVoucherEndDate(e.target.value);
+                        if (e.target.value) setVoucherDateFilter('');
+                      }}
+                      className="px-2 py-1 bg-white border border-gray-200 rounded-lg text-xs sm:text-sm focus:ring-2 focus:ring-amber-500 focus:border-transparent"
+                      title="Filter end date"
+                    />
+                  </div>
                   <button
                     type="button"
-                    onClick={() => setVoucherDateFilter('')}
+                    onClick={() => {
+                      setVoucherStartDate('');
+                      setVoucherEndDate('');
+                      setVoucherDateFilter('');
+                    }}
                     className={`px-2 py-1 rounded-lg text-xs font-semibold transition ${
-                      voucherDateFilter === ''
+                      voucherDateFilter === '' && !voucherStartDate && !voucherEndDate
                         ? 'bg-amber-600 text-white shadow'
                         : 'bg-white hover:bg-gray-100 text-gray-700 border border-gray-200'
                     }`}
@@ -1805,9 +1940,13 @@ export default function CashierPage() {
                   </button>
                   <button
                     type="button"
-                    onClick={() => setVoucherDateFilter('all')}
+                    onClick={() => {
+                      setVoucherStartDate('');
+                      setVoucherEndDate('');
+                      setVoucherDateFilter('all');
+                    }}
                     className={`px-2 py-1 rounded-lg text-xs font-semibold transition ${
-                      voucherDateFilter === 'all'
+                      voucherDateFilter === 'all' && !voucherStartDate && !voucherEndDate
                         ? 'bg-amber-600 text-white shadow'
                         : 'bg-white hover:bg-gray-100 text-gray-700 border border-gray-200'
                     }`}
@@ -1815,6 +1954,20 @@ export default function CashierPage() {
                   >
                     All Dates
                   </button>
+                  {(voucherStartDate || voucherEndDate) && (
+                    <button
+                      type="button"
+                      onClick={() => {
+                        setVoucherStartDate('');
+                        setVoucherEndDate('');
+                        setVoucherDateFilter('');
+                      }}
+                      className="px-2 py-1 rounded-lg text-xs font-medium text-red-600 hover:bg-red-50 border border-red-200 transition"
+                      title="Clear date range filter"
+                    >
+                      Clear Range
+                    </button>
+                  )}
                 </div>
 
                 <select

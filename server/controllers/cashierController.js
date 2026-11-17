@@ -626,6 +626,10 @@ export const getBreakfastVouchers = async (req, res) => {
 
     if (startDate && endDate) {
       baseQuery.mealDate = { $gte: startDate, $lte: endDate };
+    } else if (startDate) {
+      baseQuery.mealDate = { $gte: startDate };
+    } else if (endDate) {
+      baseQuery.mealDate = { $lte: endDate };
     } else if (mealDate && mealDate !== 'all') {
       baseQuery.mealDate = mealDate;
     } else if (!mealDate && !startDate && !endDate) {
